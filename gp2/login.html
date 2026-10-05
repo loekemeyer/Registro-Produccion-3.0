@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <title>Gestión Productiva — Ingresar</title>
+  <!-- PWA: el SW lo registra pwa.js al final del body. -->
+  <link rel="manifest" href="manifest.json?v=20260930a">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png?v=20260829j">
+  <meta name="theme-color" content="#ffffff">
+  <link rel="icon" type="image/png" href="GP2_favicon.png?v=1.2.0">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      min-height: 100vh; display: flex;
+      align-items: center; justify-content: center; padding: 20px;
+    }
+    .card {
+      background: rgba(255,255,255,0.97);
+      border-radius: 24px;
+      padding: 48px 40px;
+      width: 100%; max-width: 420px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    }
+    .logo { text-align: center; margin-bottom: 32px; }
+    .logo-icon {
+      width: 64px; height: 64px;
+      background: linear-gradient(135deg, #1e293b, #334155);
+      border-radius: 16px;
+      display: inline-flex; align-items: center; justify-content: center;
+      margin-bottom: 16px;
+    }
+    .logo-icon svg { width: 32px; height: 32px; fill: none; stroke: white; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    h1 { font-size: 22px; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; }
+    .subtitle { font-size: 13px; color: #64748b; margin-top: 4px; }
+    .version { text-align: center; font-size: 11px; color: #64748b; margin-bottom: 24px; letter-spacing: 0.5px; font-family: 'Consolas', monospace; }
+    .version b { color: #0f172a; }
+    .btn-google {
+      width: 100%;
+      padding: 16px;
+      background: #fff;
+      color: #1e293b;
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: all .15s;
+    }
+    .btn-google:hover { background: #f8fafc; border-color: #94a3b8; box-shadow: 0 4px 12px rgba(0,0,0,.08); }
+    .btn-google:active { transform: scale(.99); }
+    .btn-google:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-google svg { width: 22px; height: 22px; }
+    .error-msg {
+      display: none; color: #ef4444; font-size: 13px; font-weight: 500;
+      margin-top: 16px; padding: 12px; background: #fef2f2;
+      border: 1px solid #fca5a5; border-radius: 8px; text-align: center;
+    }
+    .error-msg.visible { display: block; }
+    .spinner-wrap { display: none; text-align: center; margin-top: 16px; }
+    .spinner-wrap.visible { display: block; }
+    .spinner {
+      width: 28px; height: 28px;
+      border: 3px solid #e2e8f0; border-top-color: #1e293b;
+      border-radius: 50%; animation: spin .8s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner-text { font-size: 13px; color: #64748b; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      </div>
+      <h1>Gestión Productiva</h1>
+      <div class="subtitle">Ingresá con tu cuenta de Google</div>
+    </div>
+    <div class="version">Versión <b id="appVersion">2.0</b></div>
+    <script src="version.js?v=20261005c"></script>
+
+    <button id="btnGoogle" class="btn-google" onclick="loginGoogle()">
+      <svg viewBox="0 0 48 48">
+        <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.6-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/>
+        <path fill="#FF3D00" d="m6.3 14.7 6.6 4.8c1.8-4.4 6.1-7.5 11.1-7.5 3 0 5.8 1.1 7.9 3l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.4 6.3 14.7z"/>
+        <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2L31 33c-1.9 1.4-4.4 2.3-7 2.3-5.3 0-9.7-3.3-11.3-7.9l-6.5 5C9.5 39.4 16.2 44 24 44z"/>
+        <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.1-4.1 5.5l6.4 5.4c-.5.4 6.4-4.7 6.4-14.4 0-1.3-.1-2.4-.4-3.5z"/>
+      </svg>
+      <span>Continuar con Google</span>
+    </button>
+
+    <div id="spinnerWrap" class="spinner-wrap">
+      <div class="spinner"></div>
+      <div class="spinner-text">Verificando acceso...</div>
+    </div>
+
+    <div id="errorMsg" class="error-msg"></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=20260929a"></script>
+  <script>
+    const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const btnGoogle = document.getElementById("btnGoogle");
+    const errorMsg = document.getElementById("errorMsg");
+    const spinnerWrap = document.getElementById("spinnerWrap");
+
+    function showError(msg){
+      errorMsg.textContent = msg;
+      errorMsg.classList.add("visible");
+      spinnerWrap.classList.remove("visible");
+      btnGoogle.disabled = false;
+    }
+
+    async function loginGoogle(){
+      btnGoogle.disabled = true;
+      errorMsg.classList.remove("visible");
+      spinnerWrap.classList.add("visible");
+      try{
+        // Importante: usar origin+pathname (sin query ni hash) para evitar
+        // doble-encoding del redirect_to en Google.
+        const redirectTo = window.location.origin + window.location.pathname;
+        const { error } = await sb.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo }
+        });
+        if (error) showError("Error al iniciar Google: " + error.message);
+      }catch(e){
+        showError("Error: " + (e.message || e));
+      }
+    }
+
+    // Si el usuario vuelve con Atras desde Google, el browser restaura la pagina
+    // desde bfcache con el boton deshabilitado y el spinner girando: resetear.
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted) {
+        btnGoogle.disabled = false;
+        btnGoogle.style.display = "";
+        spinnerWrap.classList.remove("visible");
+      }
+    });
+
+    let _handled = false;
+    // Si vinimos con ?logout=1 marcamos esto desde el inicio para que ningun
+    // SIGNED_IN/INITIAL_SESSION de supabase-js (leido del localStorage cacheado)
+    // dispare procesarSesion antes de que termine el signOut.
+    const _isLogout = new URL(window.location.href).searchParams.get("logout") === "1";
+    if (_isLogout) _handled = true;
+
+    async function procesarSesion(session, origen){
+      if (_handled) return;
+      if (!session) return;
+      _handled = true;
+
+      spinnerWrap.classList.add("visible");
+      btnGoogle.style.display = "none";
+      errorMsg.classList.remove("visible");
+
+      const email = session.user?.email || "";
+      // Chequear whitelist via RPC (pasamos email explicito desde el JWT verificado de Google)
+      // Auth compartida con el vecino: se llama al puente GP2.get_role_for_email
+      // (SECURITY DEFINER) que delega en public.get_role_for_email para no acoplar
+      // el frontend GP2 al schema public (Auditoria 2026-08-31, Alta 3).
+      const { data: role, error } = await sb.schema('GP2').rpc("get_role_for_email", { p_email: email });
+      if (error) {
+        // Fallo transitorio del RPC (red caida, timeout, 5xx): NO cerrar la sesion
+        // ni acusar "no autorizado" — dejar reintentar.
+        showError("No se pudo verificar el acceso (problema de conexión). Reintentá en unos segundos.");
+        btnGoogle.style.display = "";
+        _handled = false; // permitir otro intento
+        return;
+      }
+      if (!role) {
+        await sb.auth.signOut();
+        sessionStorage.clear();
+        showError("Tu cuenta (" + email + ") no está autorizada para usar esta aplicación. Para solicitar acceso comunicate con loekemeyer.n8n@gmail.com");
+        btnGoogle.style.display = "";
+        _handled = false; // permitir otro intento
+        return;
+      }
+      sessionStorage.setItem("gp_auth", "ok");
+      sessionStorage.setItem("gp_role", role);
+      sessionStorage.setItem("gp_email", email);
+      // Volver a la pantalla que mando al login (?next=, lo pone auth-guard.js). Solo
+      // rutas propias: empieza con "/" y no con "//", sin "://" ni "\\" -> nada de
+      // redirigir a otro sitio. Si la pantalla no es para su rol, el guard la corrige.
+      var next = new URL(window.location.href).searchParams.get("next") || "";
+      var nextOk = /^\/(?!\/)/.test(next) && next.indexOf("://") === -1 && next.indexOf("\\") === -1;
+      window.location.href = nextOk ? next : ((role === "envios") ? "envios-only.html" : "GP2_MODULOS.html");
+    }
+
+    // Escuchar el evento SIGNED_IN — dispara cuando supabase-js termina de procesar
+    // el token de la URL OAuth callback.
+    sb.auth.onAuthStateChange((event, session) => {
+      if (event === "SIGNED_IN" && session) procesarSesion(session, "event");
+    });
+
+    (async function(){
+      const url = new URL(window.location.href);
+      // Si vienen con ?logout=1 → cerrar sesion de Supabase antes de mostrar el boton.
+      if (_isLogout){
+        try { await sb.auth.signOut(); } catch(e){}
+        sessionStorage.clear();
+        // Limpiar keys de Supabase en localStorage tambien
+        try {
+          for (let i = localStorage.length - 1; i >= 0; i--){
+            const k = localStorage.key(i);
+            if (k && (k.indexOf('sb-') === 0 || k.indexOf('supabase') !== -1)) {
+              localStorage.removeItem(k);
+            }
+          }
+        } catch(e){}
+        // Strip query AND hash (replaceState con solo pathname limpia ambos)
+        window.history.replaceState({}, "", url.pathname);
+        // Permitir login posterior
+        _handled = false;
+        return;
+      }
+      // Limpiar hash residual si el browser dejo un fragmento del OAuth previo sin token valido.
+      if (window.location.hash && !window.location.hash.includes("access_token=")) {
+        window.history.replaceState({}, "", url.pathname + (url.search || ""));
+      }
+      // Tambien chequear inmediatamente por si ya hay sesion (auto-login).
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) procesarSesion(session, "initial");
+    })();
+  </script>
+  <script src="pwa.js?v=20260830e"></script>
+</body>
+</html>
