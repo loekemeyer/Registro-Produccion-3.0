@@ -61,6 +61,25 @@ el día 1).
 
 **No se probó:** nada con sesión iniciada (login con Google, entrada por legajo) ni escritura contra Supabase.
 
+## Fuente de verdad
+
+Decidido el 05/10/2026 (Nazareno): **se sigue trabajando desde los tres repos** (Gestión Virgilio, Gestión
+Productiva 2.0 y este). No hay un origen único y **nada los sincroniza**: un cambio hecho en uno no aparece en los
+otros hasta que alguien lo lleve a mano.
+
+Para ver cuánto se separó una carpeta de su origen, correr en el repo de origen con el commit de la tabla de arriba:
+
+```
+git fetch origin main
+git log --oneline e7a7bbd..origin/main -- index.html recepcion.js cervantes selector   # Gestión Virgilio
+git log --oneline 362ae7d..origin/main -- Produccion/RegistroApp login.html            # Gestión Productiva 2.0
+```
+
+Medido a las pocas horas de la copia (05/10/2026): 7 commits nuevos en Gestión Virgilio (v26.92 → v26.97), que en
+lo copiado cambian `index.html` (+52 / −17 líneas), `sw.js` y `version.json`; y 4 en GP2, que en lo copiado sólo
+cambian `login.html` y `version.js` (1 línea cada uno). Ninguno de esos cambios toca flujos de operario: son el
+formato del Excel de OCs, el texto del pop-up de día ocupado y números de versión.
+
 ## Antes de publicar
 
 - Si se sirve por GitHub Pages, el origen es el mismo `loekemeyer.github.io` que Gestión Virgilio y GP2: comparten
@@ -68,4 +87,3 @@ el día 1).
   permitida en Supabase → Auth → URL Configuration, o el login con Google devuelve al sitio viejo.
 - La app de Play Store (TWA) apunta a `loekemeyer.github.io/Produccion-Virgilio/` (el despliegue actual de
   Virgilio), no a este repo: los operarios no cambian de app hasta que se republique.
-- Este repo es una **foto**: Gestión Virgilio y GP2 siguen cambiando todos los días y nada sincroniza ambos lados.

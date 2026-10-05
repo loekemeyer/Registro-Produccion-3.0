@@ -5,6 +5,11 @@ de dónde sale cada carpeta, qué quedó afuera y qué no se probó. Es una copi
 `loekemeyer/Gestion-Virgilio` y `loekemeyer/Gestion-Productiva-2.0`; Supabase es el mismo proyecto
 (`hrxfctzncixxqmpfhskv`).
 
+**Fuente de verdad** `[usuario, 05/10/2026: «Se sigue trabajando desde los tres»]`: Gestión Virgilio, Gestión
+Productiva 2.0 y este repo se siguen modificando a la vez. No hay un origen único y nada los sincroniza, así que un
+archivo que existe en más de un repo puede estar distinto en cada uno. El commit de origen de cada carpeta está en
+`README.md`, junto con los comandos para medir la diferencia.
+
 Reglas que ya estaban dichas por el dueño y valen en TODOS los repos (copiadas acá porque este repo nació sin
 ellas):
 
