@@ -80,10 +80,20 @@ lo copiado cambian `index.html` (+52 / −17 líneas), `sw.js` y `version.json`;
 cambian `login.html` y `version.js` (1 línea cada uno). Ninguno de esos cambios toca flujos de operario: son el
 formato del Excel de OCs, el texto del pop-up de día ocupado y números de versión.
 
-## Antes de publicar
+## Publicación
 
-- Si se sirve por GitHub Pages, el origen es el mismo `loekemeyer.github.io` que Gestión Virgilio y GP2: comparten
-  `localStorage` y la sesión de Supabase. El login de GP2 vuelve a `origin + pathname`: la URL nueva tiene que estar
-  permitida en Supabase → Auth → URL Configuration, o el login con Google devuelve al sitio viejo.
+GitHub Pages está activado desde el 05/10/2026 (rama `main`, carpeta `/ (root)`). Base:
+`https://loekemeyer.github.io/Registro-Produccion-3.0/`
+
+| Entrada | Ruta |
+|---|---|
+| Virgilio (operario) | `/` |
+| Selector de planta | `/selector/` |
+| Cervantes (operario) | `/cervantes/` (sin sesión vuelve a `/`) |
+| GP2 Tablet Operarios | `/gp2/Produccion/RegistroApp/Operarios_GP2.html` |
+
+- El origen es el mismo `loekemeyer.github.io` que Gestión Virgilio y GP2: comparten `localStorage` y la sesión de
+  Supabase. El login de GP2 vuelve a `origin + pathname`: la URL nueva tiene que estar permitida en Supabase →
+  Auth → URL Configuration, o el login con Google devuelve al sitio viejo.
 - La app de Play Store (TWA) apunta a `loekemeyer.github.io/Produccion-Virgilio/` (el despliegue actual de
   Virgilio), no a este repo: los operarios no cambian de app hasta que se republique.
