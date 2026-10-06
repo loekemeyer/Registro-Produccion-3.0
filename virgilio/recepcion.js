@@ -303,7 +303,7 @@ const RCP_CSS = `
   #rcpRoot .fotoOverlayInfo{ flex:0 0 auto; max-width:none; max-height:38vh; }
   #rcpRoot .fotoOverlay img{ max-height:46vh; }
 }
-#rcpRoot .pcFoot{ margin-top:10px; display:flex; align-items:center; justify-content:flex-end; gap:12px; }
+#rcpRoot .pcFoot{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
 #rcpRoot .enviarBtn{ padding:11px 22px; font-size:16px; font-weight:900; border:0; border-radius:11px; background:#111; color:#fff; cursor:pointer; }
 #rcpRoot .enviarBtn:disabled{ opacity:.4; cursor:default; }
 /* v22.48 (Luis, 25/09) — botón «Recibido» en Pendientes + cuadro de quién recibe. */
@@ -365,6 +365,20 @@ const RCP_CSS = `
 #rcpRoot .histRcb{ color:#15803d; font-weight:700; white-space:nowrap; }
 #rcpRoot .histDem{ text-align:right; font-weight:800; color:#b45309; font-variant-numeric:tabular-nums; white-space:nowrap; }
 #rcpRoot .histLoading, #rcpRoot .histEmpty{ padding:26px; text-align:center; color:#64748b; font-weight:700; }
+/* v27.12 (Luis, 06/10) — botón redondo de comentarios por recepción + cuadro con el hilo.
+   Mismo "quién escribe" que Recibido (chips Nora/Pablo/Otro, GV_Recepcion_Receptores). */
+#rcpRoot .pcComentBtn{ width:38px; height:38px; border-radius:50%; border:2px solid #cbd5e1; background:#fff; cursor:pointer; padding:0; display:inline-flex; align-items:center; justify-content:center; position:relative; flex:0 0 auto; font-size:17px; line-height:1; }
+#rcpRoot .pcComentBtn.has{ border-color:#2563eb; background:#eff4ff; }
+#rcpRoot .pcComentBadge{ position:absolute; top:-6px; right:-6px; min-width:18px; height:18px; padding:0 4px; border-radius:999px; background:#2563eb; color:#fff; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
+#rcpRoot .cmtBox{ max-width:440px; max-height:88vh; display:flex; flex-direction:column; }
+#rcpRoot .cmtThread{ margin-top:10px; overflow:auto; display:flex; flex-direction:column; gap:8px; }
+#rcpRoot .cmtItem{ border:1px solid #e5e7eb; border-radius:10px; padding:8px 10px; background:#f8fafc; }
+#rcpRoot .cmtWho{ font-size:12px; font-weight:900; color:#475569; }
+#rcpRoot .cmtWhen{ font-weight:700; color:#94a3b8; }
+#rcpRoot .cmtTxt{ font-size:15px; color:#111; margin-top:3px; white-space:pre-wrap; word-break:break-word; }
+#rcpRoot .cmtEmpty{ font-size:13px; color:#94a3b8; font-weight:700; padding:6px 0; }
+#rcpRoot .cmtSecLbl{ font-size:12px; font-weight:900; color:#64748b; text-transform:uppercase; letter-spacing:.4px; margin-top:12px; }
+#rcpRoot .rcbTxtArea{ width:100%; margin-top:8px; padding:10px; font-size:16px; border:2px solid var(--border); border-radius:10px; box-sizing:border-box; min-height:68px; resize:vertical; font-family:inherit; }
 `;
 
 /* ============== DOM (inyectado dentro de #rcpRoot) ============== */
@@ -3344,6 +3358,7 @@ async function renderPendientes() {
   const list = document.createElement("div"); list.className = "pendCards";
   rows.forEach(function (r) { list.appendChild(pendCard(r)); });
   opBody.appendChild(list);
+  pendComentConteos(rows);   // v27.12: pinta el badge de cuántos comentarios tiene cada uno
   if (_pendTimer) clearInterval(_pendTimer);
   _pendTimer = setInterval(pendTickElapsed, 30000);   // refresca "Demora" en vivo
   // Deep-link desde Planify: resaltar y scrollear al remito específico
@@ -3421,6 +3436,7 @@ function pendCard(r) {
   acts.appendChild(pendFotoRow(id));
   card.appendChild(acts);
   const foot = document.createElement("div"); foot.className = "pcFoot";
+  foot.appendChild(pendComentBtn(id, r));   // v27.17 (Luis): comentarios abajo a la izquierda, al nivel de Enviar
   /* v10.02 — el código lo genera opEnviar() AL CREAR la fila (v8.83), para que el operario
      lo vea y lo escriba en el remito físico. Por eso tener `codigo` NO significa "ya
      procesada": esta lista trae SOLO estado='pendiente'. Antes el `if (r.codigo)` tapaba
@@ -3432,6 +3448,124 @@ function pendCard(r) {
   foot.appendChild(b);
   card.appendChild(foot);
   return card;
+}
+/* ===== v27.12 (Luis, 06/10) — Comentarios por recepción =====
+   Botón redondo con bloc de notas en el pie de cada tarjeta, abajo a la izquierda al
+   nivel de Enviar (v27.17). Abre un hilo (log
+   append-only en GV_Recepcion_Comentarios: anon lee e inserta, nunca edita ni borra) y usa
+   el MISMO "quién escribe" que Recibido (chips de GV_Recepcion_Receptores). No frena nada:
+   no toca el checklist ni el botón Enviar. */
+function pendComentBtn(id, r) {
+  const b = document.createElement("button"); b.type = "button"; b.className = "pcComentBtn";
+  b.title = "Comentarios sobre el estado de esta recepción";
+  const ico = document.createElement("span"); ico.textContent = "📓";
+  const badge = document.createElement("span"); badge.className = "pcComentBadge"; badge.style.display = "none";
+  b.appendChild(ico); b.appendChild(badge);
+  b.onclick = function () { pendComentariosAbrir(id, r, b); };
+  return b;
+}
+function pendComentBadgeSet(btn, n) {
+  if (!btn) return;
+  const badge = btn.querySelector(".pcComentBadge"); if (!badge) return;
+  if (n > 0) { badge.textContent = String(n); badge.style.display = ""; btn.classList.add("has"); }
+  else { badge.textContent = ""; badge.style.display = "none"; btn.classList.remove("has"); }
+}
+async function pendComentConteos(rows) {
+  try {
+    const ids = (rows || []).map(function (r) { return r.id; }).filter(function (x) { return x != null; });
+    if (!ids.length) return;
+    await sessionReady;
+    const res = await supabase.from("GV_Recepcion_Comentarios").select("recepcion_id").in("recepcion_id", ids);
+    if (res.error || !res.data || opState.step !== "pend") return;
+    const cnt = {};
+    res.data.forEach(function (x) { cnt[x.recepcion_id] = (cnt[x.recepcion_id] || 0) + 1; });
+    Object.keys(cnt).forEach(function (rid) {
+      const card = opBody.querySelector('.pendCard[data-id="' + rid + '"]');
+      if (card) pendComentBadgeSet(card.querySelector(".pcComentBtn"), cnt[rid]);
+    });
+  } catch (_e) {}
+}
+function pendComentariosAbrir(id, r, btn) {
+  r = r || {};
+  const root = document.getElementById("rcpRoot") || document.body;
+  const ov = document.createElement("div"); ov.className = "rcbOverlay";
+  const box = document.createElement("div"); box.className = "rcbBox cmtBox";
+  box.innerHTML =
+    '<div class="rcbT">Comentarios</div>' +
+    '<div class="rcbSub">' + escapeHtmlRcp((r.nombre || "") + (r.remito ? " · RTO/FC " + r.remito : "")) + '</div>' +
+    '<div class="cmtThread"><div class="cmtEmpty">Cargando…</div></div>' +
+    '<div class="cmtSecLbl">Nuevo comentario</div>' +
+    '<textarea class="rcbTxtArea" placeholder="¿Qué pasa con esta recepción?"></textarea>' +
+    '<div class="cmtSecLbl">¿Quién lo escribe? <span style="color:#b42318">*</span></div>' +
+    '<div class="rcbOps"></div><input class="rcbOtro" placeholder="¿Quién? (nombre)" style="display:none">' +
+    '<div class="rcbErr"></div>' +
+    '<div class="rcbBtns"><button type="button" class="btnCancel">Cerrar</button><button type="button" class="btnSend">Agregar</button></div>';
+  ov.appendChild(box); root.appendChild(ov);
+  const thread = box.querySelector(".cmtThread"), txt = box.querySelector(".rcbTxtArea"),
+        ops = box.querySelector(".rcbOps"), otro = box.querySelector(".rcbOtro"),
+        err = box.querySelector(".rcbErr"), ok = box.querySelector(".btnSend");
+  let sel = "", count = 0;
+  const quien = function () { return sel === "__otro" ? pendNombreCap(otro.value) : sel; };
+  const refresh = function () {
+    ops.querySelectorAll(".rcbOp").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-v") === sel); });
+    otro.style.display = sel === "__otro" ? "" : "none";
+  };
+  pendReceptoresLista().concat(["__otro"]).forEach(function (n) {
+    const b = document.createElement("button"); b.type = "button"; b.className = "rcbOp";
+    b.setAttribute("data-v", n); b.textContent = n === "__otro" ? "Otro…" : n;
+    b.onclick = function () { sel = (sel === n ? "" : n); err.textContent = ""; refresh(); if (sel === "__otro") otro.focus(); };
+    ops.appendChild(b);
+  });
+  otro.oninput = function () { err.textContent = ""; };
+  const cerrar = function () { if (ov.parentNode) ov.parentNode.removeChild(ov); };
+  box.querySelector(".btnCancel").onclick = cerrar;
+  ov.onclick = function (e) { if (e.target === ov) cerrar(); };
+  const pintarHilo = function (filas) {
+    count = (filas || []).length;
+    thread.innerHTML = "";
+    if (!count) { const e = document.createElement("div"); e.className = "cmtEmpty"; e.textContent = "Todavía no hay comentarios."; thread.appendChild(e); return; }
+    filas.forEach(function (c) {
+      const it = document.createElement("div"); it.className = "cmtItem";
+      const who = document.createElement("div"); who.className = "cmtWho";
+      const ms = c.created_at ? new Date(c.created_at).getTime() : 0;
+      who.textContent = (c.autor || "—");
+      if (ms) { const w = document.createElement("span"); w.className = "cmtWhen"; w.textContent = " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms); who.appendChild(w); }
+      const tx = document.createElement("div"); tx.className = "cmtTxt"; tx.textContent = c.texto || "";
+      it.appendChild(who); it.appendChild(tx); thread.appendChild(it);
+    });
+  };
+  (async function () {
+    try {
+      await sessionReady;
+      const res = await supabase.from("GV_Recepcion_Comentarios").select("autor,texto,created_at")
+        .eq("recepcion_id", id).order("created_at", { ascending: false }).limit(200);
+      if (res.error) throw res.error;
+      pintarHilo(res.data || []);
+      pendComentBadgeSet(btn, count);
+    } catch (e) { thread.innerHTML = '<div class="cmtEmpty" style="color:var(--danger)">No se pudieron leer los comentarios.</div>'; }
+  })();
+  ok.onclick = async function () {
+    const t = String(txt.value || "").trim(), q = quien();
+    if (!t) { err.textContent = "Escribí el comentario."; txt.focus(); return; }
+    if (!q) { err.textContent = "Decinos quién lo escribe (Nora, Pablo u Otro)."; return; }
+    ok.disabled = true; ok.textContent = "Agregando…";
+    try {
+      await sessionReady;
+      const res = await supabase.from("GV_Recepcion_Comentarios").insert({ recepcion_id: id, autor: q, texto: t });
+      if (res.error) throw res.error;
+      if (sel === "__otro") pendReceptorGuardar(q);   // best-effort: deja el nombre como opción
+      // relee el hilo para traer el created_at real de la base
+      const r2 = await supabase.from("GV_Recepcion_Comentarios").select("autor,texto,created_at")
+        .eq("recepcion_id", id).order("created_at", { ascending: false }).limit(200);
+      if (!r2.error) pintarHilo(r2.data || []);
+      pendComentBadgeSet(btn, count);
+      txt.value = ""; sel = ""; otro.value = ""; refresh();
+      ok.disabled = false; ok.textContent = "Agregar"; err.textContent = "";
+    } catch (e) {
+      ok.disabled = false; ok.textContent = "Agregar";
+      err.textContent = "No se pudo guardar: " + ((e && e.message) || e);
+    }
+  };
 }
 /* v22.48/v22.52 (Luis, 25/09) — «Recibido»: un tilde igual al de Carga ISIS. Al tildarlo pide
    quién recibe y guarda QUIÉN y CUÁNDO (se ve en el Histórico). Es un paso más: Enviar lo

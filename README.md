@@ -31,8 +31,10 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 1. **Inicio**: la raíz es la pantalla «¿Dónde vas a trabajar hoy?». Virgilio se movió entero a `virgilio/`. En Virgilio
    ya no hay segundo selector de planta: el operario cae directo en su botonera. «Cambiar planta» vuelve a `/`.
 2. **Virgilio, login sólo con la TV** (`SOLO_TV` en `virgilio/index.html`): código de 4 dígitos de la TV → nombre de
-   una lista, o «＋ No estoy en la lista» + legajo. Sin Google y sin el atajo «Entrar con mi legajo». El legajo sólo se
-   acepta con el código recién validado (10 min). Una sesión de Google guardada se ignora (y no se borra: el origen se
+   una lista. **Desde la v30.07 (Thomas, 06/10) no hay entrada por legajo**: «＋ No estoy en la lista» pide el ALTA con
+   nombre y apellido (`gv_operario_alta_crear`) y no entra; un supervisor la valida con el legajo en Gestión Virgilio
+   (⚙️ → Altas de operarios) y recién ahí el operario aparece en la lista. La entrevista (legajo 600) entra con
+   «Entrevista / prueba», también después del código. Una sesión de Google guardada se ignora (y no se borra: el origen se
    comparte con GP2). Los **supervisores no entran por este Virgilio**: su panel sigue en Gestión Virgilio.
 3. **Cervantes = la tablet de operarios de GP2** (inicio v1.2): la tarjeta «Cervantes» abría `cervantes/` (la visual de
    Registro Producción 2.0); ahora abre `gp2/Produccion/RegistroApp/Operarios_GP2.html`. Sin sesión de Google, el guard
@@ -165,7 +167,7 @@ supervisor). De esos tests se trajeron 8 de operario.
 |---|---|
 | `inicio-selector` | `/` con las 2 tarjetas; Virgilio abre `virgilio/` con su login; **Cervantes abre la tablet de GP2** (y su login vuelve a ella con `?next=`); el botón «Menú» de la tablet vuelve al inicio; `supabase.js` compartido; redirección de `selector/` |
 | `virgilio-solo-operario` | **el recorte**: los archivos de supervisor no están; la página carga sin 404 ni errores; la botonera tiene sus 20 botones y cada uno se toca sin error; las entradas de supervisor no existen y los 5 cascarones y los paneles están vacíos (51 chequeos). Con el código sin recortar falla en 19 |
-| `virgilio-solo-tv` | login de Virgilio sólo con TV (14 chequeos) |
+| `virgilio-solo-tv` | login de Virgilio sólo con TV, sin entrada por legajo y con el pedido de alta (20 chequeos) |
 | `cervantes-red` | login de `cervantes/` por la red (29 chequeos): fuera de la red, en la red, vigencia 17:44/17:50, antes de las 08:30, sin internet, recarga, vuelta de internet, legajo no habilitado |
 | `operario-queda-botonera`, `modulo-minimizar-anular`, `tarea-abierta-otro-dia`, `botonera-tm-historial`, `mg-reentrada`, `toggle-anular`, `rr-sin-remitos-cierra`, `encoding-utf8` | de Gestión Virgilio, con las rutas nuevas. `operario-queda-botonera` sin el segundo selector ni `chooseVirgilio` (lo llamaba el selector de planta); `modulo-minimizar-anular` sin el chequeo del monitor |
 

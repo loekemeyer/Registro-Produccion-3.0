@@ -62,7 +62,7 @@ button {
 .auth-divider::before, .auth-divider::after {
   content: ""; flex: 1; height: 1px; background: #dadce0;
 }
-#legajoLoginInput {
+#legajoLoginInput, #tvAltaNombre {
   width: 100%; font-size: 22px; padding: 12px; text-align: center;
   border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box;
 }
@@ -1343,7 +1343,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.06"></script>
+<script type="module" src="recepcion.js?v=30.07"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -1400,16 +1400,20 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
         <div class="tvclave-lbl">🔑 Código de ingreso (en la TV)</div>
         <input id="tvClaveInput" type="text" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="4 números" onkeydown="if(event.key==='Enter')loginConClaveTv()">
         <button class="primary-btn" onclick="loginConClaveTv()">Entrar</button>
-        <button class="tvnom-mas" style="margin-top:10px" onclick="tvMostrarLegajo()">Entrar con mi legajo</button>
       </div>
       <div id="tvNombreStep" class="hidden">
         <div class="tvclave-lbl">¿Quién sos?</div>
         <div id="tvNombreLista"></div>
-        <button class="tvnom-mas" onclick="tvMostrarLegajo()">＋ No estoy en la lista</button>
+        <button class="tvnom-mas" onclick="tvMostrarAlta()">＋ No estoy en la lista</button>
+        <button class="tvnom-mas" style="margin-top:8px" onclick="tvEntrevista()">Entrevista / prueba</button>
       </div>
+      <!-- v30.07 (Thomas, 06/10): sin entrada por legajo. Quien no está en la lista pide el ALTA con su nombre y un
+           supervisor lo valida en Gestión (⚙️ → Altas de operarios); recién ahí aparece en la lista. -->
       <div id="tvLegajoStep" class="hidden">
-        <input id="legajoLoginInput" type="number" inputmode="numeric" placeholder="Tu número de legajo">
-        <button class="primary-btn" onclick="loginWithLegajo()">Entrar con legajo</button>
+        <div class="tvclave-lbl">Pedí tu alta</div>
+        <input id="tvAltaNombre" type="text" autocomplete="off" placeholder="Nombre y apellido" onkeydown="if(event.key==='Enter')tvPedirAlta()">
+        <button class="primary-btn" onclick="tvPedirAlta()">Pedir alta</button>
+        <div id="tvAltaOk" class="small" style="margin-top:8px"></div>
       </div>
       <div id="legajoLoginError" class="small error"></div>
     </div>
@@ -1586,7 +1590,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 /* v18.67 — el botón «Entrar con legajo» está arriba en el HTML y la función de verdad se define en el último
    <script> (44k líneas después): en un celular lento el tap llega antes y tiraba
    "loginWithLegajo is not defined" (errores_cliente, 15/09). Stub hasta que cargue; la real lo pisa. Problema 312. */
-window.loginWithLegajo = window.loginWithLegajo || function () { try { alert("Un segundo… la app todavía está cargando. Volvé a tocar «Entrar»."); } catch (_e) {} };
+window.loginWithLegajo = window.loginWithLegajo || function () {};   // v30.07: ya no hay entrada por legajo
 /* =========================================================
    SUPABASE
    Org "Gestion Productiva" / Proyecto "Control Partes Talleristas".
@@ -5136,7 +5140,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.06";
+const APP_VERSION = "v30.07";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17485,11 +17489,47 @@ window.loginConClaveTv = async function () {
       lista.appendChild(b);
     });
   }
-  _tvPaso((j.operarios || []).length ? "tvNombreStep" : "tvLegajoStep");
+  _tvPaso("tvNombreStep");   // v30.07: aunque la lista venga vacía, desde ahí se pide el alta
 };
-window.tvMostrarLegajo = function () {
+window.tvMostrarAlta = function () {
+  if (SOLO_TV && !_tvClaveVigente()) { _tvPaso("tvClaveStep"); return; }
+  const ok = $("tvAltaOk"); if (ok) ok.textContent = "";
   _tvPaso("tvLegajoStep");
-  setTimeout(function () { try { $("legajoLoginInput").focus(); } catch (_e) {} }, 40);
+  setTimeout(function () { try { $("tvAltaNombre").focus(); } catch (_e) {} }, 40);
+};
+window.tvMostrarLegajo = window.tvMostrarAlta;   // nombre viejo, por si algo lo llama
+/* v30.07: el alta la valida un supervisor (gv_operario_alta_validar); acá sólo se pide. No entra a la app. */
+window.tvPedirAlta = async function () {
+  const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
+  const ok = $("tvAltaOk"); if (ok) ok.textContent = "";
+  if (SOLO_TV && !_tvClaveVigente()) { if (errEl) errEl.textContent = "Primero ingresá el código de la TV."; _tvPaso("tvClaveStep"); return; }
+  const nombre = String(($("tvAltaNombre") || {}).value || "").replace(/\s+/g, " ").trim();
+  if (nombre.length < 3 || nombre.indexOf(" ") < 0) { if (errEl) errEl.textContent = "Poné tu nombre y apellido."; return; }
+  let j = null, msg = "";
+  try {
+    const r = await fetch(SB_URL + "/rest/v1/rpc/gv_operario_alta_crear", { method: "POST",
+      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ p_nombre: nombre, p_dispositivo: (typeof gvDispositivoId === "function" ? gvDispositivoId() : null) }) });
+    if (r.ok) j = await r.json(); else { try { msg = (await r.json()).message || ""; } catch (_e) {} }
+  } catch (_e) { j = null; }
+  if (!j) { if (errEl) errEl.textContent = msg || "Sin conexión: probá de nuevo."; return; }
+  if (ok) ok.textContent = j.estado === "validado"
+    ? "Ya estás dado de alta: volvé a poner el código de la TV y elegí tu nombre."
+    : "Listo, " + (j.nombre || nombre) + ": tu alta quedó pedida. Avisale al supervisor; cuando te valide vas a aparecer en la lista.";
+  try { $("tvAltaNombre").value = ""; } catch (_e) {}
+};
+/* v30.07: la entrevista (legajo 600, compartido) entra con el código de la TV y el nombre del candidato. */
+window.tvEntrevista = async function () {
+  const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
+  if (SOLO_TV && !_tvClaveVigente()) { _tvPaso("tvClaveStep"); return; }
+  const nombre = await promptNombreEntrevista();
+  if (!nombre) { if (errEl) errEl.textContent = "Poné tu nombre para empezar la prueba."; return; }
+  const emp = { legajo: INTERVIEW_LEGAJO, nombre: nombre };
+  saveLegajoSession(emp, todayKeyBsAs() || "");
+  __identity = { type: "operario", emp: emp, nombre: emp.nombre };
+  __plantChosen = false;
+  window.__gvLoginMetodo = "clave_tv";
+  _routeAfterAuth();
 };
 function tvElegirOperario(o) {
   const errEl = $("legajoLoginError");
@@ -17504,42 +17544,8 @@ function tvElegirOperario(o) {
 }
 window.tvElegirOperario = tvElegirOperario;
 
-window.loginWithLegajo = async function () {
-  const input = $("legajoLoginInput");
-  const errEl = $("legajoLoginError");
-  if (errEl) errEl.textContent = "";
-  if (SOLO_TV && !_tvClaveVigente()) {   // v30.02: el legajo se tipea sólo con el código de la TV recién validado
-    if (errEl) errEl.textContent = "Primero ingresá el código de la TV.";
-    _tvPaso("tvClaveStep");
-    return;
-  }
-  // v23.83 (Luis): "que puedan loguearse con pin o con legajo. No los limitemos" → el legajo entra sin clave.
-  const raw = input ? String(input.value || "").trim() : "";
-  if (!raw) {
-    if (errEl) errEl.textContent = "Ingresá tu número de legajo";
-    return;
-  }
-  // v14.62 — Legajo 600 = ENTREVISTA / PRUEBA. No está en Empleados a propósito: es
-  // compartido. Cada candidato pone su NOMBRE y hace la prueba real (descuenta stock);
-  // cada evento queda sellado con ese nombre (gv_nombre_prueba).
-  let emp;
-  if (esLegajoEntrevista(raw)) {
-    const nombre = await promptNombreEntrevista();
-    if (!nombre) { if (errEl) errEl.textContent = "Poné tu nombre para empezar la prueba."; return; }
-    emp = { legajo: INTERVIEW_LEGAJO, nombre: nombre };
-  } else {
-    emp = await resolveEmpleadoByLegajo(raw);
-    if (!emp) {
-      if (errEl) errEl.textContent = "No encontramos ese legajo en Empleados. Avisá al supervisor.";
-      return;
-    }
-  }
-  saveLegajoSession(emp, todayKeyBsAs() || "");
-  __identity = { type: "operario", emp: emp, nombre: emp.nombre || ("Legajo " + emp.legajo) };
-  __plantChosen = false;
-  window.__gvLoginMetodo = "legajo";
-  _routeAfterAuth();
-};
+/* v30.07 (Thomas, 06/10): «sacá todo el módulo de registro con legajo». No hay entrada tipeando el legajo. */
+window.loginWithLegajo = function () { window.tvMostrarAlta(); };
 
 /* v5.21: por EVENTO. TOKEN_REFRESHED llega cada ~1h y antes re-corría TODO el
    applyAuthState (re-ruteo incluido); ahora solo chequea la ventana de 20h.

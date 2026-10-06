@@ -3,10 +3,11 @@
 
    1) la pantalla no muestra Google ni «Entrar con mi legajo»; sí el código de la TV y el aviso correcto
    2) signInWithGoogle() no sale a Google aunque se llame a mano
-   3) loginWithLegajo() sin el código de la TV no entra (ni deja sesión) y manda a ingresarlo
+   3) no hay entrada por legajo (v30.07): ni campo de legajo, y loginWithLegajo() no entra ni deja sesión
    4) código incorrecto → «Clave incorrecta», no entra
    5) código correcto → lista de nombres → al elegir el suyo cae en la botonera y queda la sesión del día
-   6) código correcto → «＋ No estoy en la lista» → tipea el legajo → entra (el legajo sólo con el código vigente)
+   6) código correcto → «＋ No estoy en la lista» → pide el ALTA con su nombre (gv_operario_alta_crear) y NO entra;
+      está el botón «Entrevista / prueba»
    7) una sesión de Google vieja en localStorage (el origen se comparte con GP2) ni cuenta ni se borra
    Sale 1 si falla. */
 let chromium;
@@ -31,7 +32,7 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
   async function pagina(extraInit) {
     const ctx = await b.newContext({ serviceWorkers: "block" });
     ctx.setDefaultTimeout(8000);
-    const est = { google: 0, validar: 0 };
+    const est = { google: 0, validar: 0, alta: null };
     if (extraInit) await ctx.addInitScript(extraInit);
     await ctx.route("**/*.supabase.co/**", async (route) => {
       const req = route.request(); const url = req.url();
@@ -42,6 +43,10 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
         est.validar++;
         let clave = ""; try { clave = String(JSON.parse(req.postData() || "{}").p_clave || ""); } catch {}
         return json(clave === "1234" ? { ok: true, operarios: [{ legajo: "999", nombre: "Prueba TV" }] } : { ok: false });
+      }
+      if (url.includes("/rpc/gv_operario_alta_crear")) {
+        try { est.alta = JSON.parse(req.postData() || "{}"); } catch {}
+        return json({ id: 7, nombre: (est.alta && est.alta.p_nombre) || "", estado: "pendiente" });
       }
       if (url.includes("/rest/v1/Empleados")) return json([{ Legajo: "999", Empleado: "Prueba TV" }]);
       return route.abort();
@@ -81,9 +86,9 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     chequeo("2 signInWithGoogle() no sale a Google", p.url() === urlAntes && /código de la TV/.test(await p.textContent("#authStatus")));
 
     // ---- 3) legajo sin el código ----
-    await p.evaluate(async () => { document.getElementById("legajoLoginInput").value = "999"; await loginWithLegajo(); });
-    chequeo("3 loginWithLegajo() sin código no deja sesión", (await leer(p, "vir_legajo_auth")) === null);
-    chequeo("3 y manda a ingresar el código", /Primero ingresá el código de la TV/.test(await p.textContent("#legajoLoginError")) && (await visible(p, "#tvClaveStep")));
+    chequeo("3 no existe el campo de legajo", (await p.locator("#legajoLoginInput").count()) === 0);
+    await p.evaluate(async () => { await loginWithLegajo(); });
+    chequeo("3 loginWithLegajo() no deja sesión y vuelve al código", (await leer(p, "vir_legajo_auth")) === null && (await visible(p, "#tvClaveStep")));
 
     // ---- 4) código incorrecto ----
     await p.fill("#tvClaveInput", "0000");
@@ -102,17 +107,19 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     chequeo("5 al elegir su nombre cae en la botonera con la sesión del día", ses && ses.legajo === "999" && !(await visible(p, "#plantSelector")));
     await ctx.close(); }
 
-  // ---- 6) código correcto → legajo ----
-  { const { ctx, p } = await pagina();
+  // ---- 6) código correcto → pedir alta (sin entrar) ----
+  { const { ctx, p, est } = await pagina();
     await p.fill("#tvClaveInput", "1234");
     await p.click("#tvClaveStep .primary-btn");
     await p.waitForSelector("#tvNombreStep:not(.hidden)");
-    await p.click("#tvNombreStep .tvnom-mas");
+    chequeo("6 está el botón «Entrevista / prueba»", await p.locator("#tvNombreStep .tvnom-mas", { hasText: "Entrevista" }).isVisible());
+    await p.click("#tvNombreStep .tvnom-mas >> nth=0");
     await p.waitForSelector("#tvLegajoStep:not(.hidden)");
-    await p.fill("#legajoLoginInput", "999");
+    await p.fill("#tvAltaNombre", "Juan Perez");
     await p.click("#tvLegajoStep .primary-btn");
-    await p.waitForSelector("#optionsScreen:not(.hidden)");
-    chequeo("6 «＋ No estoy en la lista» + legajo entra (con el código vigente)", !!(await leer(p, "vir_legajo_auth")));
+    await p.waitForFunction(() => /alta quedó pedida/.test(document.getElementById("tvAltaOk").textContent));
+    chequeo("6 pide el alta con el nombre", est.alta && est.alta.p_nombre === "Juan Perez");
+    chequeo("6 y NO entra ni deja sesión", (await leer(p, "vir_legajo_auth")) === null && !(await visible(p, "#optionsScreen")));
     await ctx.close(); }
 
   // ---- 7) sesión de Google vieja ----
