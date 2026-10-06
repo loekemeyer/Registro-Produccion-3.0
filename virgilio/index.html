@@ -1405,14 +1405,13 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
         <div class="tvclave-lbl">¿Quién sos?</div>
         <div id="tvNombreLista"></div>
         <button class="tvnom-mas" onclick="tvMostrarAlta()">＋ No estoy en la lista</button>
-        <button class="tvnom-mas" style="margin-top:8px" onclick="tvEntrevista()">Entrevista / prueba</button>
       </div>
-      <!-- v30.07 (Thomas, 06/10): sin entrada por legajo. Quien no está en la lista pide el ALTA con su nombre y un
-           supervisor lo valida en Gestión (⚙️ → Altas de operarios); recién ahí aparece en la lista. -->
+      <!-- v30.08 (Thomas, 06/10): sin entrada por legajo. Quien no está en la lista tipea su nombre y ENTRA YA con el
+           legajo 600 (regla v27.37 de Gestión); queda en GV_Operario_Alta y un admin lo valida en Gestión → ⚙️ Validar Operarios. -->
       <div id="tvLegajoStep" class="hidden">
-        <div class="tvclave-lbl">Pedí tu alta</div>
+        <div class="tvclave-lbl">Tu nombre y apellido</div>
         <input id="tvAltaNombre" type="text" autocomplete="off" placeholder="Nombre y apellido" onkeydown="if(event.key==='Enter')tvPedirAlta()">
-        <button class="primary-btn" onclick="tvPedirAlta()">Pedir alta</button>
+        <button class="primary-btn" onclick="tvPedirAlta()">Entrar con mi nombre</button>
         <div id="tvAltaOk" class="small" style="margin-top:8px"></div>
       </div>
       <div id="legajoLoginError" class="small error"></div>
@@ -5140,7 +5139,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.07";
+const APP_VERSION = "v30.08";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17498,25 +17497,25 @@ window.tvMostrarAlta = function () {
   setTimeout(function () { try { $("tvAltaNombre").focus(); } catch (_e) {} }, 40);
 };
 window.tvMostrarLegajo = window.tvMostrarAlta;   // nombre viejo, por si algo lo llama
-/* v30.07: el alta la valida un supervisor (gv_operario_alta_validar); acá sólo se pide. No entra a la app. */
+/* v30.08 (≡ Gestión loginConNombre, v27.37): registra el alta para que un admin la valide y ENTRA YA con el
+   legajo compartido 600 (nombre sellado en cada evento). */
 window.tvPedirAlta = async function () {
   const errEl = $("legajoLoginError"); if (errEl) errEl.textContent = "";
   const ok = $("tvAltaOk"); if (ok) ok.textContent = "";
   if (SOLO_TV && !_tvClaveVigente()) { if (errEl) errEl.textContent = "Primero ingresá el código de la TV."; _tvPaso("tvClaveStep"); return; }
   const nombre = String(($("tvAltaNombre") || {}).value || "").replace(/\s+/g, " ").trim();
-  if (nombre.length < 3 || nombre.indexOf(" ") < 0) { if (errEl) errEl.textContent = "Poné tu nombre y apellido."; return; }
-  let j = null, msg = "";
+  if (nombre.length < 3) { if (errEl) errEl.textContent = "Poné tu nombre y apellido."; return; }
   try {
-    const r = await fetch(SB_URL + "/rest/v1/rpc/gv_operario_alta_crear", { method: "POST",
+    fetch(SB_URL + "/rest/v1/rpc/gv_operario_alta_crear", { method: "POST",
       headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
       body: JSON.stringify({ p_nombre: nombre, p_dispositivo: (typeof gvDispositivoId === "function" ? gvDispositivoId() : null) }) });
-    if (r.ok) j = await r.json(); else { try { msg = (await r.json()).message || ""; } catch (_e) {} }
-  } catch (_e) { j = null; }
-  if (!j) { if (errEl) errEl.textContent = msg || "Sin conexión: probá de nuevo."; return; }
-  if (ok) ok.textContent = j.estado === "validado"
-    ? "Ya estás dado de alta: volvé a poner el código de la TV y elegí tu nombre."
-    : "Listo, " + (j.nombre || nombre) + ": tu alta quedó pedida. Avisale al supervisor; cuando te valide vas a aparecer en la lista.";
-  try { $("tvAltaNombre").value = ""; } catch (_e) {}
+  } catch (_e) {}
+  const emp = { legajo: INTERVIEW_LEGAJO, nombre: nombre };
+  saveLegajoSession(emp, todayKeyBsAs() || "");
+  __identity = { type: "operario", emp: emp, nombre: nombre };
+  __plantChosen = false;
+  window.__gvLoginMetodo = "nombre";
+  _routeAfterAuth();
 };
 /* v30.07: la entrevista (legajo 600, compartido) entra con el código de la TV y el nombre del candidato. */
 window.tvEntrevista = async function () {

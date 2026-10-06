@@ -107,19 +107,19 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     chequeo("5 al elegir su nombre cae en la botonera con la sesión del día", ses && ses.legajo === "999" && !(await visible(p, "#plantSelector")));
     await ctx.close(); }
 
-  // ---- 6) código correcto → pedir alta (sin entrar) ----
+  // ---- 6) código correcto → «No estoy en la lista» → nombre: pide el alta y ENTRA con el 600 (v30.08 ≡ Gestión v27.37) ----
   { const { ctx, p, est } = await pagina();
     await p.fill("#tvClaveInput", "1234");
     await p.click("#tvClaveStep .primary-btn");
     await p.waitForSelector("#tvNombreStep:not(.hidden)");
-    chequeo("6 está el botón «Entrevista / prueba»", await p.locator("#tvNombreStep .tvnom-mas", { hasText: "Entrevista" }).isVisible());
     await p.click("#tvNombreStep .tvnom-mas >> nth=0");
     await p.waitForSelector("#tvLegajoStep:not(.hidden)");
     await p.fill("#tvAltaNombre", "Juan Perez");
     await p.click("#tvLegajoStep .primary-btn");
-    await p.waitForFunction(() => /alta quedó pedida/.test(document.getElementById("tvAltaOk").textContent));
+    await p.waitForSelector("#optionsScreen:not(.hidden)");
+    const ses6 = JSON.parse((await leer(p, "vir_legajo_auth")) || "null");
     chequeo("6 pide el alta con el nombre", est.alta && est.alta.p_nombre === "Juan Perez");
-    chequeo("6 y NO entra ni deja sesión", (await leer(p, "vir_legajo_auth")) === null && !(await visible(p, "#optionsScreen")));
+    chequeo("6 y entra con el legajo 600 y su nombre", ses6 && ses6.legajo === "600" && ses6.nombre === "Juan Perez");
     await ctx.close(); }
 
   // ---- 7) sesión de Google vieja ----
