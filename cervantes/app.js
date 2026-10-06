@@ -288,7 +288,8 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   /* ================= VERSION (unica fuente de verdad) ================= */
-  const LOCAL_VERSION = "v1.9.3";
+  // Serie v3.0.N = Registro Producción 3.0 (no pisa las v1.9.x de la copia de Gestión Virgilio).
+  const LOCAL_VERSION = "v3.0.1";
 
   /* ================= KEYS STORAGE ================= */
   const APP_TAG = "_Cervantes";
@@ -392,6 +393,150 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   localStorage.setItem(DAY_GUARD_KEY, today);
 
+  /* ================= PASE DE RED (login por la red de la empresa) =================
+     v3.0.1 — Registro Producción 3.0. Cervantes ya no usa la sesión de Virgilio: el login es la RED.
+     En el primer mensaje del día el legajo tiene que estar conectado al Wi-Fi de la empresa: se llama a la
+     Edge Function `login-operario`, que compara la IP real del pedido con public.red_empresa y deja el
+     intento en public.seg_login_operario_log (hora del servidor, IP, legajo, ok / motivo).
+       · 200  → queda un "pase" del legajo, válido hasta las 17:45 (hora de Buenos Aires): aunque se corte
+                la luz o internet, sigue andando.
+       · 403  → fuera de la red (o legajo no habilitado): no se envía nada.
+       · sin internet / función caída → el mensaje queda en la cola RETENIDO (no pasa al IDB, así que el
+                service worker no lo manda) hasta que el legajo consiga el pase; al volver la red se vuelve
+                a preguntar.
+     La base todavía acepta la clave pública (las políticas se cierran en otra etapa): el JWT que devuelve
+     login-operario NO se guarda ni se manda. El pase es sólo local; la prueba es la fila ok del log. */
+  const LOGIN_OPERARIO_URL = SUPABASE_URL + "/functions/v1/login-operario";
+  const LS_PASE_PREFIX = `prod_pase${APP_TAG}`;    // + "::" + legajo
+  const PASE_FIN_MIN = 17 * 60 + 45;               // el pase vale hasta las 17:45
+  const PASE_TIMEOUT_MS = 12000;
+  const PASE_REINTENTO_MS = 20000;
+  const _paseEnCurso = new Map();                  // legajo -> promesa (evita llamadas dobles)
+  const _paseRechazo = new Map();                  // legajo -> "fuera" | "legajo" (último intento rechazado)
+  let _paseUltimoIntento = 0;
+
+  function leerPase(legajo) {
+    try { return JSON.parse(localStorage.getItem(LS_PASE_PREFIX + "::" + String(legajo).trim()) || "null"); }
+    catch { return null; }
+  }
+  function guardarPase(legajo, datos) {
+    try {
+      localStorage.setItem(LS_PASE_PREFIX + "::" + String(legajo).trim(), JSON.stringify({
+        legajo: String(legajo).trim(), nombre: (datos && datos.nombre) || "", sede: (datos && datos.sede) || "",
+        day: dayKeyAR(), at: isoNow()
+      }));
+    } catch { /* storage lleno o bloqueado: sin pase, se vuelve a preguntar */ }
+  }
+  // ¿Hay pase de HOY y todavía no son las 17:45?
+  function paseVigente(legajo) {
+    const p = leerPase(legajo);
+    return !!(p && p.day === dayKeyAR() && nowMinutesAR() < PASE_FIN_MIN);
+  }
+  // ¿Hay un pase de ese día o posterior? (libera lo que quedó retenido ese día)
+  function paseDesde(legajo, day) {
+    const p = leerPase(legajo);
+    return !!(p && p.day && p.day >= day);
+  }
+  // Un ítem queda RETENIDO si se encoló sin pase de hoy (__retDia). Mientras el marcador esté puesto no
+  // se copia al IDB, no lo toma el service worker y reconcileQueueWithIDB() no lo da por enviado.
+  function estaRetenido(item) {
+    return !!(item && item.__retDia && !paseDesde(String(item.legajo || "").trim(), item.__retDia));
+  }
+
+  // Pregunta a login-operario si este equipo está en la red de la empresa.
+  // -> { estado: "ok" | "fuera" | "legajo" | "sin_red", sede, nombre }
+  async function consultarRed(legajo) {
+    if (navigator.onLine === false) return { estado: "sin_red" };
+    const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctl ? setTimeout(() => ctl.abort(), PASE_TIMEOUT_MS) : null;
+    try {
+      const r = await fetch(LOGIN_OPERARIO_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY },
+        body: JSON.stringify({ legajo: String(legajo).trim(), app: "cervantes" }),
+        signal: ctl ? ctl.signal : undefined
+      });
+      let j = null;
+      try { j = await r.json(); } catch { /* sin cuerpo */ }
+      if (r.ok) return { estado: "ok", sede: (j && j.sede) || "", nombre: (j && j.nombre) || "" };
+      if (r.status === 403) return { estado: /legajo/i.test(String((j && j.error) || "")) ? "legajo" : "fuera" };
+      return { estado: "sin_red" };   // 5xx u otro: la función no pudo verificar; no es culpa del operario
+    } catch {
+      return { estado: "sin_red" };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  function validarRed(legajo) {
+    const leg = String(legajo).trim();
+    if (_paseEnCurso.has(leg)) return _paseEnCurso.get(leg);
+    const p = (async () => {
+      const r = await consultarRed(leg);
+      _paseUltimoIntento = Date.now();
+      if (r.estado === "ok") { guardarPase(leg, r); _paseRechazo.delete(leg); }
+      else if (r.estado === "fuera" || r.estado === "legajo") _paseRechazo.set(leg, r.estado);
+      return r;
+    })().finally(() => { _paseEnCurso.delete(leg); });
+    _paseEnCurso.set(leg, p);
+    return p;
+  }
+
+  // Con el pase conseguido, lo retenido de ese legajo pasa a la cola normal (IDB + background sync).
+  function liberarRetenidos(legajo) {
+    const leg = String(legajo).trim();
+    const q = readQueue();
+    let n = 0;
+    for (const item of q) {
+      if (item.__retDia && String(item.legajo || "").trim() === leg && !estaRetenido(item)) {
+        delete item.__retDia;
+        idbPut(item).catch(() => {});
+        n++;
+      }
+    }
+    if (n) { writeQueue(q); registerBackgroundSync(); updateSyncBadge(); }
+  }
+
+  // Asegura el pase del legajo antes de aceptar su mensaje.
+  // -> { ok: true, pendiente: false } | { ok: true, pendiente: true } (sin internet: queda en cola)
+  //    | { ok: false, mensaje } (fuera de la red: no se envía)
+  async function asegurarPaseRed(legajo) {
+    const leg = String(legajo || "").trim();
+    if (paseVigente(leg)) return { ok: true, pendiente: false };
+    const r = await validarRed(leg);
+    if (r.estado === "ok") { liberarRetenidos(leg); return { ok: true, pendiente: false }; }
+    if (r.estado === "sin_red") return { ok: true, pendiente: true };
+    if (r.estado === "legajo") return { ok: false, mensaje: "El legajo " + leg + " no está habilitado para iniciar la jornada. Avisá al supervisor." };
+    return { ok: false, mensaje: "Para iniciar la jornada tenés que estar conectado al Wi-Fi de la empresa." };
+  }
+
+  // Al volver internet (o cada tanto) los legajos con mensajes retenidos vuelven a preguntar por la red.
+  async function reintentarPasesRetenidos() {
+    if (navigator.onLine === false) return;
+    if (Date.now() - _paseUltimoIntento < PASE_REINTENTO_MS) return;
+    const legajos = [...new Set(readQueue().filter(estaRetenido).map(x => String(x.legajo || "").trim()).filter(Boolean))];
+    for (const leg of legajos) {
+      const r = await validarRed(leg);
+      if (r.estado === "ok") liberarRetenidos(leg);
+    }
+  }
+
+  // Aviso fijo arriba mientras haya mensajes esperando la red de la empresa.
+  function actualizarAvisoRed(retenidos) {
+    let el = document.getElementById("redAviso");
+    if (!retenidos) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "redAviso";
+      el.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:200;padding:8px 12px;font-size:14px;font-weight:700;text-align:center;background:#fef3c7;color:#92400e;border-bottom:2px solid #f59e0b;";
+      document.body.appendChild(el);
+    }
+    const fuera = [...new Set(readQueue().filter(estaRetenido).map(x => String(x.legajo || "").trim()))].some(l => _paseRechazo.has(l));
+    el.textContent = fuera
+      ? `📶 Estás fuera de la red de la empresa: ${retenidos} mensaje(s) esperan. Conectate al Wi-Fi para enviarlos.`
+      : `📶 ${retenidos} mensaje(s) esperan: se envían cuando se valide la red de la empresa.`;
+  }
+
   /* ================= COLA ================= */
   function readQueue() {
     try { return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]"); }
@@ -463,7 +608,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const stillQueued = [];
     let recovered = 0;
     for (const item of lsQueue) {
-      if (idbIds.has(item.id)) {
+      // v3.0.1: lo retenido a la espera de la red de la empresa nunca estuvo en el IDB: no se da por enviado.
+      if (item.__retDia || idbIds.has(item.id)) {
         stillQueued.push(item);
       } else {
         if (item.legajo && item.id) {
@@ -482,6 +628,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const q = readQueue();
     if (!q.length) return;
     for (const item of q) {
+      if (item.__retDia) continue;   // v3.0.1: retenido hasta validar la red: el service worker no lo ve
       try { await idbPut(item); } catch { /* ignore */ }
     }
   }
@@ -501,7 +648,14 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!badge) return;
     const q = readQueue();
     const failed = q.filter(x => (x.__tries || 0) > 0).length;
-    if (q.length === 0) {
+    const retenidos = q.filter(estaRetenido).length;   // v3.0.1: esperando la red de la empresa
+    actualizarAvisoRed(retenidos);
+    if (retenidos > 0) {
+      badge.textContent = `${LOCAL_VERSION} 📶 ${retenidos}`;
+      badge.style.background = "#fef3c7";
+      badge.style.color = "#92400e";
+      badge.style.borderColor = "#f59e0b";
+    } else if (q.length === 0) {
       badge.textContent = `${LOCAL_VERSION} ✓`;
       badge.style.background = "#f0fdf4";
       badge.style.color = "#166534";
@@ -521,11 +675,16 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function enqueue(payload) {
     const item = { ...payload, __tries: 0, __queuedAt: isoNow() };
+    // v3.0.1: sin pase de red de hoy el ítem queda RETENIDO (ver PASE DE RED): no va al IDB ni al service worker.
+    const legItem = String(payload.legajo || "").trim();
+    if (legItem && !paseDesde(legItem, dayKeyAR())) item.__retDia = dayKeyAR();
     const q = readQueue();
     q.push(item);
     writeQueue(q);
-    idbPut(item).catch(() => {});
-    registerBackgroundSync();
+    if (!item.__retDia) {
+      idbPut(item).catch(() => {});
+      registerBackgroundSync();
+    }
 
     const leg = String(payload.legajo || "").trim();
     if (leg) {
@@ -890,10 +1049,11 @@ document.addEventListener("DOMContentLoaded", () => {
     isFlushing = true;
     let didWork = false;
     try {
+      await reintentarPasesRetenidos();   // v3.0.1: al volver internet se vuelve a preguntar por la red
       let q = readQueue();
       if (!q.length) return;
 
-      const batch = q.slice(0, 20);
+      const batch = q.filter(x => !estaRetenido(x)).slice(0, 20);
       for (const item of batch) {
         didWork = true;
         try {
@@ -1894,7 +2054,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handler del click en el boton "Continuar Cajon".
   // Setea state.cajonContinuado + lastMatrix/lastCajon como si fuera continuacion activa.
-  function handleClickBotonContinuar(e) {
+  async function handleClickBotonContinuar(e) {
     const el = e?.currentTarget || document.getElementById("btnContinuarCajonRow1");
     if (!el) return;
     const leg = el.dataset.legajo;
@@ -1903,6 +2063,13 @@ document.addEventListener("DOMContentLoaded", () => {
     const fechaAyer = el.dataset.fechaAyer;
     const tsInicioCajon = el.dataset.tsInicioCajon;
     const segPostAyer = Number(el.dataset.segPostAyer || 0);
+
+    // v3.0.1 — esta ruta también puede ser el primer mensaje del día (encola una LT): mismo chequeo de red.
+    // `el` ya está capturado arriba (e.currentTarget se pierde tras un await, el elemento no).
+    if (!paseVigente(leg)) {
+      const pase = await asegurarPaseRed(leg);
+      if (!pase.ok) { alert(pase.mensaje); return; }
+    }
 
     const s = readState(leg);
     const tsActivacion = isoNow();
@@ -2029,6 +2196,21 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!selected) return;
     const legajo = legajoKey();
     if (!legajo) { alert("Ingresa el numero de legajo"); return; }
+
+    // v3.0.1 — primer mensaje del día: el legajo tiene que estar en la red de la empresa (ver PASE DE RED).
+    // Va ANTES de la Llegada Tarde: la LT sólo existe si pasa después de las 08:30, y quien manda su primer
+    // mensaje antes de esa hora no genera LT: la verificación de presencia no puede depender de ella.
+    if (!paseVigente(legajo)) {
+      errorEl.style.color = "#475569";
+      errorEl.innerText = "Validando la red de la empresa…";
+      btnEnviar.disabled = true;
+      let pase;
+      try { pase = await asegurarPaseRed(legajo); } finally { btnEnviar.disabled = false; }
+      if (!pase.ok) { errorEl.style.color = "red"; errorEl.innerText = pase.mensaje; return; }
+      errorEl.innerText = pase.pendiente
+        ? "Sin conexión: el mensaje queda en la cola y se envía cuando se valide la red de la empresa."
+        : "";
+    }
 
     maybeSendLateArrival(legajo);
 
@@ -3339,6 +3521,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   window.addEventListener("focus", () => { flushQueue(); flushStockQueue(); });
   window.addEventListener("online", async () => {
+    _paseUltimoIntento = 0;   // v3.0.1: volvió internet → preguntar por la red de la empresa ya, sin esperar el intervalo
     const end = Date.now() + 3000;
     while (Date.now() < end && readQueue().length) await flushQueue();
     flushStockQueue();
