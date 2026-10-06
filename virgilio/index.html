@@ -5139,7 +5139,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.08";
+const APP_VERSION = "v30.09";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -5277,6 +5277,10 @@ function updatePendingIndicator() {
 let _lastSentReport = null;     // { payload, legajo, prevState }
 let _undoTimerId    = null;
 const UNDO_WINDOW_MS = 60000;
+/* v27.58 (Thomas, 06/10): el legajo 1 es de PRUEBA. Antes de registrar desde la botonera pregunta
+   si va de verdad, y si va tiene 10 min para deshacer (≡ el tope de `gv_deshacer_evento`). */
+const UNDO_WINDOW_MS_PRUEBA = 600000;
+function _undoWindowMs(legajo) { return String(legajo || "").trim() === "1" ? UNDO_WINDOW_MS_PRUEBA : UNDO_WINDOW_MS; }
 
 function showUndoBanner() {
   if (!_lastSentReport) return;
@@ -5285,8 +5289,9 @@ function showUndoBanner() {
   if (!banner || !text) return;
   banner.classList.remove("hidden");
   const start = Date.now();
+  const ventana = _undoWindowMs(_lastSentReport.legajo);
   function updateText() {
-    const remaining = Math.ceil((UNDO_WINDOW_MS - (Date.now() - start)) / 1000);
+    const remaining = Math.ceil((ventana - (Date.now() - start)) / 1000);
     if (remaining <= 0) {
       _lastSentReport = null;
       hideUndoBanner();
@@ -5294,7 +5299,8 @@ function showUndoBanner() {
     }
     const p = _lastSentReport.payload;
     const tx = p.texto ? ` "${p.texto}"` : "";
-    text.textContent = `↩ Último: ${p.opcion}${tx} — ${remaining}s`;
+    const quedan = remaining > 60 ? Math.floor(remaining / 60) + ":" + String(remaining % 60).padStart(2, "0") : remaining + "s";
+    text.textContent = `↩ Último: ${p.opcion}${tx} — ${quedan}`;
   }
   updateText();
   if (_undoTimerId) clearInterval(_undoTimerId);
@@ -5778,6 +5784,11 @@ async function send() {
 
   if (!legajoStr) { alert("Falta el número de legajo"); return; }
   if (!opcion)    { alert("Falta seleccionar una opción"); return; }
+  // v27.58 (Thomas, 06/10): legajo 1 = prueba → pregunta antes de registrar. «Cancelar» no registra nada.
+  if (legajoStr === "1" && !confirm("Legajo 1 (prueba): ¿querés que esto se REGISTRE de verdad?\n\n" +
+        "Si lo registrás, tenés 10 minutos para deshacerlo.\n«Cancelar» = no se registra nada.")) {
+    resetSelection(); return;
+  }
   // v25.86: «Enviar» en MG / BR = EMPEZÓ la tarea (el tiempo corre desde acá) y abre el módulo.
   if (opcion === "MG" || opcion === "RKBM") {
     resetSelection();
