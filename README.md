@@ -15,8 +15,8 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 |---|---|---|---|---|
 | `/` | **Inicio**: elegir Virgilio o Cervantes | `selector/` de `loekemeyer/Gestion-Virgilio` · `e7a7bbd` | `sw.js` → `inicio-v1.2` | — |
 | `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada | `v30.NN` (hoy `v30.05`) | **sólo el código de la TV** |
-| `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Es lo que abre «Cervantes» en el inicio** | `loekemeyer/Gestion-Productiva-2.0` · `362ae7d` | la de GP2 | Google + lista blanca (sin cambios) |
-| `gp2/` (resto) | Lo mínimo que esa tablet necesita: `login.html`, `auth-guard.js`, `supabase-config.js`, `gp2-ui.js`, `pwa.js`, `sw.js`, `version.js`, manifest e íconos | `loekemeyer/Gestion-Productiva-2.0` · `362ae7d` | la de GP2 | — |
+| `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Es lo que abre «Cervantes» en el inicio** | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | Google + lista blanca (sin cambios) |
+| `gp2/` (resto) | Lo mínimo que esa tablet necesita: `login.html`, `auth-guard.js`, `supabase-config.js`, `gp2-ui.js`, `pwa.js`, `sw.js`, `version.js`, manifest e íconos | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | — |
 | `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Desde el 06/10 no tiene enlace desde el inicio**; sigue en el repo sin tocar | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **la red (Wi-Fi) de la empresa**, en el primer mensaje del día |
 | `supabase.js` (raíz) | supabase-js propio, compartido: `virgilio/` y `cervantes/` lo cargan con `../supabase.js` | `loekemeyer/Gestion-Virgilio` | — | — |
 | `selector/` | Sólo una redirección a `/` (URL vieja) | — | — | — |
@@ -39,7 +39,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 3. **Cervantes = la tablet de operarios de GP2** (inicio v1.2): la tarjeta «Cervantes» abría `cervantes/` (la visual de
    Registro Producción 2.0); ahora abre `gp2/Produccion/RegistroApp/Operarios_GP2.html`. Sin sesión de Google, el guard
    de GP2 manda a su login y vuelve a la tablet con `?next=`. El botón «Menú» de la tablet apuntaba a `GP2_MODULOS.html`
-   (no está acá): ahora vuelve al inicio del sitio. Token de caché de la tablet `20261006a`.
+   (no está acá): ahora vuelve al inicio del sitio. Token de caché de la tablet `20261006k` (el de GP2).
 4. **Cervantes, login por la red** (`asegurarPaseRed`, `cervantes/app.js`) — **ya no es la entrada**: sigue en
    `cervantes/` y con su prueba (`cervantes-red`), pero la tablet de GP2 no lo usa. Cómo funciona, por si se vuelve a usar:
    en el **primer mensaje del día** (antes de la Llegada Tarde, que no existe si llega antes de las 08:30) llama a la
@@ -188,18 +188,19 @@ Para ver cuánto se separó una carpeta de su origen, correr en el repo de orige
 ```
 git fetch origin main
 git log --oneline e7a7bbd..origin/main -- index.html recepcion.js cervantes selector   # Gestión Virgilio
-git log --oneline 362ae7d..origin/main -- Produccion/RegistroApp login.html            # Gestión Productiva 2.0
+git log --oneline 3a526e8..origin/main -- Produccion/RegistroApp login.html            # Gestión Productiva 2.0
 ```
 
-Medido el 06/10/2026 (~15:00, un día después de la copia):
+Medido el 06/10/2026 (noche), antes de pasar los operarios a este repo:
 
-- **Gestión Virgilio** (v26.92 → v27.19): 34 commits tocan lo copiado; en `index.html`, `importacion.js`, `recepcion.js`,
-  `sw.js` y `version.json` son 776 líneas agregadas y 55 borradas. `cervantes/` y `selector/` no cambiaron. Casi todo es
-  de oficina o supervisor; tres commits podrían tocar al operario y no se verificó (comentarios por recepción en
-  Pendientes, se saca el OCR de «Cargar foto de Maestro Producción», reintento del puente a LK).
-- **Gestión Productiva 2.0** (v1.236.0 → v1.242.0): 14 commits tocan lo copiado; 6 archivos, +32/−9. Hay **un cambio
-  de operario**: la tablet muestra los artículos de cada pieza de la matriz 237 (542/543/570, 720/722, 858); y
-  `auth-guard.js` ahora borra el token muerto de `localStorage` al volver al login (925 errores 403 en un día).
+- **Virgilio contra Gestión Virgilio v27.57**: se compararon las 1.111 funciones con nombre (también las de adentro de
+  los IIFE). **Todas iguales** salvo las del login (sólo código de la TV, a propósito) y los cascarones de supervisor.
+  `recepcion.js`, `planimetria.js` y `supabase-config.js` son idénticos byte a byte. De las 79 pruebas de operario de
+  Gestión, corridas contra este Virgilio: **63 pasan igual** y las 16 que fallan miden supervisor o archivos que acá no van
+  (importación, admin de insumos, monitor, SQL, hoja de picking, freno del supervisor, selector viejo). Las 12 pruebas
+  propias de este repo pasan. Los eventos salen con `gv_app = gestion@v30.NN` (la serie dice de qué app vino).
+- **Tablet de GP2**: estaba en v1.236.0; se trajo a **v1.245.2** (`3a526e8`): artículos de cada pieza, lo último arriba,
+  «Terminar cajón» sin confirmación y el `auth-guard` que borra el token muerto. Se conservó el «← Menú» al inicio.
 
 ## Publicación
 

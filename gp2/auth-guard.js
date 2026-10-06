@@ -58,7 +58,22 @@ window.GP2_AUTH_ON = GP2_AUTH_ON;
   //     supabase-js la descarta), GP2_SB() llama a esto y se vuelve al login. Sin esto la
   //     pantalla seguia andando como anonimo: leia bien y al grabar la base contestaba
   //     "permission denied for function ..." (29/09, Tablet recibiendo Charcas).
-  window.GP2_IR_AL_LOGIN = function () { sessionStorage.clear(); redirigirLogin(); };
+  window.GP2_IR_AL_LOGIN = function () {
+    sessionStorage.clear();
+    // 2026-10-06 (Luis) — purgar TAMBIEN el token muerto de localStorage. Si queda, la
+    // proxima carga lo ve en haySesionGuardada() (hay refresh_token) y NO manda derecho a
+    // Google: la pantalla carga con la sesion muerta y supabase-js le vuelve a pegar a
+    // /user con ella -> 403 "Session not found" en cada carga (925 en un dia, medido el
+    // 06/10 contra el proyecto de Gestion, todas con referer de GP2). Borrandolo, la
+    // proxima carga cae por el camino (1) y va directo al login, sin cadaver que revalidar.
+    try {
+      for (var i = localStorage.length - 1; i >= 0; i--) {
+        var k = localStorage.key(i);
+        if (k && (k.indexOf('sb-') === 0 || k.indexOf('supabase') !== -1)) localStorage.removeItem(k);
+      }
+    } catch (e) {}
+    redirigirLogin();
+  };
 
   // 3) Si el role es "envios", restringir las paginas accesibles.
   var role = sessionStorage.getItem('gp_role') || 'admin';
@@ -85,6 +100,9 @@ window.GP2_AUTH_ON = GP2_AUTH_ON;
       'calculadora.html',
       'calculadora-basica.html',
       'calcularcajones_gp2.html',
+      // Verificacion de cajones (2026-10-06): Alan Gonzalez es de Logistica y el cartel de las 15:00
+      // tambien sale en envios-only.html (si esa PC lo tildó)
+      'produccion/verificacioncajones/verificacioncajones_gp2.html',
       'login.html'
     ];
     var ok = permitidos.some(function(p){ return path.indexOf(p) !== -1; });

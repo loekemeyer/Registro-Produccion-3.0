@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-<script src="../../auth-guard.js?v=20260929a"></script>
+<script src="../../auth-guard.js?v=20261006b"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -19,7 +19,7 @@
     (function(){
       // El operario ya no tiene version propia: se compara el TOKEN de cache compartido
       // (el mismo ?v= que llevan todos los assets). Si cambia, el HTML cacheado es viejo.
-      var MI_V = '20261006a';
+      var MI_V = '20261006k';
       function chequear(){
         fetch(location.pathname, { cache: 'no-store' }).then(function(r){ return r.text(); }).then(function(html){
           var m = html.match(/operarios_gp2\.js\?v=([\w.]+)/);
@@ -85,6 +85,7 @@
     .mz { background: #f8fafc; border: 2px solid #d5dae1; border-radius: 10px; padding: 10px 8px; text-align: left; cursor: pointer; user-select: none; }
     .mz .mz-n { font-size: 18px; font-weight: 900; color: #1e40af; }
     .mz .mz-d { font-size: 11px; font-weight: 600; color: #64748b; margin-top: 2px; overflow-wrap: anywhere; }
+    .mz .mz-a { font-size: 14px; font-weight: 800; color: #854d0e; margin-top: 4px; overflow-wrap: anywhere; }
     .mz.sel { background: #e7ebf8; border-color: #cdd4ea; }
     .mz.sel .mz-n { color: #0f172a; }
     .mz.sel .mz-d { color: #334155; }
@@ -270,6 +271,6 @@
 </div>
 
 <script src="../../supabase-config.js?v=20260929a"></script>
-<script src="operarios_gp2.js?v=20261006a"></script>
+<script src="operarios_gp2.js?v=20261006k"></script>
 </body>
 </html>
