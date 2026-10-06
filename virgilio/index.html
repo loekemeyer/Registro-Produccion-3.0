@@ -1343,7 +1343,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.05"></script>
+<script type="module" src="recepcion.js?v=30.06"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5136,7 +5136,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.05";
+const APP_VERSION = "v30.06";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -5304,6 +5304,18 @@ function hideUndoBanner() {
   if (_undoTimerId) { clearInterval(_undoTimerId); _undoTimerId = null; }
 }
 
+function _gvDeshacerServidor(clientId, legajo, intento) {
+  fetch(SUPABASE_URL + "/rest/v1/rpc/gv_deshacer_evento", {
+    method: "POST",
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_client_id: String(clientId || ""), p_legajo: String(legajo || "") })
+  }).then(function (r) { return r.ok ? r.json() : "error"; })
+    .catch(function () { return "error"; })
+    .then(function (res) {
+      if ((res === "sin_fila" || res === "error") && intento < 4)
+        setTimeout(function () { _gvDeshacerServidor(clientId, legajo, intento + 1); }, 4000 * (intento + 1));
+    });
+}
 async function undoLastSent() {
   if (!_lastSentReport) return;
   if (!confirm("¿Borrar este último mensaje?")) return;
@@ -5316,11 +5328,11 @@ async function undoLastSent() {
   const fecha = isoToDayKey(payload.ts);
   const hist  = readDayHist(fecha, legajo);
   writeDayHist(fecha, legajo, hist.filter(it => it.id !== payload.id));
-  // 4) DELETE en Supabase (fire-and-forget — si no llegó, 404 silencioso).
-  fetch(SUPABASE_TABLE_ENDPOINT + "?client_id=eq." + encodeURIComponent(payload.id), {
-    method: "DELETE",
-    headers: { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY }
-  }).catch(() => {});
+  // 4) v30.06 — se DESHACE en la base con `gv_deshacer_evento` (EP → EPX + suelta la tanda,
+  //    AP → anula el armado, el resto → <opcion>X). Antes era un DELETE con la clave pública, que
+  //    anon NO tiene: 401 silencioso y el evento quedaba vivo (F46A, 06/10). Si todavía no llegó
+  //    (sin_fila), se reintenta: puede estar en vuelo.
+  _gvDeshacerServidor(payload.id, legajo, 0);
   // 5) Limpiar el banner.
   _lastSentReport = null;
   hideUndoBanner();
