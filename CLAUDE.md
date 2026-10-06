@@ -1,11 +1,12 @@
 # CLAUDE.md — Registro Producción 3.0
 
-Apps de operario (Virgilio, Cervantes y la tablet de GP2) en un solo repo. **Leer `README.md` primero**: dice
-de dónde sale cada carpeta, qué cambió, qué quedó afuera y qué no se probó. Nació como copia de
-`loekemeyer/Gestion-Virgilio` y `loekemeyer/Gestion-Productiva-2.0`, pero **desde el 06/10/2026 ya no es una copia sin
-modificar**: la raíz (`/`) es el inicio que separa Cervantes y Virgilio (`virgilio/`, `cervantes/`), y cada una tiene
-su propio login (Virgilio: sólo el código de la TV; Cervantes: la red de la empresa). Supabase es el mismo proyecto
-(`hrxfctzncixxqmpfhskv`).
+Apps de operario (Virgilio y la tablet de GP2, que es lo que abre «Cervantes») en un solo repo. **Sólo la botonera del
+operario**: lo de supervisor u oficina no está. **Leer `README.md` primero**: dice de dónde sale cada carpeta, qué cambió,
+qué se recortó y qué no se probó. Nació como copia de `loekemeyer/Gestion-Virgilio` y `loekemeyer/Gestion-Productiva-2.0`,
+pero **desde el 06/10/2026 ya no es una copia sin modificar**: la raíz (`/`) es el inicio que separa Cervantes y Virgilio,
+Virgilio vive en `virgilio/` con login sólo por el código de la TV, y Cervantes abre la tablet de operarios de GP2
+(`gp2/Produccion/RegistroApp/`, login de GP2). `cervantes/` (Registro Producción 2.0) quedó sin enlace. Supabase es el
+mismo proyecto (`hrxfctzncixxqmpfhskv`).
 
 **Fuente de verdad** `[usuario, 05/10/2026: «Se sigue trabajando desde los tres»]`: Gestión Virgilio, Gestión
 Productiva 2.0 y este repo se siguen modificando a la vez. No hay un origen único y nada los sincroniza, así que un
@@ -145,6 +146,12 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
   (`reg_prod_3_0_<nombre>`), y desde el cliente se llaman así. Las Edge Functions llevan el mismo prefijo.
 - **Pruebas**: `node tests/<nombre>.cjs` (Playwright). Correr las que toquen lo modificado antes de commitear;
   `modulo-minimizar-anular` es intermitente en el código original también.
-- **`virgilio/index.html` tiene un byte nulo legítimo**: `grep -a`, y modificarlo con parches que lo conserven (no con
-  herramientas que reescriban el archivo como texto).
+- **`virgilio/index.html` está recortado a la botonera del operario** `[usuario, 06/10/2026: «solo esté la botonera de
+  operarios de GV y GP2»]`. **No agregar código de supervisor** (Facturación, PPP, Stock, Monitor, Cobranzas, Importación,
+  OC, Configuración…) ni traer scripts o librerías que sólo ellos usen. Los 5 cascarones (`showSupervisor`, `showConteo`,
+  `stkRender`, `pppRenderProg`, `psRender`) y los 5 paneles ocultos son a propósito. **No se puede copiar el archivo de
+  Gestión Virgilio**: un cambio de operario se lleva a mano, función por función (README, «Cómo portar un cambio»).
+  `tests/virgilio-solo-operario.cjs` falla si vuelve lo recortado.
+- **El CSS de `virgilio/index.html` también está podado**: una regla nueva para una clase que sólo arma el JS por
+  concatenación necesita que el prefijo aparezca como `"prefijo-" + x` o `` `prefijo-${x}` `` (así lo reconoció la poda).
 - **Cambios en `main`** `[usuario, 06/10/2026]`: se hacen directo en `main`, sin pull request, salvo que se pida otra cosa.
