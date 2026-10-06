@@ -10535,7 +10535,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.01";
+const APP_VERSION = "v30.02";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -60483,6 +60483,15 @@ async function refreshProductivityCharts(){
 <script src="../supabase.js"></script>
 <script>
 (function initAuth() {
+/* v30.02 (Registro Producción 3.0): en Virgilio el operario entra SÓLO con el código de la TV (después elige su
+   nombre, o «＋ No estoy en la lista» y tipea el legajo). Sin Google y sin «Entrar con mi legajo» directo: el legajo
+   sólo se pide con el código de la TV recién validado. Una sola llave para volver atrás: SOLO_TV = false. */
+const SOLO_TV = true;
+if (SOLO_TV) {
+  const _stTv = document.createElement("style");
+  _stTv.textContent = "#googleSignInBtn, #authBlock .auth-divider, #tvClaveStep .tvnom-mas { display: none !important; }";
+  document.head.appendChild(_stTv);
+}
 // Failsafe (v5.21): el botón de login arranca deshabilitado ("Conectando…").
 // Si en 8s nadie resolvió el estado (bundle que no cargó, error inesperado),
 // habilitarlo igual para no dejar la app muerta. Registrado ANTES de los
@@ -60655,7 +60664,7 @@ function showLoggedOut() {
   const btn = $("googleSignInBtn");
   if (btn) btn.disabled = false;
   if (rejectedMsg) setAuthStatus(rejectedMsg, true);
-  else setAuthStatus("Iniciá sesión para continuar", false);
+  else setAuthStatus(SOLO_TV ? "Ingresá el código de la TV para continuar" : "Iniciá sesión para continuar", false);
 }
 
 /* Pantalla 2: selector de planta. Se llega tras login y desde "Cambiar planta". */
@@ -60978,7 +60987,7 @@ async function applyAuthState() {
     session = res && res.data ? res.data.session : null;
   } catch (_e) {}
   const today = todayKeyBsAs();
-  if (session && session.user && session.user.email) {
+  if (!SOLO_TV && session && session.user && session.user.email) {   // SOLO_TV: una sesión de Google guardada se ignora (y no se borra: el origen es compartido con GP2)
     _authRetryN = 0;
     // Ventana de 20h corridas desde el primer login (v5.21).
     const since = Number(localStorage.getItem(AUTH_SINCE_KEY));
@@ -61004,7 +61013,7 @@ async function applyAuthState() {
   // v5.21: ¿hay TOKENS guardados pero getSession dio null/error? Casi seguro es
   // el refresh fallando por RED (el bundle no borra el storage en errores
   // retryables) → "Reconectando…" con reintento, NO pantalla de login.
-  if (!session && authTokensStored()) {
+  if (!SOLO_TV && !session && authTokensStored()) {
     const offline = (typeof navigator !== "undefined" && navigator.onLine === false);
     // Offline: esperar la red sin límite (mostrar login acá invita a pisar la
     // sesión guardada). Con red: hasta 3 reintentos con backoff y recién ahí login.
@@ -61021,6 +61030,7 @@ async function applyAuthState() {
 }
 
 window.signInWithGoogle = async function () {
+  if (SOLO_TV) { setAuthStatus("En Virgilio se entra con el código de la TV.", true); return; }
   rejectedMsg = null;  // nuevo intento: limpiamos la leyenda de rechazo previa
   const btn = $("googleSignInBtn");
   if (btn) btn.disabled = true;
@@ -61136,6 +61146,7 @@ window.tvMostrarLegajo = function () {
 };
 function tvElegirOperario(o) {
   const errEl = $("legajoLoginError");
+  if (SOLO_TV && !_tvClaveVigente()) { _tvPaso("tvClaveStep"); return; }   // v30.02
 
   const emp = { legajo: String(o.legajo).trim(), nombre: String(o.nombre || "").trim() };
   saveLegajoSession(emp, todayKeyBsAs() || "");
@@ -61150,6 +61161,11 @@ window.loginWithLegajo = async function () {
   const input = $("legajoLoginInput");
   const errEl = $("legajoLoginError");
   if (errEl) errEl.textContent = "";
+  if (SOLO_TV && !_tvClaveVigente()) {   // v30.02: el legajo se tipea sólo con el código de la TV recién validado
+    if (errEl) errEl.textContent = "Primero ingresá el código de la TV.";
+    _tvPaso("tvClaveStep");
+    return;
+  }
   // v23.83 (Luis): "que puedan loguearse con pin o con legajo. No los limitemos" → el legajo entra sin clave.
   const raw = input ? String(input.value || "").trim() : "";
   if (!raw) {
