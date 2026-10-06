@@ -2,6 +2,8 @@
    1) después de registrar una tarea (send) sigue en su botonera;
    2) si ya entró HOY a Virgilio, una recarga lo deja directo en la botonera (sin selector ni legajo);
    3) (v30.01) sin esa marca TAMBIÉN cae directo: el selector de planta es la pantalla de inicio del sitio (/).
+   (v30.03: se sacó el chequeo «elegir Virgilio guarda la marca»: `chooseVirgilio` sólo la llamaba el botón del selector de
+   planta, que es del supervisor y ya no está en este repo.)
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -43,10 +45,7 @@ catch (_e) { try { ({ chromium } = require("playwright")); } catch (_e2) { conso
     __gvAuthTest.setOperario({ legajo: "999", nombre: "Prueba" });
     __gvAuthTest.route();
     out.otroDiaDirecto = vis("optionsScreen") && !vis("plantSelector") && !vis("legajoScreen");
-    // 4) elegir Virgilio guarda la marca y entra a la botonera
-    chooseVirgilio();
-    out.eligeGuarda = JSON.parse(localStorage.getItem("vir_planta_dia")).day === getTodayKey() && vis("optionsScreen");
-    // 5) cambiar de planta borra la marca y vuelve al inicio del sitio (../). No se llama: navegaría y
+    // 4) cambiar de planta borra la marca y vuelve al inicio del sitio (../). No se llama: navegaría y
     //    mataría el contexto de la prueba; se verifica el código.
     const cp = String(cambiarPlanta);
     out.cambiarVuelveAlInicio = /removeItem\("vir_planta_dia"\)/.test(cp) && /window\.location\.href = "\.\.\/"/.test(cp);

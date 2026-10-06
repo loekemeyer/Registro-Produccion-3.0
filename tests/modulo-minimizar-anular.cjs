@@ -8,7 +8,8 @@
      B) volver a entrar sigue el MISMO tramo: sin RKI / IRI / MGI nuevo y con la hora de inicio de antes —
         también si la app se reinició en el medio (el módulo ya no está en memoria).
      C) «Anular» está abajo y sale: manda el cierre con texto ANULADO, cierra la tarea y el botón deja de estar rojo.
-     D) el monitor del admin no cuenta el tramo ANULADO como movimiento (≡ la vista: mov_s saca el ANULADO).
+   (El chequeo D del original —el monitor del admin no cuenta el tramo ANULADO como movimiento— se sacó: el monitor
+   es de supervisor y no está en este repo. Sigue en Gestión Virgilio.)
    Sale 1 si falla. */
 const path = require("path");
 let chromium;
@@ -134,11 +135,6 @@ catch (_e) {
     return out;
   });
 
-  // D) el monitor del admin no cuenta el tramo ANULADO como movimiento (≡ vista)
-  const fs = require("fs");
-  const html = fs.readFileSync(path.join(root, "index.html"), "latin1");
-  const dMonitor = /tanda === "ANULADO" && ev\.ts_inicio && MOV_TOGGLE_CODES\.has\(ev\.opcion\)\) continue;/.test(html);
-
   const checks = [
     ["BR abre un solo RKI", r.brAbreUnRKI], ["BR «Anular bajada» abajo", r.brAnularAbajo],
     ["BR Cerrar minimiza (sin RKB, tarea abierta)", r.brCerrarMinimiza], ["BR rojo minimizado", r.brRojoMinimizado],
@@ -153,7 +149,6 @@ catch (_e) {
     ["MG re-entrar = mismo tramo", r.mgReentraMismo], ["MG tras reinicio = mismo tramo", r.mgReinicioMismo],
     ["MG Anular → MGC ANULADO y cierra", r.mgAnularCierra], ["MG no rojo tras anular", r.mgNoRojoTrasAnular],
     ["MG anulado en el Historial", r.mgHistorialAnulado],
-    ["D monitor: ANULADO no es movimiento", dMonitor],
   ];
   const pass = checks.every((c) => c[1]) && errs.length === 0;
   console.log("modulo-minimizar-anular: pageerrors:", errs.length ? errs.join(" | ") : "none");
