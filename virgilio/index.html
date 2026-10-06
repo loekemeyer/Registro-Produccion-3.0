@@ -68,6 +68,16 @@ button {
   width: 100%; font-size: 30px; padding: 10px; text-align: center; letter-spacing: .35em;
   border: 1px solid #dadce0; border-radius: 6px; box-sizing: border-box; margin-bottom: 8px;
 }
+/* v30.03: el «4 números» del campo va con las letras juntas (los dígitos que se tipean conservan su separación). */
+#tvClaveInput::placeholder { letter-spacing: .04em; }
+/* v30.03: en el login no se ve nada debajo de «Entrar» (ni el instructivo ni el Resumen de hoy): sólo el cartel. */
+#authBlock:not(.hidden) ~ #btnInstructivo, #authBlock:not(.hidden) ~ #legajoHistorySpace { display: none !important; }
+#loginMarca {
+  display: none; width: max-content; max-width: 100%; margin: 28px auto 0; padding: 6px 16px;
+  border: 1px solid #cfe0f7; background: #eaf1fb; color: #1e3a8a; border-radius: 999px;
+  font-size: 14px; font-weight: 800; letter-spacing: .02em; text-align: center;
+}
+#authBlock:not(.hidden) ~ #loginMarca { display: block; }
 #tvNombreLista { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 52vh; overflow: auto; margin-bottom: 10px; }
 #tvNombreLista button {
   padding: 14px 8px; font-size: 16px; font-weight: 700; border: 1px solid #cfe0f7; background: #eaf1fb;
@@ -6367,6 +6377,9 @@ table.facfc-tbl td.num, table.facfc-tbl th.num{ text-align:right; font-variant-n
 
   <button id="btnInstructivo" onclick="showInstructivo()" style="margin:14px auto 0;display:block;background:none;border:none;color:#1e6bd6;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:underline;">❓ ¿Cómo se usa? — instructivo rápido</button>
 
+  <!-- v30.03: cartel del login (sólo se ve mientras el login está en pantalla) -->
+  <div id="loginMarca">Gestión Virgilio</div>
+
   <!-- OPERARIO: tras loguear se muestra el nombre (no se tipea legajo).
        #legajoInput queda oculto pero conserva el valor para el resto del código. -->
   <div id="legajoEntry" class="hidden">
@@ -10535,7 +10548,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.02";
+const APP_VERSION = "v30.03";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -60658,7 +60671,7 @@ function showLoggedOut() {
   $("cervAdmin").classList.add("hidden");
   $("btnHistDias").classList.add("hidden");   // 📅 no aplica en el login (sin operario)
   _setCambiarPlanta(false);
-  setHistorySpace(true);
+  setHistorySpace(false);   // v30.03: el login no muestra el Resumen de hoy
   setUserTag(null);
   setLegajoTitle("Producción");
   const btn = $("googleSignInBtn");
