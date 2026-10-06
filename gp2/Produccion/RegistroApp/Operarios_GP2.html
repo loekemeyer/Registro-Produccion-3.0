@@ -19,7 +19,7 @@
     (function(){
       // El operario ya no tiene version propia: se compara el TOKEN de cache compartido
       // (el mismo ?v= que llevan todos los assets). Si cambia, el HTML cacheado es viejo.
-      var MI_V = '20261005b';
+      var MI_V = '20261006a';
       function chequear(){
         fetch(location.pathname, { cache: 'no-store' }).then(function(r){ return r.text(); }).then(function(html){
           var m = html.match(/operarios_gp2\.js\?v=([\w.]+)/);
@@ -158,7 +158,7 @@
 
 <!-- LEGAJO -->
 <div id="legajoScreen">
-  <button id="btnMenu" title="Salir al menú principal" onclick="location.href='../../GP2_MODULOS.html'">&larr; Menú</button>
+  <button id="btnMenu" title="Volver al inicio (elegir planta)" onclick="location.href='../../../'">&larr; Menú</button>
   <button id="btnHistDias" title="Historial dias anteriores">📅</button>
   <h1>Ingresa tu número de Operario</h1>
   <input id="legajoInput" type="number" inputmode="numeric" />
@@ -270,6 +270,6 @@
 </div>
 
 <script src="../../supabase-config.js?v=20260929a"></script>
-<script src="operarios_gp2.js?v=20261005b"></script>
+<script src="operarios_gp2.js?v=20261006a"></script>
 </body>
 </html>

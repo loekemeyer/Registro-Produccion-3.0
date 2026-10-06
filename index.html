@@ -64,23 +64,23 @@
       <p class="card-desc">Picking · Armado · Carga de camión · Recepción</p>
       <span class="card-go">→</span>
     </a>
-    <a class="card cer" id="cardCer" href="cervantes/" onclick="recordar('cervantes')">
+    <a class="card cer" id="cardCer" href="gp2/Produccion/RegistroApp/Operarios_GP2.html" onclick="recordar('cervantes')">
       <span class="badge">Última vez</span>
       <p class="card-name">Cervantes</p>
-      <p class="card-desc">Registro de producción · Matrices · Cajas</p>
+      <p class="card-desc">Tablet de operarios · Matrices · Producción</p>
       <span class="card-go">→</span>
     </a>
   </main>
 
   <footer>
     Podés volver acá cuando quieras para cambiar de planta.<br>
-    <span class="ver">Inicio v1.1</span>
+    <span class="ver">Inicio v1.2</span>
   </footer>
 
   <script>
-    /* Las dos apps viven en este mismo repo, cada una en su carpeta: Virgilio en
-       virgilio/ y Cervantes en cervantes/. Esta pantalla es el inicio del sitio y
-       solo linkea a esas subcarpetas; cada app hace su propio login. */
+    /* Las dos plantas viven en este mismo repo: Virgilio en virgilio/ y Cervantes en la tablet de
+       operarios de GP2 (gp2/Produccion/RegistroApp/). Esta pantalla es el inicio del sitio y solo
+       linkea a esas dos; cada una hace su propio login. */
     var LS_KEY = "appprod_ultima_planta";
 
     function recordar(planta){ try { localStorage.setItem(LS_KEY, planta); } catch(e){} }

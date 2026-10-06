@@ -3,10 +3,10 @@
    Mismo patrón "no-cache" que las apps Virgilio/Cervantes:
    NO cachea estáticos (para no dejar pantallas pegadas a una
    versión vieja) y limpia cualquier caché previa al activar.
-   Scope de la raíz del sitio; virgilio/ y cervantes/ registran su propio
+   Scope de la raíz del sitio; virgilio/ y la tablet de GP2 registran su propio
    service worker, que tiene prioridad en sus carpetas.
    ========================================================= */
-const SW_VERSION = "inicio-v1.1";
+const SW_VERSION = "inicio-v1.2";
 
 self.addEventListener("install", () => {
   self.skipWaiting();
