@@ -64,6 +64,13 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     chequeo("1 no se ve «Entrar con mi legajo»", !(await visible(p, "#tvClaveStep .tvnom-mas")));
     chequeo("1 se ve el código de la TV", (await visible(p, "#tvClaveInput")) && (await visible(p, "#tvClaveStep .primary-btn")));
     chequeo("1 el aviso pide el código de la TV", /Ingresá el código de la TV/.test(await p.textContent("#authStatus")));
+    // v30.03: debajo de «Entrar» no se ve nada salvo el cartel «Gestión Virgilio»; el «4 números» va con las letras juntas
+    chequeo("1 no se ve el instructivo ni el Resumen de hoy", !(await visible(p, "#btnInstructivo")) && !(await visible(p, "#legajoHistorySpace")));
+    chequeo("1 se ve el cartel «Gestión Virgilio»", (await visible(p, "#loginMarca")) && /^Gestión Virgilio$/.test((await p.textContent("#loginMarca")).trim()));
+    chequeo("1 el «4 números» va con las letras juntas", await p.evaluate(() => {
+      const i = document.getElementById("tvClaveInput");
+      return parseFloat(getComputedStyle(i, "::placeholder").letterSpacing) < 3 && parseFloat(getComputedStyle(i).letterSpacing) > 5;
+    }));
 
     // ---- 2) Google cerrado también por código ----
     const urlAntes = p.url();
