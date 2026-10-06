@@ -1,8 +1,10 @@
 # CLAUDE.md — Registro Producción 3.0
 
 Apps de operario (Virgilio, Cervantes y la tablet de GP2) en un solo repo. **Leer `README.md` primero**: dice
-de dónde sale cada carpeta, qué quedó afuera y qué no se probó. Es una copia sin modificar de
-`loekemeyer/Gestion-Virgilio` y `loekemeyer/Gestion-Productiva-2.0`; Supabase es el mismo proyecto
+de dónde sale cada carpeta, qué cambió, qué quedó afuera y qué no se probó. Nació como copia de
+`loekemeyer/Gestion-Virgilio` y `loekemeyer/Gestion-Productiva-2.0`, pero **desde el 06/10/2026 ya no es una copia sin
+modificar**: la raíz (`/`) es el inicio que separa Cervantes y Virgilio (`virgilio/`, `cervantes/`), y cada una tiene
+su propio login (Virgilio: sólo el código de la TV; Cervantes: la red de la empresa). Supabase es el mismo proyecto
 (`hrxfctzncixxqmpfhskv`).
 
 **Fuente de verdad** `[usuario, 05/10/2026: «Se sigue trabajando desde los tres»]`: Gestión Virgilio, Gestión
@@ -130,5 +132,19 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
 - **Claves de Supabase**: sólo `sb_publishable_` en el front. Nunca escribir código nuevo con la `anon` legacy
   (JWT `eyJhbGciOiJIUzI1NiIs…`) ni dejar una `sb_secret_` / `service_role` en un archivo de este repo.
 - **Todo cambio de JS/CSS/HTML de una app bumpea su versión** en el mismo commit (los celulares cachean fuerte):
-  `?v=` del `<script>`/`<link>` y la versión propia de esa app (`APP_VERSION` / `SW_VERSION` / `version.json` en
-  la raíz, `LOCAL_VERSION` + `CACHE_VERSION` en `cervantes/`, `version.js` en `gp2/`).
+  `?v=` del `<script>`/`<link>` y la versión propia de esa app (`APP_VERSION` en `virgilio/index.html`, `SW_VERSION` en
+  `virgilio/sw.js` y `virgilio/version.json`; `LOCAL_VERSION` + `CACHE_VERSION` en `cervantes/`; `SW_VERSION` en el
+  `sw.js` de la raíz; `version.js` en `gp2/`).
+- **Series de versión de este repo**: Virgilio `v30.NN`, Cervantes `v3.0.N`. Virgilio las compara con `_verNum`, que sólo
+  acepta `vMAYOR.MENOR`: no agregar sufijos.
+
+## Convenciones de este repo
+
+- **Funciones de Supabase que se creen para este repo** `[usuario, 06/10/2026]`: se llaman `Reg_Prod_3_0_<nombre>`
+  (sin punto, para no tener que usar comillas dobles). Sin comillas Postgres las guarda en minúsculas
+  (`reg_prod_3_0_<nombre>`), y desde el cliente se llaman así. Las Edge Functions llevan el mismo prefijo.
+- **Pruebas**: `node tests/<nombre>.cjs` (Playwright). Correr las que toquen lo modificado antes de commitear;
+  `modulo-minimizar-anular` es intermitente en el código original también.
+- **`virgilio/index.html` tiene un byte nulo legítimo**: `grep -a`, y modificarlo con parches que lo conserven (no con
+  herramientas que reescriban el archivo como texto).
+- **Cambios en `main`** `[usuario, 06/10/2026]`: se hacen directo en `main`, sin pull request, salvo que se pida otra cosa.
