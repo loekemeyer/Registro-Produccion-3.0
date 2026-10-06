@@ -14,7 +14,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 | Carpeta | Qué es | Origen (commit) | Versión propia | Login |
 |---|---|---|---|---|
 | `/` | **Inicio**: elegir Virgilio o Cervantes | `selector/` de `loekemeyer/Gestion-Virgilio` · `e7a7bbd` | `sw.js` → `inicio-v1.2` | — |
-| `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada | `v30.NN` (hoy `v30.04`) | **sólo el código de la TV** |
+| `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada | `v30.NN` (hoy `v30.05`) | **sólo el código de la TV** |
 | `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Es lo que abre «Cervantes» en el inicio** | `loekemeyer/Gestion-Productiva-2.0` · `362ae7d` | la de GP2 | Google + lista blanca (sin cambios) |
 | `gp2/` (resto) | Lo mínimo que esa tablet necesita: `login.html`, `auth-guard.js`, `supabase-config.js`, `gp2-ui.js`, `pwa.js`, `sw.js`, `version.js`, manifest e íconos | `loekemeyer/Gestion-Productiva-2.0` · `362ae7d` | la de GP2 | — |
 | `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Desde el 06/10 no tiene enlace desde el inicio**; sigue en el repo sin tocar | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **la red (Wi-Fi) de la empresa**, en el primer mensaje del día |

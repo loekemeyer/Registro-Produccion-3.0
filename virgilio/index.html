@@ -74,14 +74,8 @@ button {
 }
 /* v30.03: el «4 números» del campo va con las letras juntas (los dígitos que se tipean conservan su separación). */
 #tvClaveInput::placeholder { letter-spacing: .04em; }
-/* v30.03: en el login no se ve nada debajo de «Entrar» (ni el instructivo ni el Resumen de hoy): sólo el cartel. */
+/* v30.03: en el login no se ve nada debajo de «Entrar» (ni el instructivo ni el Resumen de hoy). */
 #authBlock:not(.hidden) ~ #btnInstructivo, #authBlock:not(.hidden) ~ #legajoHistorySpace { display: none !important; }
-#loginMarca {
-  display: none; width: max-content; max-width: 100%; margin: 28px auto 0; padding: 6px 16px;
-  border: 1px solid #cfe0f7; background: #eaf1fb; color: #1e3a8a; border-radius: 999px;
-  font-size: 14px; font-weight: 800; letter-spacing: .02em; text-align: center;
-}
-#authBlock:not(.hidden) ~ #loginMarca { display: block; }
 #tvNombreLista { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 52vh; overflow: auto; margin-bottom: 10px; }
 #tvNombreLista button {
   padding: 14px 8px; font-size: 16px; font-weight: 700; border: 1px solid #cfe0f7; background: #eaf1fb;
@@ -1349,7 +1343,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.04"></script>
+<script type="module" src="recepcion.js?v=30.05"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -1422,9 +1416,6 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
   </div>
 
   <button id="btnInstructivo" onclick="showInstructivo()" style="margin:14px auto 0;display:block;background:none;border:none;color:#1e6bd6;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:underline;">❓ ¿Cómo se usa? — instructivo rápido</button>
-
-  <!-- v30.03: cartel del login (sólo se ve mientras el login está en pantalla) -->
-  <div id="loginMarca">Gestión Virgilio</div>
 
   <!-- OPERARIO: tras loguear se muestra el nombre (no se tipea legajo).
        #legajoInput queda oculto pero conserva el valor para el resto del código. -->
@@ -5145,7 +5136,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.04";
+const APP_VERSION = "v30.05";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17158,7 +17149,7 @@ function showLoggedOut() {
   _setCambiarPlanta(false);
   setHistorySpace(false);   // v30.03: el login no muestra el Resumen de hoy
   setUserTag(null);
-  setLegajoTitle("Producción");
+  setLegajoTitle("Producción Virgilio");
   const btn = $("googleSignInBtn");
   if (btn) btn.disabled = false;
   if (rejectedMsg) setAuthStatus(rejectedMsg, true);
