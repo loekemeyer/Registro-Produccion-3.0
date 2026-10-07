@@ -1,15 +1,14 @@
 /* Virgilio — el operario entra SÓLO con el código de la TV (v30.02, SOLO_TV = true).
    Supabase está simulado (gv_tv_clave_validar acepta "1234"); lo demás se aborta como en las otras pruebas.
 
-   1) la pantalla muestra el botón de Google (v30.10, sólo supervisor) y el código de la TV; no «Entrar con mi legajo»
-   2) signInWithGoogle() sale a Google (v30.10)
+   1) la pantalla no muestra Google ni «Entrar con mi legajo»; sí el código de la TV y el aviso correcto
+   2) signInWithGoogle() no sale a Google aunque se llame a mano
    3) no hay entrada por legajo (v30.07): ni campo de legajo, y loginWithLegajo() no entra ni deja sesión
    4) código incorrecto → «Clave incorrecta», no entra
    5) código correcto → lista de nombres → al elegir el suyo cae en la botonera y queda la sesión del día
    6) código correcto → «＋ No estoy en la lista» → pide el ALTA con su nombre (gv_operario_alta_crear) y NO entra;
       está el botón «Entrevista / prueba»
    7) una sesión de Google vieja en localStorage (el origen se comparte con GP2) ni cuenta ni se borra
-   8) v30.10: una sesión de Google de SUPERVISOR va directo a Gestión Virgilio
    Sale 1 si falla. */
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -33,7 +32,7 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
   async function pagina(extraInit) {
     const ctx = await b.newContext({ serviceWorkers: "block" });
     ctx.setDefaultTimeout(8000);
-    const est = { google: 0, validar: 0, alta: null }; _ultEst = est;
+    const est = { google: 0, validar: 0, alta: null };
     if (extraInit) await ctx.addInitScript(extraInit);
     await ctx.route("**/*.supabase.co/**", async (route) => {
       const req = route.request(); const url = req.url();
@@ -59,14 +58,14 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     await p.waitForSelector("#authBlock:not(.hidden)");
     return { ctx, p, est };
   }
-  let _ultEst = null;
   const leer = (p, k) => p.evaluate((key) => localStorage.getItem(key), k);
   const visible = (p, sel) => p.locator(sel).first().isVisible();
 
   // ---- 1) pantalla ----
   { const { ctx, p } = await pagina();
     await p.waitForFunction(() => /código de la TV/.test(document.getElementById("authStatus").textContent));
-    chequeo("1 se ve el botón de Google (supervisor, v30.10)", await visible(p, "#googleSignInBtn"));
+    chequeo("1 no se ve el botón de Google", !(await visible(p, "#googleSignInBtn")));
+    chequeo("1 no se ve el separador «o»", !(await visible(p, "#authBlock .auth-divider")));
     chequeo("1 no se ve «Entrar con mi legajo»", !(await visible(p, "#tvClaveStep .tvnom-mas")));
     chequeo("1 se ve el código de la TV", (await visible(p, "#tvClaveInput")) && (await visible(p, "#tvClaveStep .primary-btn")));
     chequeo("1 el aviso pide el código de la TV", /Ingresá el código de la TV/.test(await p.textContent("#authStatus")));
@@ -81,12 +80,10 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     }));
 
     // ---- 2) Google cerrado también por código ----
-    const est2 = _ultEst;
-    await p.evaluate(() => { signInWithGoogle(); });
-    await pausa(600);
-    chequeo("2 signInWithGoogle() sale a Google (v30.10)", est2.google >= 1);
-    await ctx.close(); }
-  { const { ctx, p } = await pagina();
+    const urlAntes = p.url();
+    await p.evaluate(() => signInWithGoogle());
+    await pausa(400);
+    chequeo("2 signInWithGoogle() no sale a Google", p.url() === urlAntes && /código de la TV/.test(await p.textContent("#authStatus")));
 
     // ---- 3) legajo sin el código ----
     chequeo("3 no existe el campo de legajo", (await p.locator("#legajoLoginInput").count()) === 0);
@@ -132,20 +129,6 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     await pausa(1500);
     chequeo("7 una sesión de Google guardada no cuenta: sigue el login por TV (sin «Reconectando…»)", (await visible(p, "#tvClaveInput")) && !/Reconectando/.test(await p.textContent("#authStatus")) && !(await visible(p, "#optionsScreen")));
     chequeo("7 y no se borra (el origen se comparte con GP2)", !!(await leer(p, clave)));
-    await ctx.close(); }
-
-  // ---- 8) sesión de Google de supervisor → Gestión Virgilio ----
-  { const clave = "sb-hrxfctzncixxqmpfhskv-auth-token";
-    const sesionSup = { access_token: "x", refresh_token: "y", token_type: "bearer", expires_at: 4102444800, expires_in: 3600, user: { id: "u", email: "loekemeyer.n8n@gmail.com" } };
-    const ctx = await b.newContext({ serviceWorkers: "block" });
-    await ctx.addInitScript(`localStorage.setItem(${JSON.stringify(clave)}, ${JSON.stringify(JSON.stringify(sesionSup))});`);
-    let gestion = false;
-    await ctx.route("https://loekemeyer.github.io/Gestion-Virgilio/**", (r) => { gestion = true; return r.fulfill({ status: 200, contentType: "text/html", body: "<html><body>GESTION</body></html>" }); });
-    await ctx.route("**/*.supabase.co/**", (r) => r.request().method() === "OPTIONS" ? r.fulfill({ status: 204, headers: CORS }) : r.abort());
-    const p = await ctx.newPage();
-    await p.goto(srv.url + "/virgilio/", { waitUntil: "domcontentloaded" });
-    for (let i = 0; i < 40 && !gestion; i++) await pausa(200);
-    chequeo("8 una sesión de Google de supervisor va a Gestión Virgilio", gestion);
     await ctx.close(); }
 
   const fallas = res.filter(([, ok]) => !ok);
