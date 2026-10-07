@@ -1,4 +1,4 @@
-/* Cervantes · botonera de GP2 (cervantes-gp2/, v3.1.2) — entra con el código de la TV, usa el PASE y habla con el schema reg_prod_3_0.
+/* Cervantes · botonera de GP2 (cervantes-gp2/, v3.1.3) — entra con el código de la TV, usa el PASE y habla con el schema reg_prod_3_0.
    Supabase está simulado: la base de mentira exige el pase (igual que reg_prod_3_0_pase_ok) y guarda lo que le llega.
      1) sin pase aparece la pantalla del código; código malo no entra; código bueno entra, guarda el pase y trae el catálogo
         con el pase, el id del equipo y la cabecera Content-Profile: reg_prod_3_0
@@ -11,7 +11,8 @@
      7) base caída al abrir: se abre con el catálogo guardado en el celular y sin pase se puede cargar (queda en la cola, con aviso)
         hasta que vuelve y se ingresa el código
      8) rollos (Fase 1c): sólo si el catálogo trae rollos_activos; elegir rollo en E y «CT» / «PR quedó resto» de Eduardo; sin señal esperan
-        en su cola y salen en orden
+        en su cola y salen en orden; ANTI-DUPLICADO (Fase 1d): si la base lo hizo pero la respuesta se perdió, el reintento lleva el MISMO
+        id y no descuenta otro rollo
      9) NO se llama a nada de GP2 (registro_operarios_bundle, registrar_evento_prod, anular_evento_prod, tomar_rollo, cerrar_rollo)
    Sale 1 si falla. */
 const fs = require("fs");
@@ -50,6 +51,7 @@ const BUNDLE = {
 // Catálogo de la Fase 1c: trae `rollos_activos` y los flejes (la 10 corta del fleje 100; hay 4 rollos de 25 kg)
 const BUNDLE_ROLLOS = Object.assign({}, BUNDLE, {
   rollos_activos: true,
+  rollos_antiduplicado: true,
   matriz_fleje: { "10": { comp_id: 100, codigo: "FL94", descripcion: "Fleje 94" } },
   rollos_saldo: [{ comp_id: 100, codigo: "FL94", kg_por_rollo: 25, rollos: 4 }],
 });
@@ -71,7 +73,9 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
       vence: new Date(Date.now() + 3 * 3600 * 1000).toISOString(),
       caida: false,                  // true = sin respuesta (como sin señal)
       bundle: BUNDLE,                // lo que devuelve reg_prod_3_0_bundle (hoy sin rollos; la Fase 1c los trae)
-      rollos: [],                    // llamadas aceptadas de tomar/cerrar rollo
+      rollos: [],                    // llamadas aceptadas de tomar/cerrar rollo (una por id)
+      entregas: [],                  // todo lo que llegó de rollos, con los repetidos
+      perderRespuesta: false,        // true = la base lo hace pero la respuesta no llega al celular (una vez)
       llamadas: [],                  // { fn, perfil, cuerpo }
       eventos: [],                   // cuerpos de reg_prod_3_0_registrar_evento aceptados
       anulados: [],
@@ -100,10 +104,13 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
       }
       if (fn === "reg_prod_3_0_registrar_ingreso") return json(200, 1);
       if (fn === "reg_prod_3_0_bundle") return conPase ? json(200, base.bundle) : paseMal();
-      if (fn === "reg_prod_3_0_tomar_rollo" || fn === "reg_prod_3_0_cerrar_rollo") {
+      if (["reg_prod_3_0_tomar_rollo", "reg_prod_3_0_cerrar_rollo", "reg_prod_3_0_rollo_tomar", "reg_prod_3_0_rollo_cerrar"].includes(fn)) {
         if (!conPase) return paseMal();
-        base.rollos.push({ fn, cuerpo });
-        return json(200, { ok: true });
+        base.entregas.push({ fn, cuerpo });
+        const repetido = !!cuerpo.p_id && base.rollos.some((r) => r.cuerpo.p_id === cuerpo.p_id);   // como reg_prod_3_0.rollo_llamadas
+        if (!repetido) base.rollos.push({ fn, cuerpo });
+        if (base.perderRespuesta) { base.perderRespuesta = false; return route.abort("failed"); }
+        return json(200, repetido ? { ok: true, dup: true } : { ok: true });
       }
       if (fn === "reg_prod_3_0_envasado_articulos") return conPase ? json(200, ARTICULOS) : paseMal();
       if (fn === "reg_prod_3_0_registrar_evento") {
@@ -196,7 +203,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.2" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.3" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -337,7 +344,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   await p4.waitForSelector("#legajoScreen:not(.hidden)");
   await esperar(() => base3.rollos.length === 1);
   const tom = base3.rollos[0];
-  chequeo("8 el E con rollo llama a tomar_rollo con legajo, fleje, kg y matriz", !!tom && tom.fn === "reg_prod_3_0_tomar_rollo" && tom.cuerpo.p_legajo === "999" && tom.cuerpo.p_comp_id === 100 && tom.cuerpo.p_kg_por_rollo === 25 && tom.cuerpo.p_matriz === "10" && !!tom.cuerpo.p_fecha);
+  chequeo("8 el E con rollo llama a tomar_rollo con legajo, fleje, kg y matriz", !!tom && tom.fn === "reg_prod_3_0_rollo_tomar" && !!tom.cuerpo.p_id && tom.cuerpo.p_legajo === "999" && tom.cuerpo.p_comp_id === 100 && tom.cuerpo.p_kg_por_rollo === 25 && tom.cuerpo.p_matriz === "10" && !!tom.cuerpo.p_fecha);
   chequeo("8 y va con pase y equipo", !!tom && tom.cuerpo.p_pase === "PASE.OK1" && !!tom.cuerpo.p_dispositivo);
   await esperar(() => base3.eventos.some((e) => e.p.toque.opcion === "E"));
   chequeo("8 el toque E sale igual", base3.eventos.some((e) => e.p.toque.opcion === "E" && e.p.matriz === "10"));
@@ -352,7 +359,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   await p4.waitForSelector("#legajoScreen:not(.hidden)");
   await esperar(() => base3.rollos.length === 2);
   const cer = base3.rollos[1];
-  chequeo("8 PR con «quedó resto» llama a cerrar_rollo con quedo_resto = true", !!cer && cer.fn === "reg_prod_3_0_cerrar_rollo" && cer.cuerpo.p_legajo === "19" && cer.cuerpo.p_quedo_resto === true && cer.cuerpo.p_pase === "PASE.OK1");
+  chequeo("8 PR con «quedó resto» llama a cerrar_rollo con quedo_resto = true", !!cer && cer.fn === "reg_prod_3_0_rollo_cerrar" && !!cer.cuerpo.p_id && cer.cuerpo.p_legajo === "19" && cer.cuerpo.p_quedo_resto === true && cer.cuerpo.p_pase === "PASE.OK1");
   // sin señal: tomar y cerrar esperan en orden
   await ponerLegajo(p4, "999");
   await enviarOpcion(p4, "C", "10");                          // el cajón de la matriz abierta, para poder empezar otra
@@ -366,8 +373,26 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   base3.caida = false;
   await p4.click("#syncBadge");
   await esperar(() => base3.rollos.length === 3);
-  chequeo("8 al volver la señal sale el tomar_rollo guardado, con su fecha original", base3.rollos.length === 3 && base3.rollos[2].fn === "reg_prod_3_0_tomar_rollo" && !!base3.rollos[2].cuerpo.p_fecha);
+  chequeo("8 al volver la señal sale el tomar_rollo guardado, con su fecha original", base3.rollos.length === 3 && base3.rollos[2].fn === "reg_prod_3_0_rollo_tomar" && !!base3.rollos[2].cuerpo.p_fecha);
   await esperar(() => p4.evaluate(() => JSON.parse(localStorage.getItem("rp3c_rqueue") || "[]").length === 0 && /al día/.test(document.getElementById("syncBadge").textContent)));
+  // la base hizo el «tomar» pero la respuesta se perdió: el reintento lleva el MISMO id y no descuenta otro rollo
+  await esperar(() => p4.evaluate(() => /al día/.test(document.getElementById("syncBadge").textContent)));
+  await ponerLegajo(p4, "999");
+  await enviarOpcion(p4, "C", "10");
+  await esperar(() => p4.evaluate(() => /al día/.test(document.getElementById("syncBadge").textContent)));
+  await ponerLegajo(p4, "999");
+  const nRollos = base3.rollos.length, nEntregas = base3.entregas.length;
+  base3.perderRespuesta = true;
+  await p4.click('.box[data-code="E"]'); await p4.fill("#textInput", "10"); await p4.waitForSelector("#rolloGrid .rl"); await p4.click("#rolloGrid .rl");
+  await p4.click("#btnEnviar"); await p4.waitForSelector("#legajoScreen:not(.hidden)");
+  await esperar(() => base3.entregas.length === nEntregas + 1);
+  await esperar(() => p4.evaluate(() => JSON.parse(localStorage.getItem("rp3c_rqueue") || "[]").length === 1));
+  await p4.click("#syncBadge");
+  await esperar(() => base3.entregas.length === nEntregas + 2);
+  const [primera, reintento] = base3.entregas.slice(nEntregas);
+  chequeo("8 respuesta perdida: el reintento lleva el MISMO id", !!primera && !!reintento && !!primera.cuerpo.p_id && primera.cuerpo.p_id === reintento.cuerpo.p_id);
+  chequeo("8 y la base lo cuenta una sola vez (no descuenta otro rollo)", base3.rollos.length === nRollos + 1);
+  await esperar(() => p4.evaluate(() => JSON.parse(localStorage.getItem("rp3c_rqueue") || "[]").length === 0));
   chequeo("8 y las colas quedan vacías", await p4.evaluate(() => JSON.parse(localStorage.getItem("rp3c_rqueue") || "[]").length === 0 && JSON.parse(localStorage.getItem("rp3c_queue") || "[]").length === 0));
   await ctx3.close();
 

@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.2)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.3)
    GENERADO por tools/portar_botonera_gp2.py desde la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de
    loekemeyer/Gestion-Productiva-2.0). Para traer un cambio de GP2 se vuelve a correr el script; no editar a mano lo que
    viene de GP2 (se pierde en el próximo port): lo propio de 3.0 vive en el script.
@@ -9,17 +9,19 @@
      · se entra con el CÓDIGO DE LA TV (4 números), no con Google. La base devuelve un PASE firmado, atado a este
        equipo, que vale hasta las 17:45 (o 3 h si se entra más tarde);
      · todo va por funciones del schema reg_prod_3_0 (cabecera Content-Profile) que exigen ese pase:
-         reg_prod_3_0_bundle · reg_prod_3_0_registrar_evento · reg_prod_3_0_anular_evento · reg_prod_3_0_tomar_rollo · reg_prod_3_0_cerrar_rollo
+         reg_prod_3_0_bundle · reg_prod_3_0_registrar_evento · reg_prod_3_0_anular_evento · reg_prod_3_0_rollo_tomar · reg_prod_3_0_rollo_cerrar
        La base guarda la CRUDA tal cual vino y arma la PROCESADA en la misma transacción;
      · sin internet se carga igual: los toques quedan en la cola del celular y se envían, con su hora original, cuando hay
        pase e internet. El catálogo (empleados, matrices, envasado, rollos) se guarda en el celular para poder abrir sin señal;
      · STOCK Y ROLLOS (Fase 1c): los mueve la base, en la misma transacción que el toque (reg_prod_3_0_registrar_evento →
        GP2.fabricar_stock) y con reg_prod_3_0_tomar_rollo / _cerrar_rollo, siempre con el pase. Mientras la base no lo tenga, el
        catálogo no trae `rollos_activos` y el selector de rollo, «¿quedó resto?» y el botón CT de Eduardo quedan apagados.
+     · ANULAR (el 🗑 del historial) devuelve el stock que había movido ese toque (Fase 1d, lo hace la base). Los rollos llevan un
+       id anti-duplicado: un reintento no descuenta otro rollo ni cierra el siguiente (como los toques, que ya lo tenían).
    Eduardo Barrionuevo (legajo "19"): CT button + rollo en E/PR (sólo con rollos_activos).
    ============================================================ */
 
-const APP_VERSION = "v3.1.2";
+const APP_VERSION = "v3.1.3";
 const LEGAJO_EDUARDO = "19";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
@@ -763,13 +765,18 @@ async function llamarRollo(fn, args) {
   }
   enqueueRollo(fn, args);
 }
+// ANTI-DUPLICADO (Fase 1d, si el catálogo trae rollos_antiduplicado): cada llamada lleva un id propio que viaja en la cola, así que un
+// reintento (la base lo hizo pero la respuesta no llegó) repite el MISMO id y la base no descuenta otro rollo ni cierra el siguiente.
+function rollosAntiduplicado() { return D.rollos_antiduplicado === true; }
 async function tomarRollo(legajo, comp_id, kg_por_rollo, matriz) {
-  await llamarRollo("reg_prod_3_0_tomar_rollo", {
-    p_legajo: String(legajo), p_comp_id: Number(comp_id), p_kg_por_rollo: Number(kg_por_rollo), p_matriz: String(matriz), p_fecha: isoNow()
-  });
+  const args = { p_legajo: String(legajo), p_comp_id: Number(comp_id), p_kg_por_rollo: Number(kg_por_rollo), p_matriz: String(matriz), p_fecha: isoNow() };
+  if (rollosAntiduplicado()) await llamarRollo("reg_prod_3_0_rollo_tomar", Object.assign({ p_id: uuidv4() }, args));
+  else await llamarRollo("reg_prod_3_0_tomar_rollo", args);
 }
 async function cerrarRollo(legajo, quedoResto) {
-  await llamarRollo("reg_prod_3_0_cerrar_rollo", { p_legajo: String(legajo), p_quedo_resto: !!quedoResto, p_fecha: isoNow() });
+  const args = { p_legajo: String(legajo), p_quedo_resto: !!quedoResto, p_fecha: isoNow() };
+  if (rollosAntiduplicado()) await llamarRollo("reg_prod_3_0_rollo_cerrar", Object.assign({ p_id: uuidv4() }, args));
+  else await llamarRollo("reg_prod_3_0_cerrar_rollo", args);
 }
 
 /* ============================================================
