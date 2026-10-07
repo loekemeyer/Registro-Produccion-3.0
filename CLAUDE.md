@@ -142,6 +142,8 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
 
 ## Convenciones de este repo
 
+- **Schema propio** `[usuario, 07/10/2026: «schema propio»]`: lo que se cree en Supabase para este repo va en el schema `reg_prod_3_0`
+  (ya expuesto en la API: las apps lo llaman con `Content-Profile: reg_prod_3_0`), no en `public`. Las tablas son separadas por sede.
 - **Funciones de Supabase que se creen para este repo** `[usuario, 06/10/2026]`: se llaman `Reg_Prod_3_0_<nombre>`
   (sin punto, para no tener que usar comillas dobles). Sin comillas Postgres las guarda en minúsculas
   (`reg_prod_3_0_<nombre>`), y desde el cliente se llaman así. Las Edge Functions llevan el mismo prefijo.

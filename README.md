@@ -30,15 +30,28 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 
 - **Registro Producción 3.0 es la página de los operarios** (Cervantes y Virgilio). **GP2 y Gestión Virgilio quedan sólo como páginas
   de admin.** La botonera de Cervantes pasa a ser la de la tablet de GP2 («como funciona hoy GP2»).
-- **Los operarios entran sólo con el código de la TV**, sin Google. El pase lo firma la base (hoy es una marca local).
-- **Un solo par de tablas nuevas** en el schema propio `reg_prod_3_0`: una **cruda** y una **procesada**, con el campo `sede`
-  (Cervantes o Virgilio). La procesada la arma la base, en la misma transacción que guarda la cruda (como hoy
-  `GP2.registrar_evento_prod`, que no tiene cruda). Todo en tablas protegidas: se escribe sólo por funciones con pase.
+- **Los operarios entran sólo con el código de la TV**, sin Google. **El pase lo firma la base** (HMAC con un secreto en Vault,
+  atado al equipo, hasta las 17:45 o 3 horas si ya pasaron): `reg_prod_3_0.reg_prod_3_0_pase_emitir` y `..._pase_ok`. Hoy las apps
+  todavía lo guardan sólo como marca local; las funciones de escritura de la Fase 1b lo van a exigir.
+- **Auditoría de horarios** [Elías, 07/10]: un ingreso pasada la hora del pase (17:45) o **más de 30 minutos antes del inicio de la
+  jornada** (08:30 Cervantes, 08:00 Virgilio) no se bloquea: queda además en `reg_prod_3_0.auditoria` para revisar (`revisado`,
+  `revisado_por`, `nota`). Los horarios están en `reg_prod_3_0.config` y se pueden cambiar. En la Fase 1b se aplica igual a cada toque.
+- **Tablas nuevas en el schema propio `reg_prod_3_0`, separadas por sede** [Elías, 07/10: «tienen que estar separadas»]:
+  `crudo_cervantes`, `crudo_virgilio` y `procesado_cervantes` (Virgilio sólo cruda), cada una con las MISMAS columnas que la
+  vieja más `anulado`, `extra`, `origen` e `id_origen`. Para lo que tiene que mirar las dos sedes (por ejemplo cuánto duró el
+  viaje de Cambio de Sede) está la vista de sólo lectura `reg_prod_3_0.crudo`, que las junta. La procesada la arma la base, en la
+  misma transacción que guarda la cruda (como hoy `GP2.registrar_evento_prod`, que no tiene cruda), y mueve el stock de GP2
+  (`GP2.fabricar_stock`) [Elías: «sí»]. Todo en tablas protegidas: se escribe sólo por funciones con pase. **Fase 1a aplicada
+  el 07/10** (tablas, pase firmado, auditoría); falta la Fase 1b (las funciones que escriben) y el front.
 - **Mientras se arma, los operarios siguen con las originales** (`Registros Produccion Cervantes`, `db_n8n_espejo`,
   `Registros_Produccion_Virgilio`). Cuando dejen el sistema anterior se migran los registros viejos a las tablas nuevas (con
   `origen` e `id_origen`, para poder repetir la copia sin duplicar) y se reapuntan los lectores.
 - **Lo que hay que reapuntar en el corte** (medido el 07/10/2026): de Cervantes, 16 funciones, 1 vista, 1 trigger y 1 cron; de
-  Virgilio, 85 funciones, 44 vistas, 19 triggers y 1 cron. Para volver a medirlo:
+  Virgilio, 85 funciones, 44 vistas, 19 triggers y 1 cron. **Plan A** [Elías]: las tablas nuevas tienen las mismas columnas, así que
+  el día del corte las viejas se renombran y el nombre viejo pasa a ser una vista de compatibilidad sobre las nuevas. **Ojo**: eso
+  alcanza para las funciones (buscan la tabla por nombre al ejecutarse), pero **las vistas quedan atadas a la tabla vieja por su
+  identidad interna, no por el nombre**: las 44 vistas hay que recrearlas con el mismo texto (con un script) y los 19 triggers
+  hay que crearlos sobre las tablas nuevas. Para volver a medirlo:
 
 ```sql
 with t(nombre, grupo) as (values ('Registros Produccion Cervantes', 'Cervantes'), ('db_n8n_espejo', 'Cervantes'),
@@ -129,10 +142,14 @@ select grupo, tipo, objeto from dep order by grupo, tipo, objeto;   -- sin la ú
      sólo cuando cambia el conjunto de legajos.
    - Convive con lo de Luis (v25.25): `GV_Dispositivo_Login`, la vista `gv_dispositivos` y la alerta diaria «un mismo celular con N
      operarios» siguen como estaban; esto agrega la IP y a Cervantes.
-   - Cómo se lee: `select * from public.reg_prod_3_0_ingresos order by at desc;`. Un equipo con varios legajos el mismo día:
-     `select dispositivo, count(distinct legajo) from public.reg_prod_3_0_ingresos where ok group by 1 having count(distinct legajo) > 1;`.
-   - **Ya está creado en la base** (07/10, migración `reg_prod_3_0_ingresos`; el SQL exacto está en `sql/reg_prod_3_0_ingresos.sql`):
-     la tabla, las 2 funciones internas, las 2 que llaman las apps, la vista de la alerta y el cron. Se probó por HTTP con la clave
+   - Cómo se lee: `select * from reg_prod_3_0.reg_prod_3_0_ingresos order by at desc;`. Un equipo con varios legajos el mismo día:
+     `select dispositivo, count(distinct legajo) from reg_prod_3_0.reg_prod_3_0_ingresos where ok group by 1 having count(distinct legajo) > 1;`.
+   - **Ya está creado en la base** (07/10; el SQL exacto está en `sql/reg_prod_3_0_ingresos.sql` y, con la mudanza al schema propio
+     `reg_prod_3_0`, en `sql/reg_prod_3_0_fase_1a.sql`): la tabla, las funciones internas, las 2 que llaman las apps, la vista de la
+     alerta y el cron. Las 2 funciones que llaman las apps siguen en `public` como **atajos que delegan** (los celulares cachean la
+     versión vieja); las apps nuevas llaman al schema `reg_prod_3_0` con la cabecera `Content-Profile: reg_prod_3_0`. **Quedan 3
+     funciones viejas en `public`** (`reg_prod_3_0_alerta_dispositivo_multi_telegram`, `reg_prod_3_0_ingreso_log` y `reg_prod_3_0_ip`),
+     sin uso y sin permisos para `anon`: la herramienta de Supabase no deja correr `DROP`, hay que borrarlas a mano. Se probó por HTTP con la clave
      pública: código bueno y malo, legajo inexistente, que `anon` no lee la tabla ni llama a las internas, y que la IP **no se
      falsifica** con `X-Forwarded-For` (la fila guarda la IP real en `ip` y el header tal cual en `xff`; sale de `cf-connecting-ip`).
      Dependencias: `GP2.monitor_clave_validar` (de GP2), `tg_enqueue`, `tg_outbox_flush`, `es_legajo_test`, `ip_en_red_empresa`.
