@@ -1,29 +1,31 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.1)
-   Es la tablet de GP2 (gp2/Produccion/RegistroApp/operarios_gp2.js) llevada al celular del operario:
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.2)
+   GENERADO por tools/portar_botonera_gp2.py desde la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de
+   loekemeyer/Gestion-Productiva-2.0). Para traer un cambio de GP2 se vuelve a correr el script; no editar a mano lo que
+   viene de GP2 (se pierde en el próximo port): lo propio de 3.0 vive en el script.
+   Lo que cambia respecto de la tablet:
      · se entra con el CÓDIGO DE LA TV (4 números), no con Google. La base devuelve un PASE firmado, atado a este
        equipo, que vale hasta las 17:45 (o 3 h si se entra más tarde);
      · todo va por funciones del schema reg_prod_3_0 (cabecera Content-Profile) que exigen ese pase:
-         reg_prod_3_0_bundle · reg_prod_3_0_envasado_articulos · reg_prod_3_0_registrar_evento · reg_prod_3_0_anular_evento
+         reg_prod_3_0_bundle · reg_prod_3_0_registrar_evento · reg_prod_3_0_anular_evento · reg_prod_3_0_tomar_rollo · reg_prod_3_0_cerrar_rollo
        La base guarda la CRUDA tal cual vino y arma la PROCESADA en la misma transacción;
      · sin internet se carga igual: los toques quedan en la cola del celular y se envían, con su hora original, cuando hay
-       pase e internet. El catálogo (empleados, matrices, envasado) se guarda en el celular para poder abrir sin señal;
+       pase e internet. El catálogo (empleados, matrices, envasado, rollos) se guarda en el celular para poder abrir sin señal;
      · STOCK Y ROLLOS (Fase 1c): los mueve la base, en la misma transacción que el toque (reg_prod_3_0_registrar_evento →
        GP2.fabricar_stock) y con reg_prod_3_0_tomar_rollo / _cerrar_rollo, siempre con el pase. Mientras la base no lo tenga, el
        catálogo no trae `rollos_activos` y el selector de rollo, «¿quedó resto?» y el botón CT de Eduardo quedan apagados.
-   Eduardo Barrionuevo (legajo "19"): CT button + rollo en E/PR (apagado, ver arriba).
+   Eduardo Barrionuevo (legajo "19"): CT button + rollo en E/PR (sólo con rollos_activos).
    ============================================================ */
 
-const APP_VERSION = "v3.1.1";
+const APP_VERSION = "v3.1.2";
 const LEGAJO_EDUARDO = "19";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
 const SCHEMA = "reg_prod_3_0";
 const RPC_TIMEOUT_MS = 20000;
-const PASE_FIN_MIN = 17 * 60 + 45;   // el pase vale hasta las 17:45 (la hora de vencimiento la pone la base)
 
 /* ============================================================
    TRANSPORTE: la clave pública + el PASE. Devuelve { data, error } como supabase-js; error.red = sin señal / base caída.
@@ -231,7 +233,6 @@ async function consultarClaveTv(clave) {
 // Con el pase conseguido: catálogo al día y lo que estaba en cola se manda.
 function alTenerPase() {
   cargarBundle().catch(() => {});
-  cargarArticulosEnvasado().catch(() => {});
   flushQueue().then(() => { renderSyncBadge(); renderSummary(); }).catch(() => {});
   renderSyncBadge();
 }
@@ -311,7 +312,7 @@ function actualizarAvisoRed(pendientes) {
 /* ============================================================
    DATOS (cargados una vez desde bundle)
    ============================================================ */
-/* Shape real de reg_prod_3_0_bundle() (el mismo de registro_operarios_bundle() de GP2, con los rollos vacíos hasta la Fase 1c):
+/* Shape real de reg_prod_3_0_bundle() (el de registro_operarios_bundle() de GP2, con pase; `rollos_activos` desde la Fase 1c):
    empleados    { legajo -> {nombre, activo, hora_entrada} }
    matrices     [ {n, d, ppk, uxg, maq, act} ]   uxg = unidades por golpe, act = activa
    registro_en_golpes  true = el cajon se cierra anotando GOLPES del contador
@@ -322,15 +323,6 @@ function actualizarAvisoRed(pendientes) {
    rollos_saldo [ {comp_id, codigo, kg_por_rollo, rollos} ]              */
 let D = {};
 
-/* ARTÍCULO DE CADA PIEZA DE ENVASADO (v3.0.1, Registro Producción 3.0) — sólo matrices de ENVASADO (las que cierran un
-   terminado, sector 12). El selector de pieza decía «Art. 394» (el código); ahora lleva el NOMBRE del artículo y la MARCA,
-   porque hay artículos que se llaman igual y se distinguen sólo por la marca (322: «Espátula Lisa Nylon 1 Pza» es el 394
-   LOEKE y el 842 CHEF). Viene de la RPC reg_prod_3_0_envasado_articulos (una sola llamada, ~6 KB; con pase):
-     { n_matriz: [ { pieza_codigo, pieza_desc, arts: [ { codigo, nombre, marca } ] } ] }
-   Si la RPC no está o falla, queda lo de siempre («Art. 394» con el código que trae el bundle). */
-let ENV_ARTS = {};
-
-const LS_ENVASADO = "rp3c_envasado";
 const LS_BUNDLE = "rp3c_bundle";
 const CATALOGO_REFRESCO_MS = 30 * 60 * 1000;   // con la app abierta, el catálogo se vuelve a pedir cada 30 min
 let _catalogoAt = 0;
@@ -338,56 +330,6 @@ let _bundleTimer = null;
 
 function leerCache(clave) { try { return JSON.parse(localStorage.getItem(clave) || "null"); } catch { return null; } }
 function guardarCache(clave, data) { try { localStorage.setItem(clave, JSON.stringify({ at: isoNow(), data })); } catch { /* storage lleno: sin caché */ } }
-
-async function cargarArticulosEnvasado() {
-  if (!Object.keys(ENV_ARTS).length) {                       // primero lo guardado en el celular (abre sin señal)
-    const c = leerCache(LS_ENVASADO);
-    if (c && c.data && typeof c.data === "object") ENV_ARTS = c.data;
-  }
-  if (!paseVigente() || navigator.onLine === false) return;
-  const { data, error } = await rpc("reg_prod_3_0_envasado_articulos");
-  if (error) {
-    if (error.code === "28000") pasePerdido();
-    else console.warn("Artículos de envasado (se sigue sin nombres):", error.message);
-    return;
-  }
-  ENV_ARTS = (data && typeof data === "object") ? data : {};
-  guardarCache(LS_ENVASADO, ENV_ARTS);
-  if (selected && ["E", "CM"].includes(selected.code)) {   // repintar lo que ya estuviera en pantalla
-    renderMatrizPicker();
-    renderPiezaPicker(String($("textInput").value || "").trim());
-  }
-}
-function piezasEnvasado(n) { return ENV_ARTS[String(n || "").trim()] || []; }
-function artsDePieza(n, codigoPieza) {
-  const p = piezasEnvasado(n).find(x => String(x.pieza_codigo || "").trim() === String(codigoPieza || "").trim());
-  return (p && p.arts) || [];
-}
-// Marca como la ve el operario [usuario 07/10/2026]: LK = Loeke (diminutivo de Loekemeyer), CH = Chef; las demás, tal cual (LOKE).
-const MARCA_CORTA = { "LOEKE": "LK", "CHEF": "CH" };
-function marcaCorta(m) { const k = String(m || "").trim(); return MARCA_CORTA[k.toUpperCase()] || k; }
-// ¿Todas las piezas de esa matriz son el MISMO artículo (mismo nombre)? Entonces el nombre no distingue nada y se muestra
-// sólo la MARCA [usuario 07/10/2026]; si los nombres son distintos, nombre y marca. Sin marca no se puede: nombre y código.
-function soloMarcaDe(n) {
-  const arts = piezasEnvasado(n).flatMap(p => p.arts || []);
-  if (arts.length < 2 || !arts.every(a => a.marca)) return false;
-  const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
-  return new Set(arts.map(a => norm(a.nombre))).size === 1;
-}
-// Un artículo por línea: «Art. 394 · Espátula Lisa Nylon 1 Pza» y debajo la marca corta (LK / CH), o sólo la marca (ver soloMarcaDe).
-function lineasArt(arts, soloMarca) {
-  return (arts || []).map(a => soloMarca
-    ? `<div class="mz-m solo">${esc(marcaCorta(a.marca))}</div>`
-    : `<div class="mz-a">Art. ${esc(a.codigo || "")}${a.nombre ? " · " + esc(a.nombre) : ""}</div>` +
-      (a.marca ? `<div class="mz-m">${esc(marcaCorta(a.marca))}</div>` : "")).join("");
-}
-// Lo mismo en una línea de texto: «Art. 394 · Espátula Lisa Nylon 1 Pza (LOEKE)», o sólo «LOEKE».
-function textoArt(arts, soloMarca) {
-  return (arts || []).map(a => soloMarca
-    ? marcaCorta(a.marca)
-    : `Art. ${a.codigo || ""}${a.nombre ? " · " + a.nombre : ""}${a.marca ? " (" + marcaCorta(a.marca) + ")" : ""}`).join(" / ");
-}
-
 function armarBundle(d) {
   const x = (d && typeof d === "object") ? d : {};
   x.matricesMap = new Map((x.matrices || []).map(m => [String(m.n || "").trim(), m]));
@@ -417,7 +359,6 @@ async function cargarBundle() {
 function refrescarCatalogos() {
   if (navigator.onLine === false || !paseVigente() || Date.now() - _catalogoAt < CATALOGO_REFRESCO_MS) return;
   cargarBundle().catch(() => {});
-  cargarArticulosEnvasado().catch(() => {});
 }
 
 function nombreMatriz(n) { return D.matricesMap?.get(String(n).trim())?.d || ""; }
@@ -911,11 +852,9 @@ function renderMatrizInfo() {
   const nm = s.lastMatrix.texto;
   const desc = nombreMatriz(nm);
   el.classList.remove("hidden");
-  const pieza = s.lastMatrix.pieza ? ` · Pieza: ${esc(s.lastMatrix.pieza)}` : "";
-  // v3.0.1: artículo (nombre y marca) si es una matriz de envasado. Con una sola pieza no hay pieza guardada: es esa.
-  const piezasEnv = piezasEnvasado(nm);
-  const artsAct = s.lastMatrix.pieza ? artsDePieza(nm, s.lastMatrix.pieza) : (piezasEnv.length === 1 ? piezasEnv[0].arts : []);
-  const artTxt = artsAct && artsAct.length ? `<br><b>${esc(textoArt(artsAct, soloMarcaDe(nm)))}</b>` : "";
+  // La pieza se muestra con su etiqueta corta si la matriz la tiene; lo guardado en el estado sigue siendo el codigo.
+  const piezaTxt = etiquetaDeSalida(nm, s.lastMatrix.comp_salida_id) || s.lastMatrix.pieza;
+  const pieza = piezaTxt ? ` · Pieza: ${esc(piezaTxt)}` : "";
   // Rollo en uso: cuanto queda, estimado con lo producido (uni / ppk por cajon).
   // Si la tablet perdio el estado (otro dia, otro equipo o storage borrado), cae
   // al uso abierto persistido en el servidor: rollos_abiertos trae kg_usados
@@ -930,7 +869,7 @@ function renderMatrizInfo() {
     rollo = `<br>🧻 Rollo de ${fmt1(r.kg_por_rollo)} kg (${esc(r.codigo || "fleje")}): ` +
             `<b style="color:${color}">quedan ~${fmt1(Math.max(0, queda))} kg</b>`;
   }
-  el.innerHTML = `<b>Matriz activa: ${esc(nm)}</b>${desc ? ` — ${esc(desc)}` : ""}${pieza}${artTxt}${rollo}`;
+  el.innerHTML = `<b>Matriz activa: ${esc(nm)}</b>${desc ? ` — ${esc(desc)}` : ""}${pieza}${rollo}`;
 }
 
 /* ============================================================
@@ -967,11 +906,8 @@ function renderMatrizPicker(filtro) {
     const conPieza = esElegida && piezaSel && salidasDeMatriz(n).length >= 2;
     el.className = "mz" + (esElegida ? " sel" : "") + (conPieza ? " has-chip" : "");
     el.dataset.n = n;
-    // v3.0.1: matriz de envasado con UNA sola pieza → el artículo va en la card (con varias, se ve al elegir la pieza)
-    const piezasEnv = piezasEnvasado(n);
-    const artLinea = piezasEnv.length === 1 ? lineasArt(piezasEnv[0].arts) : "";
-    const cuerpo = `<div class="mz-main"><div class="mz-n">${esc(n)}</div><div class="mz-d">${esc(m.d || "")}</div>${artLinea}</div>`;
-    const chip = conPieza ? `<div class="mz-chip">${esc(piezaSel.codigo || "")}<small>acá va el stock</small></div>` : "";
+    const cuerpo = `<div class="mz-main"><div class="mz-n">${esc(n)}</div><div class="mz-d">${esc(m.d || "")}</div></div>`;
+    const chip = conPieza ? `<div class="mz-chip">${esc(piezaSel.etiqueta || piezaSel.codigo || "")}<small>acá va el stock</small></div>` : "";
     el.innerHTML = cuerpo + chip;
     el.addEventListener("click", () => elegirMatriz(n));
     grid.appendChild(el);
@@ -993,11 +929,19 @@ function elegirMatriz(n) {
    La pieza elegida viaja como comp_salida_id en el C para que
    el stock se sume en el componente correcto.
    ============================================================ */
-let piezaSel = null; // {comp_id, codigo, descripcion}
+let piezaSel = null; // {comp_id, codigo, descripcion, arts, etiqueta}
 let rolloSel = null; // {comp_id, codigo, kg_por_rollo} — rollo elegido (antes era el value del <select>)
 
 function salidasDeMatriz(n) {
   return (D.matriz_salidas || {})[String(n || "").trim()] || [];
+}
+
+// Etiqueta CORTA de una salida (GP2.matriz_salida_etiqueta, bundle.matriz_salidas[n][i].etiqueta): es lo UNICO que
+// ve el operario al elegir la pieza [usuario 2026-10-07: "solo le aparezca esto al operario"]. Sin etiqueta
+// (matriz nueva o bundle viejo cacheado en la tablet) devuelve "" y la pantalla cae a codigo + descripcion + arts.
+function etiquetaDeSalida(n, compId) {
+  const sa = salidasDeMatriz(n).find(x => x.comp_id === compId);
+  return (sa && String(sa.etiqueta || "").trim()) || "";
 }
 
 function renderPiezaPicker(n) {
@@ -1019,10 +963,12 @@ function renderPiezaPicker(n) {
     wrap.classList.add("collapsed");
     const btn = document.createElement("button");
     btn.type = "button"; btn.className = "pieza-cambiar";
-    // v3.0.1: nombre y marca del artículo (RPC de envasado); sin RPC, el código que trae el bundle, como antes
-    const artsSel = artsDePieza(n, piezaSel.codigo);
-    const arts = artsSel.length ? ` (${esc(textoArt(artsSel, soloMarcaDe(n)))})` : (piezaSel.arts ? ` (art. ${esc(piezaSel.arts)})` : "");
-    btn.innerHTML = `Fabricás <b>${esc(piezaSel.codigo || "")}</b> · ${esc(piezaSel.descripcion || "")}${arts} — <u>cambiar</u>`;
+    if (piezaSel.etiqueta) {
+      btn.innerHTML = `Fabricás <b>${esc(piezaSel.etiqueta)}</b> — <u>cambiar</u>`;
+    } else {
+      const arts = piezaSel.arts ? ` (art. ${esc(piezaSel.arts)})` : "";
+      btn.innerHTML = `Fabricás <b>${esc(piezaSel.codigo || "")}</b> · ${esc(piezaSel.descripcion || "")}${arts} — <u>cambiar</u>`;
+    }
     btn.addEventListener("click", () => {
       piezaSel = null;
       renderPiezaPicker(n);
@@ -1040,9 +986,14 @@ function renderPiezaPicker(n) {
     el.className = "mz";
     // Los articulos que usan esa pieza (la 237 saca 3 piezas para 542/543/570, 720/722 y 858):
     // el operario piensa en el articulo, no en el codigo del intermedio. [usuario 2026-10-05]
-    // v3.0.1: nombre y marca (RPC de envasado); sin RPC, el código que trae el bundle, como antes
-    const arts = lineasArt(artsDePieza(n, sa.codigo), soloMarcaDe(n)) || (sa.arts ? `<div class="mz-a">Art. ${esc(sa.arts)}</div>` : "");
-    el.innerHTML = `<div class="mz-n">${esc(sa.codigo || "")}</div><div class="mz-d">${esc(sa.descripcion || "")}</div>${arts}`;
+    // Con etiqueta (GP2.matriz_salida_etiqueta) la tarjeta dice SOLO eso: ni codigo, ni descripcion, ni articulos.
+    if (sa.etiqueta) {
+      el.classList.add("mz-et");
+      el.innerHTML = `<div class="mz-n">${esc(sa.etiqueta)}</div>`;
+    } else {
+      const arts = sa.arts ? `<div class="mz-a">Art. ${esc(sa.arts)}</div>` : "";
+      el.innerHTML = `<div class="mz-n">${esc(sa.codigo || "")}</div><div class="mz-d">${esc(sa.descripcion || "")}</div>${arts}`;
+    }
     el.addEventListener("click", () => {
       piezaSel = sa; $("error").innerText = "";
       renderPiezaPicker(n);
@@ -1602,7 +1553,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Antes de entrar: el código de la TV (si falta el pase). Hasta que haya pase, el catálogo sale de lo guardado en el celular.
   verificarEntrada();
   cargarBundle().catch(e => console.warn("Bundle:", e));
-  cargarArticulosEnvasado().catch(() => {});   // nombre y marca de los artículos de envasado (sin la RPC, sigue sin nombres)
   registrarServiceWorker();
 
   // Legajo input: render summary on change
@@ -1650,7 +1600,6 @@ document.addEventListener("DOMContentLoaded", () => {
   window.addEventListener("online", () => {
     verificarEntrada();
     cargarBundle().catch(() => {});
-    cargarArticulosEnvasado().catch(() => {});
     flushQueue().then(() => { renderSyncBadge(); renderSummary(); });
   });
   window.addEventListener("offline", renderSyncBadge);

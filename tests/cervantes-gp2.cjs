@@ -1,4 +1,4 @@
-/* Cervantes · botonera de GP2 (cervantes-gp2/, v3.1.1) — entra con el código de la TV, usa el PASE y habla con el schema reg_prod_3_0.
+/* Cervantes · botonera de GP2 (cervantes-gp2/, v3.1.2) — entra con el código de la TV, usa el PASE y habla con el schema reg_prod_3_0.
    Supabase está simulado: la base de mentira exige el pase (igual que reg_prod_3_0_pase_ok) y guarda lo que le llega.
      1) sin pase aparece la pantalla del código; código malo no entra; código bueno entra, guarda el pase y trae el catálogo
         con el pase, el id del equipo y la cabecera Content-Profile: reg_prod_3_0
@@ -7,6 +7,7 @@
      4) el historial marca ENVIADO y el 🗑 anula en la base (con pase)
      5) sin señal: el toque queda PENDIENTE y se manda solo cuando vuelve
      6) pase vencido en la base: vuelve el código de la TV, el toque espera en la cola y sale con el pase nuevo
+        6b) la pieza se elige por su ETIQUETA corta (como la tablet de GP2 desde el 07/10) y viaja como comp_salida_id
      7) base caída al abrir: se abre con el catálogo guardado en el celular y sin pase se puede cargar (queda en la cola, con aviso)
         hasta que vuelve y se ingresa el código
      8) rollos (Fase 1c): sólo si el catálogo trae rollos_activos; elegir rollo en E y «CT» / «PR quedó resto» de Eduardo; sin señal esperan
@@ -39,7 +40,12 @@ const BUNDLE = {
     { n: "322", d: "Env Espatula NY", ppk: 1, uxg: 1, maq: "", act: true },
   ],
   registro_en_golpes: true,
-  matriz_salidas: {}, matriz_fleje: {}, matriz_fleje_pieza: {}, envasado: {}, rollos_saldo: [], rollos_abiertos: {},
+  // la 322 saca 2 piezas con etiqueta corta (GP2.matriz_salida_etiqueta): el operario ve sólo «LK» / «CH»
+  matriz_salidas: { "322": [
+    { comp_id: 1, codigo: "394", descripcion: "394 Terminado", arts: "394", etiqueta: "LK" },
+    { comp_id: 2, codigo: "842", descripcion: "842 Terminado", arts: "842", etiqueta: "CH" },
+  ] },
+  matriz_fleje: {}, matriz_fleje_pieza: {}, envasado: {}, rollos_saldo: [], rollos_abiertos: {},
 };
 // Catálogo de la Fase 1c: trae `rollos_activos` y los flejes (la 10 corta del fleje 100; hay 4 rollos de 25 kg)
 const BUNDLE_ROLLOS = Object.assign({}, BUNDLE, {
@@ -161,8 +167,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const bun = llamadas(base, "reg_prod_3_0_bundle").pop();
   chequeo("1 el catálogo se pide con el pase y el equipo", !!bun && bun.cuerpo.p_pase === "PASE.OK1" && bun.cuerpo.p_dispositivo === idEquipo);
   chequeo("1 el pase y el catálogo quedan guardados en el celular", await p.evaluate(() => !!JSON.parse(localStorage.getItem("rp3c_pase") || "null")?.pase && !!JSON.parse(localStorage.getItem("rp3c_bundle") || "null")?.data?.matrices));
-  await esperar(() => llamadas(base, "reg_prod_3_0_envasado_articulos").length > 0);
-  chequeo("1 los artículos de envasado también van con pase", (llamadas(base, "reg_prod_3_0_envasado_articulos").pop() || { cuerpo: {} }).cuerpo.p_pase === "PASE.OK1");
+  chequeo("1 ya no pide los nombres de artículo (GP2 los cambió por la etiqueta)", llamadas(base, "reg_prod_3_0_envasado_articulos").length === 0);
 
   // ============ 2) la botonera de GP2 ============
   await p.fill("#legajoInput", "12345");
@@ -191,7 +196,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.1" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.2" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -241,6 +246,31 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   chequeo("6 con el código nuevo sale lo que estaba en la cola, con el pase nuevo", base.eventos.length === antes6 + 1 && base.eventos[antes6].p_pase === "PASE.OK2");
   await esperar(() => p.evaluate(() => /al día/.test(document.getElementById("syncBadge").textContent)));
   chequeo("6 y la cola queda vacía", await p.evaluate(() => /al día/.test(document.getElementById("syncBadge").textContent)));
+
+  // ============ 6b) pieza con etiqueta (como GP2 desde el 07/10) ============
+  await ponerLegajo(p, "19");
+  await p.click('.box[data-code="E"]');
+  await p.fill("#textInput", "322");
+  await p.waitForSelector("#piezaGrid .mz");
+  const tarjetas = (await p.locator("#piezaGrid .mz").allInnerTexts()).map((t) => t.trim());
+  chequeo("6b la pieza se elige por su etiqueta y la tarjeta dice sólo eso", JSON.stringify(tarjetas) === JSON.stringify(["LK", "CH"]));
+  await p.click("#piezaGrid .mz >> nth=1");
+  await p.waitForSelector("#piezaGrid .pieza-cambiar");
+  chequeo("6b elegida, la línea dice «Fabricás CH»", /Fabricás CH/.test(await p.textContent("#piezaGrid .pieza-cambiar")));
+  chequeo("6b y la tarjeta de la matriz lleva la etiqueta", /CH/.test(await p.textContent('#matrizGrid .mz[data-n="322"] .mz-chip')));
+  await p.click("#btnEnviar");
+  await p.waitForSelector("#legajoScreen:not(.hidden)");
+  await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "E" && e.p.matriz === "322"));
+  const e322 = base.eventos.find((e) => e.p.toque.opcion === "E" && e.p.matriz === "322");
+  chequeo("6b el E lleva la pieza elegida (comp_salida_id), que decide dónde va el stock", !!e322 && e322.p.comp_salida_id === 2);
+  await ponerLegajo(p, "19");
+  await p.click('.box[data-code="C"]');
+  chequeo("6b en el C la matriz activa dice «Pieza: CH»", /Pieza: CH/.test(await p.textContent("#matrizInfo")));
+  await p.fill("#textInput", "5");
+  await p.click("#btnEnviar");
+  await p.waitForSelector("#legajoScreen:not(.hidden)");
+  await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C" && e.p.matriz === "322"));
+  chequeo("6b el C de la 322 también lleva la pieza", (base.eventos.find((e) => e.p.toque.opcion === "C" && e.p.matriz === "322") || { p: {} }).p.comp_salida_id === 2);
 
   // ============ 7) base caída ============
   // 7a) con pase y catálogo guardados: se abre igual

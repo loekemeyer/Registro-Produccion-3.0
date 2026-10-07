@@ -1,4 +1,7 @@
--- ESTADO: NO APLICADO en la base (07/10/2026). Espera el "sí" de Elías; al aplicarlo se cambia esta línea por "APLICADO" y la fecha.
+-- ESTADO: APLICADO en la base el 07/10/2026 (4 migraciones, en este orden: fase_1c_a_internas, _d_rollos, _c_registrar_stock, _b_catalogo;
+-- el catálogo al final porque es el que prende los rollos en la app). Verificado por la API con la clave pública: diagnóstico
+-- {directo:false, con_pase:true, después:false, rol:anon}; las internas y GP2.fabricar_stock directo dan 42501; sin pase 28000; el
+-- catálogo es idéntico al de GP2.registro_operarios_bundle en sus 9 bloques (+ rollos_activos). Stock real: no se probó (movería stock).
 -- Registro Producción 3.0 — FASE 1c (07/10/2026, Elías: «1 sí … y no se toca GP2»): stock y rollos de GP2 desde las funciones con pase.
 --
 -- EL PROBLEMA. GP2.fabricar_stock / tomar_rollo / cerrar_rollo empiezan con GP2._exigir_autorizado(), que sólo deja pasar a una cuenta de
@@ -14,7 +17,8 @@
 --   reg_prod_3_0_gp2_diagnostico(pase, equipo)                       sólo lectura: dice si la marca funciona (directo=false, con pase=true, después=false)
 --   reg_prod_3_0_bundle                                              ahora trae los rollos (matriz_fleje, matriz_fleje_pieza, rollos_saldo, rollos_abiertos),
 --                                                                    el aviso `rollos_activos` y lo que le faltaba de GP2: la etiqueta y el orden de las piezas
---   reg_prod_3_0_registrar_evento                                    después de la procesada mueve el stock, igual que GP2.registrar_evento_prod
+--   reg_prod_3_0_registrar_evento                                    después de la procesada mueve el stock, igual que GP2.registrar_evento_prod,
+--                                                                    y guarda matriz_id en la procesada (GP2.produccion lo tiene; columna nueva)
 --   reg_prod_3_0_tomar_rollo / _cerrar_rollo                         con pase (el botón CT y «¿quedó resto?» de Eduardo, y elegir rollo en E)
 -- PARIDAD CON GP2 (a propósito): anular un toque NO devuelve el stock (GP2.anular_evento_prod tampoco); un reintento de tomar_rollo que
 -- llegó dos veces descuenta dos (GP2 tampoco lo evita).
@@ -187,6 +191,10 @@ begin
 end $f$;
 
 -- 4) registrar un toque: la cruda, la procesada y AHORA el stock (misma lógica que GP2.registrar_evento_prod) -----------------------------
+-- La procesada guarda también el id de la matriz, como GP2.produccion.matriz_id (los informes de GP2 cruzan por ahí). Columna nueva, vacía
+-- para lo ya cargado (hoy: sólo filas de prueba).
+alter table reg_prod_3_0.procesado_cervantes add column if not exists matriz_id bigint;
+
 create or replace function reg_prod_3_0.reg_prod_3_0_registrar_evento(p_pase text, p_dispositivo text, p jsonb)
 returns jsonb language plpgsql security definer set search_path = ''
 as $f$
@@ -263,11 +271,11 @@ begin
   v_ini := reg_prod_3_0.reg_prod_3_0_a_timestamptz(t->>'hs_inicio');
 
   insert into reg_prod_3_0.procesado_cervantes (
-    crudo_id, id_ejecucion, fecha, legajo, nombre_empleado, matriz, nombre_matriz, uni, golpes, uni_x_golpe,
+    crudo_id, id_ejecucion, fecha, legajo, nombre_empleado, matriz, matriz_id, nombre_matriz, uni, golpes, uni_x_golpe,
     premio, tiempo_toma, tiempo_historico, hora_inicio, hora_fin, fecha_inicio, fecha_fin,
     segundos_historico, segundos_trabajados, segundos_tiempo_muerto, anular_tiempo, dia, mes, quincena)
   values (
-    v_cid, v_id, v_f, v_leg, coalesce(nullif(p->>'nombre_empleado', ''), v_nombre), v_mat,
+    v_cid, v_id, v_f, v_leg, coalesce(nullif(p->>'nombre_empleado', ''), v_nombre), v_mat, v_mid,
     coalesce(nullif(p->>'nombre_matriz', ''), v_mname), v_uni, v_golpes,
     case when v_golpes is not null then coalesce(v_uxg, 1) end,
     v_premio, v_tt, case when v_uni > 0 then v_th end,
