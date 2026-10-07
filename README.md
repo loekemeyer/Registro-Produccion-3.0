@@ -35,7 +35,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
    apellido → registra el alta (`gv_operario_alta_crear`) y **entra ya** con el legajo compartido 600 y su nombre
    (v30.08, igual que Gestión v27.37); un admin lo valida con su legajo en Gestión Virgilio (⚙️ → Validar Operarios)
    y desde ahí aparece en la lista. La entrevista usa el mismo camino. Una sesión de Google guardada se ignora (y no se borra: el origen se
-   comparte con GP2). Los **supervisores no entran por este Virgilio**: su panel sigue en Gestión Virgilio.
+   comparte con GP2). **Desde la v30.10 (Luis, 07/10) vuelve el botón de Google, sólo para supervisores**: el panel no está acá, así que un supervisor que entra con Google (o con la sesión ya guardada) va directo a Gestión Virgilio (`GESTION_URL`); un mail que no es de supervisor no entra por Google.
 3. **Cervantes = la tablet de operarios de GP2** (inicio v1.2): la tarjeta «Cervantes» abría `cervantes/` (la visual de
    Registro Producción 2.0); ahora abre `gp2/Produccion/RegistroApp/Operarios_GP2.html`. Sin sesión de Google, el guard
    de GP2 manda a su login y vuelve a la tablet con `?next=`. El botón «Menú» de la tablet apuntaba a `GP2_MODULOS.html`
