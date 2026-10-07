@@ -329,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* ================= VERSION (unica fuente de verdad) ================= */
   // Serie v3.0.N = Registro Producción 3.0 (no pisa las v1.9.x de la copia de Gestión Virgilio).
-  const LOCAL_VERSION = "v3.0.3";
+  const LOCAL_VERSION = "v3.0.4";
 
   /* ================= KEYS STORAGE ================= */
   const APP_TAG = "_Cervantes";
@@ -433,27 +433,32 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   localStorage.setItem(DAY_GUARD_KEY, today);
 
-  /* ================= PASE DE RED (login por la red de la empresa) =================
-     v3.0.1 — Registro Producción 3.0. Cervantes ya no usa la sesión de Virgilio: el login es la RED.
-     En el primer mensaje del día el legajo tiene que estar conectado al Wi-Fi de la empresa: se llama a la
-     Edge Function `login-operario`, que compara la IP real del pedido con public.red_empresa y deja el
-     intento en public.seg_login_operario_log (hora del servidor, IP, legajo, ok / motivo).
-       · 200  → queda un "pase" del legajo, válido hasta las 17:45 (hora de Buenos Aires): aunque se corte
-                la luz o internet, sigue andando.
-       · 403  → fuera de la red (o legajo no habilitado): no se envía nada.
+  /* ================= PASE POR CÓDIGO DE LA TV =================
+     v3.0.4 — Registro Producción 3.0. Reemplaza el pase por Wi-Fi de v3.0.1–v3.0.3 (se sacó: la red ya no es
+     la puerta). En el primer mensaje del día el legajo tiene que tipear los 4 números que muestra la TV de
+     Cervantes (cambian cada minuto; vale el de este minuto y el anterior). Lo valida la base con
+     public.reg_prod_3_0_cerv_ingresar(), que además deja el ingreso en public.reg_prod_3_0_ingresos: hora del
+     servidor, IP que ve el servidor, id del equipo, huella, navegador, modelo, legajo y ok / motivo. Sirve
+     para saber desde qué equipo entró cada legajo (y si un equipo entró con varios legajos): es un REGISTRO,
+     no bloquea por equipo.
+       · ok → queda un "pase" del legajo, válido hasta las 17:45 (hora de Buenos Aires): aunque se corte la
+              luz o internet, sigue andando.
+       · código malo o vencido → se vuelve a pedir; legajo no habilitado o demasiados intentos → no se envía.
        · sin internet / función caída → el mensaje queda en la cola RETENIDO (no pasa al IDB, así que el
-                service worker no lo manda) hasta que el legajo consiga el pase; al volver la red se vuelve
-                a preguntar.
-     La base todavía acepta la clave pública (las políticas se cierran en otra etapa): el JWT que devuelve
-     login-operario NO se guarda ni se manda. El pase es sólo local; la prueba es la fila ok del log. */
-  const LOGIN_OPERARIO_URL = SUPABASE_URL + "/functions/v1/login-operario";
+              service worker no lo manda). El código vence a los 2 minutos, así que no se puede validar solo
+              al volver internet: aparece un aviso con el botón «Ingresar código».
+     La base todavía acepta la clave pública (las políticas se cierran en otra etapa): el pase es sólo local;
+     la prueba es la fila ok del registro. El navegador NO puede leer la MAC del celular: el equipo se
+     identifica con un id aleatorio que queda guardado en él (el mismo `gv_dispositivo` que usa Virgilio, así
+     un celular se reconoce en las dos apps), más una huella de sus características. La IP no la puede ver
+     el celular: la anota el servidor al recibir el pedido. */
+  const CLAVE_TV_RPC = SUPABASE_URL + "/rest/v1/rpc/reg_prod_3_0_cerv_ingresar";
   const LS_PASE_PREFIX = `prod_pase${APP_TAG}`;    // + "::" + legajo
+  const LS_DISPOSITIVO = "gv_dispositivo";         // el MISMO id que Virgilio (v25.25): mismo origen, mismo celular = mismo id
   const PASE_FIN_MIN = 17 * 60 + 45;               // el pase vale hasta las 17:45
   const PASE_TIMEOUT_MS = 12000;
-  const PASE_REINTENTO_MS = 20000;
-  const _paseEnCurso = new Map();                  // legajo -> promesa (evita llamadas dobles)
-  const _paseRechazo = new Map();                  // legajo -> "fuera" | "legajo" (último intento rechazado)
-  let _paseUltimoIntento = 0;
+  const PASE_INTENTOS = 6;                         // errores de código por pantalla antes de cortar
+  const _paseEnCurso = new Map();                  // legajo -> promesa (evita pedir el código dos veces)
 
   function leerPase(legajo) {
     try { return JSON.parse(localStorage.getItem(LS_PASE_PREFIX + "::" + String(legajo).trim()) || "null"); }
@@ -462,10 +467,10 @@ document.addEventListener("DOMContentLoaded", () => {
   function guardarPase(legajo, datos) {
     try {
       localStorage.setItem(LS_PASE_PREFIX + "::" + String(legajo).trim(), JSON.stringify({
-        legajo: String(legajo).trim(), nombre: (datos && datos.nombre) || "", sede: (datos && datos.sede) || "",
+        legajo: String(legajo).trim(), nombre: (datos && datos.nombre) || "",
         day: dayKeyAR(), at: isoNow()
       }));
-    } catch { /* storage lleno o bloqueado: sin pase, se vuelve a preguntar */ }
+    } catch { /* storage lleno o bloqueado: sin pase, se vuelve a pedir el código */ }
   }
   // ¿Hay pase de HOY y todavía no son las 17:45?
   function paseVigente(legajo) {
@@ -483,43 +488,137 @@ document.addEventListener("DOMContentLoaded", () => {
     return !!(item && item.__retDia && !paseDesde(String(item.legajo || "").trim(), item.__retDia));
   }
 
-  // Pregunta a login-operario si este equipo está en la red de la empresa.
-  // -> { estado: "ok" | "fuera" | "legajo" | "sin_red", sede, nombre }
-  async function consultarRed(legajo) {
+  // ---- equipo: id guardado en el celular + huella + navegador + modelo (todo lo que el navegador deja leer)
+  let _dispMemoria = "";
+  function idDispositivo() {
+    try {
+      let id = localStorage.getItem(LS_DISPOSITIVO);
+      if (!id || id.length < 8) {
+        id = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+          : ("d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
+        localStorage.setItem(LS_DISPOSITIVO, id);
+      }
+      return id;
+    } catch {
+      if (!_dispMemoria) _dispMemoria = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+      return _dispMemoria;   // sin storage: vale mientras no se recargue; la huella lo respalda
+    }
+  }
+  async function huellaDe(txt) {
+    try {
+      if (window.crypto && crypto.subtle && window.TextEncoder) {
+        const b = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)));
+        return Array.from(b.slice(0, 8)).map(x => x.toString(16).padStart(2, "0")).join("");
+      }
+    } catch { /* cae al hash simple */ }
+    let h = 2166136261;
+    for (let i = 0; i < txt.length; i++) { h ^= txt.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(16).padStart(8, "0");
+  }
+  let _infoDisp = null;
+  async function infoDispositivo() {
+    if (_infoDisp) return _infoDisp;
+    const n = navigator, s = window.screen || {};
+    let zona = "";
+    try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch { /* sin Intl */ }
+    const extra = {
+      pantalla: (s.width || 0) + "x" + (s.height || 0) + "@" + (window.devicePixelRatio || 1),
+      idioma: n.language || "", zona, plataforma: n.platform || "",
+      nucleos: n.hardwareConcurrency || null, memoria_gb: n.deviceMemory || null, tactil: n.maxTouchPoints || 0
+    };
+    try {
+      if (n.userAgentData && n.userAgentData.getHighEntropyValues) {
+        const h = await n.userAgentData.getHighEntropyValues(["model", "platform", "platformVersion"]);
+        extra.modelo = h.model || "";
+        extra.so = ((h.platform || "") + " " + (h.platformVersion || "")).trim();
+      }
+    } catch { /* el navegador no da el modelo */ }
+    const navegador = String(n.userAgent || "").slice(0, 300);
+    const huella = await huellaDe([navegador, extra.pantalla, extra.idioma, extra.zona, extra.plataforma,
+      extra.nucleos, extra.memoria_gb, extra.modelo || ""].join("|"));
+    _infoDisp = { dispositivo: idDispositivo(), huella, navegador, extra };
+    return _infoDisp;
+  }
+
+  // Pantalla para tipear el código. -> "1234" | null (canceló)
+  function pedirClaveTv(legajo, aviso) {
+    return new Promise((resolve) => {
+      const viejo = document.getElementById("tvClaveModal");
+      if (viejo) viejo.remove();
+      const fondo = document.createElement("div");
+      fondo.id = "tvClaveModal";
+      fondo.style.cssText = "position:fixed;inset:0;z-index:300;background:rgba(15,23,42,.65);display:flex;align-items:center;justify-content:center;padding:16px;";
+      const caja = document.createElement("div");
+      caja.style.cssText = "background:#fff;border-radius:14px;padding:20px;max-width:340px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.35);text-align:center;font-family:inherit;";
+      const t = document.createElement("div");
+      t.style.cssText = "font-size:20px;font-weight:800;color:#0f172a;margin-bottom:6px;";
+      t.textContent = "📺 Código de la TV";
+      const d = document.createElement("div");
+      d.style.cssText = "font-size:14px;color:#475569;margin-bottom:12px;";
+      d.textContent = "Legajo " + legajo + ". Mirá la TV y poné los 4 números (cambian cada minuto).";
+      const inp = document.createElement("input");
+      inp.id = "tvClaveInput";
+      inp.type = "text"; inp.inputMode = "numeric"; inp.maxLength = 4; inp.autocomplete = "one-time-code";
+      inp.setAttribute("pattern", "[0-9]*");
+      inp.style.cssText = "width:100%;box-sizing:border-box;font-size:34px;letter-spacing:12px;text-align:center;padding:8px;border:2px solid #cbd5e1;border-radius:10px;font-weight:800;";
+      const err = document.createElement("div");
+      err.id = "tvClaveError";
+      err.style.cssText = "min-height:20px;margin:8px 0;font-size:14px;font-weight:700;color:#b91c1c;";
+      err.textContent = aviso || "";
+      const fila = document.createElement("div");
+      fila.style.cssText = "display:flex;gap:8px;";
+      const no = document.createElement("button");
+      no.id = "tvClaveNo"; no.type = "button"; no.textContent = "Cancelar";
+      no.style.cssText = "flex:1;padding:12px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;font-size:16px;font-weight:700;";
+      const ok = document.createElement("button");
+      ok.id = "tvClaveOk"; ok.type = "button"; ok.textContent = "Entrar";
+      ok.style.cssText = "flex:1;padding:12px;border-radius:10px;border:none;background:#1e40af;color:#fff;font-size:16px;font-weight:800;";
+      fila.append(no, ok);
+      caja.append(t, d, inp, err, fila);
+      fondo.appendChild(caja);
+      document.body.appendChild(fondo);
+
+      const cerrar = (v) => { fondo.remove(); resolve(v); };
+      const enviar = () => {
+        const v = inp.value.replace(/\D/g, "");
+        if (v.length !== 4) { err.textContent = "Son 4 números."; return; }
+        cerrar(v);
+      };
+      inp.addEventListener("input", () => { inp.value = inp.value.replace(/\D/g, "").slice(0, 4); });
+      inp.addEventListener("keydown", (e) => { if (e.key === "Enter") enviar(); });
+      ok.addEventListener("click", enviar);
+      no.addEventListener("click", () => cerrar(null));
+      setTimeout(() => { try { inp.focus(); } catch { /* sin foco */ } }, 50);
+    });
+  }
+
+  // Manda el código a la base. -> { estado: "ok" | "codigo" | "legajo" | "bloqueo" | "sin_red", nombre }
+  async function consultarClaveTv(legajo, clave) {
     if (navigator.onLine === false) return { estado: "sin_red" };
+    const info = await infoDispositivo().catch(() => ({ dispositivo: idDispositivo(), huella: "", navegador: "", extra: {} }));
     const ctl = typeof AbortController !== "undefined" ? new AbortController() : null;
     const timer = ctl ? setTimeout(() => ctl.abort(), PASE_TIMEOUT_MS) : null;
     try {
-      const r = await fetch(LOGIN_OPERARIO_URL, {
+      const r = await fetch(CLAVE_TV_RPC, {
         method: "POST",
         headers: { "Content-Type": "application/json", "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY },
-        body: JSON.stringify({ legajo: String(legajo).trim(), app: "cervantes" }),
+        body: JSON.stringify({
+          p_app: "cervantes", p_legajo: String(legajo).trim(), p_clave: clave,
+          p_dispositivo: info.dispositivo, p_huella: info.huella, p_navegador: info.navegador, p_extra: info.extra
+        }),
         signal: ctl ? ctl.signal : undefined
       });
+      if (!r.ok) return { estado: "sin_red" };   // 404 (función sin crear) / 5xx: no se pudo verificar; no es culpa del operario
       let j = null;
       try { j = await r.json(); } catch { /* sin cuerpo */ }
-      if (r.ok) return { estado: "ok", sede: (j && j.sede) || "", nombre: (j && j.nombre) || "" };
-      if (r.status === 403) return { estado: /legajo/i.test(String((j && j.error) || "")) ? "legajo" : "fuera" };
-      return { estado: "sin_red" };   // 5xx u otro: la función no pudo verificar; no es culpa del operario
+      if (j && j.ok) return { estado: "ok", nombre: j.nombre || "" };
+      const e = String((j && j.error) || "");
+      return { estado: e === "legajo" || e === "bloqueo" ? e : "codigo" };
     } catch {
       return { estado: "sin_red" };
     } finally {
       if (timer) clearTimeout(timer);
     }
-  }
-
-  function validarRed(legajo) {
-    const leg = String(legajo).trim();
-    if (_paseEnCurso.has(leg)) return _paseEnCurso.get(leg);
-    const p = (async () => {
-      const r = await consultarRed(leg);
-      _paseUltimoIntento = Date.now();
-      if (r.estado === "ok") { guardarPase(leg, r); _paseRechazo.delete(leg); }
-      else if (r.estado === "fuera" || r.estado === "legajo") _paseRechazo.set(leg, r.estado);
-      return r;
-    })().finally(() => { _paseEnCurso.delete(leg); });
-    _paseEnCurso.set(leg, p);
-    return p;
   }
 
   // Con el pase conseguido, lo retenido de ese legajo pasa a la cola normal (IDB + background sync).
@@ -537,31 +636,44 @@ document.addEventListener("DOMContentLoaded", () => {
     if (n) { writeQueue(q); registerBackgroundSync(); updateSyncBadge(); }
   }
 
-  // Asegura el pase del legajo antes de aceptar su mensaje.
+  // Asegura el pase del legajo antes de aceptar su mensaje (pide el código de la TV si hace falta).
   // -> { ok: true, pendiente: false } | { ok: true, pendiente: true } (sin internet: queda en cola)
-  //    | { ok: false, mensaje } (fuera de la red: no se envía)
-  async function asegurarPaseRed(legajo) {
+  //    | { ok: false, mensaje } (canceló, legajo no habilitado o demasiados intentos: no se envía)
+  function asegurarPaseTv(legajo) {
     const leg = String(legajo || "").trim();
-    if (paseVigente(leg)) return { ok: true, pendiente: false };
-    const r = await validarRed(leg);
-    if (r.estado === "ok") { liberarRetenidos(leg); return { ok: true, pendiente: false }; }
-    if (r.estado === "sin_red") return { ok: true, pendiente: true };
-    if (r.estado === "legajo") return { ok: false, mensaje: "El legajo " + leg + " no está habilitado para iniciar la jornada. Avisá al supervisor." };
-    return { ok: false, mensaje: "Para iniciar la jornada tenés que estar conectado al Wi-Fi de la empresa." };
+    if (paseVigente(leg)) return Promise.resolve({ ok: true, pendiente: false });
+    if (_paseEnCurso.has(leg)) return _paseEnCurso.get(leg);
+    const p = (async () => {
+      if (navigator.onLine === false) return { ok: true, pendiente: true };
+      let aviso = "";
+      for (let i = 0; i < PASE_INTENTOS; i++) {
+        const clave = await pedirClaveTv(leg, aviso);
+        if (clave == null) return { ok: false, mensaje: "Para iniciar la jornada tenés que ingresar el código de la TV." };
+        const r = await consultarClaveTv(leg, clave);
+        if (r.estado === "ok") { guardarPase(leg, r); liberarRetenidos(leg); return { ok: true, pendiente: false }; }
+        if (r.estado === "sin_red") return { ok: true, pendiente: true };
+        if (r.estado === "legajo") return { ok: false, mensaje: "El legajo " + leg + " no está habilitado para iniciar la jornada. Avisá al supervisor." };
+        if (r.estado === "bloqueo") return { ok: false, mensaje: "Demasiados intentos con el código. Esperá unos minutos y probá de nuevo." };
+        aviso = "Código incorrecto o vencido: mirá la TV y probá de nuevo.";
+      }
+      return { ok: false, mensaje: "El código no coincide. Mirá la TV y probá de nuevo." };
+    })().finally(() => { _paseEnCurso.delete(leg); });
+    _paseEnCurso.set(leg, p);
+    return p;
   }
 
-  // Al volver internet (o cada tanto) los legajos con mensajes retenidos vuelven a preguntar por la red.
-  async function reintentarPasesRetenidos() {
-    if (navigator.onLine === false) return;
-    if (Date.now() - _paseUltimoIntento < PASE_REINTENTO_MS) return;
+  // Botón del aviso: pide el código de cada legajo que tenga mensajes retenidos.
+  async function ingresarCodigoRetenidos() {
     const legajos = [...new Set(readQueue().filter(estaRetenido).map(x => String(x.legajo || "").trim()).filter(Boolean))];
     for (const leg of legajos) {
-      const r = await validarRed(leg);
-      if (r.estado === "ok") liberarRetenidos(leg);
+      const r = await asegurarPaseTv(leg);
+      if (!r.ok && r.mensaje) { alert(r.mensaje); break; }
     }
+    updateSyncBadge();
+    flushQueue();
   }
 
-  // Aviso fijo arriba mientras haya mensajes esperando la red de la empresa.
+  // Aviso fijo arriba mientras haya mensajes esperando el código de la TV.
   function actualizarAvisoRed(retenidos) {
     let el = document.getElementById("redAviso");
     if (!retenidos) { if (el) el.remove(); return; }
@@ -569,12 +681,20 @@ document.addEventListener("DOMContentLoaded", () => {
       el = document.createElement("div");
       el.id = "redAviso";
       el.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:200;padding:8px 12px;font-size:14px;font-weight:700;text-align:center;background:#fef3c7;color:#92400e;border-bottom:2px solid #f59e0b;";
+      const txt = document.createElement("span");
+      txt.id = "redAvisoTxt";
+      const btn = document.createElement("button");
+      btn.id = "redAvisoBtn"; btn.type = "button"; btn.textContent = "Ingresar código";
+      btn.style.cssText = "margin-left:10px;padding:4px 12px;border-radius:8px;border:1px solid #b45309;background:#fff;color:#92400e;font-size:14px;font-weight:800;";
+      btn.addEventListener("click", ingresarCodigoRetenidos);
+      el.append(txt, btn);
       document.body.appendChild(el);
     }
-    const fuera = [...new Set(readQueue().filter(estaRetenido).map(x => String(x.legajo || "").trim()))].some(l => _paseRechazo.has(l));
-    el.textContent = fuera
-      ? `📶 Estás fuera de la red de la empresa: ${retenidos} mensaje(s) esperan. Conectate al Wi-Fi para enviarlos.`
-      : `📶 ${retenidos} mensaje(s) esperan: se envían cuando se valide la red de la empresa.`;
+    const sinRed = navigator.onLine === false;
+    el.querySelector("#redAvisoTxt").textContent = sinRed
+      ? `📺 ${retenidos} mensaje(s) esperan: cuando vuelva internet ingresá el código de la TV.`
+      : `📺 ${retenidos} mensaje(s) esperan el código de la TV para enviarse.`;
+    el.querySelector("#redAvisoBtn").style.display = sinRed ? "none" : "";
   }
 
   /* ================= COLA ================= */
@@ -648,7 +768,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const stillQueued = [];
     let recovered = 0;
     for (const item of lsQueue) {
-      // v3.0.1: lo retenido a la espera de la red de la empresa nunca estuvo en el IDB: no se da por enviado.
+      // v3.0.4: lo retenido a la espera del código de la TV nunca estuvo en el IDB: no se da por enviado.
       if (item.__retDia || idbIds.has(item.id)) {
         stillQueued.push(item);
       } else {
@@ -668,7 +788,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const q = readQueue();
     if (!q.length) return;
     for (const item of q) {
-      if (item.__retDia) continue;   // v3.0.1: retenido hasta validar la red: el service worker no lo ve
+      if (item.__retDia) continue;   // v3.0.4: retenido hasta el código de la TV: el service worker no lo ve
       try { await idbPut(item); } catch { /* ignore */ }
     }
   }
@@ -688,10 +808,10 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!badge) return;
     const q = readQueue();
     const failed = q.filter(x => (x.__tries || 0) > 0).length;
-    const retenidos = q.filter(estaRetenido).length;   // v3.0.1: esperando la red de la empresa
+    const retenidos = q.filter(estaRetenido).length;   // v3.0.4: esperando el código de la TV
     actualizarAvisoRed(retenidos);
     if (retenidos > 0) {
-      badge.textContent = `${LOCAL_VERSION} 📶 ${retenidos}`;
+      badge.textContent = `${LOCAL_VERSION} 📺 ${retenidos}`;
       badge.style.background = "#fef3c7";
       badge.style.color = "#92400e";
       badge.style.borderColor = "#f59e0b";
@@ -715,7 +835,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function enqueue(payload) {
     const item = { ...payload, __tries: 0, __queuedAt: isoNow() };
-    // v3.0.1: sin pase de red de hoy el ítem queda RETENIDO (ver PASE DE RED): no va al IDB ni al service worker.
+    // v3.0.4: sin pase de hoy el ítem queda RETENIDO (ver PASE POR CÓDIGO DE LA TV): no va al IDB ni al service worker.
     const legItem = String(payload.legajo || "").trim();
     if (legItem && !paseDesde(legItem, dayKeyAR())) item.__retDia = dayKeyAR();
     const q = readQueue();
@@ -1089,7 +1209,6 @@ document.addEventListener("DOMContentLoaded", () => {
     isFlushing = true;
     let didWork = false;
     try {
-      await reintentarPasesRetenidos();   // v3.0.1: al volver internet se vuelve a preguntar por la red
       let q = readQueue();
       if (!q.length) return;
 
@@ -2109,10 +2228,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const tsInicioCajon = el.dataset.tsInicioCajon;
     const segPostAyer = Number(el.dataset.segPostAyer || 0);
 
-    // v3.0.1 — esta ruta también puede ser el primer mensaje del día (encola una LT): mismo chequeo de red.
+    // v3.0.4 — esta ruta también puede ser el primer mensaje del día (encola una LT): mismo código de la TV.
     // `el` ya está capturado arriba (e.currentTarget se pierde tras un await, el elemento no).
     if (!paseVigente(leg)) {
-      const pase = await asegurarPaseRed(leg);
+      const pase = await asegurarPaseTv(leg);
       if (!pase.ok) { alert(pase.mensaje); return; }
     }
 
@@ -2242,18 +2361,18 @@ document.addEventListener("DOMContentLoaded", () => {
     const legajo = legajoKey();
     if (!legajo) { alert("Ingresa el numero de legajo"); return; }
 
-    // v3.0.1 — primer mensaje del día: el legajo tiene que estar en la red de la empresa (ver PASE DE RED).
+    // v3.0.4 — primer mensaje del día: el legajo tiene que ingresar el código de la TV (ver PASE POR CÓDIGO DE LA TV).
     // Va ANTES de la Llegada Tarde: la LT sólo existe si pasa después de las 08:30, y quien manda su primer
     // mensaje antes de esa hora no genera LT: la verificación de presencia no puede depender de ella.
     if (!paseVigente(legajo)) {
       errorEl.style.color = "#475569";
-      errorEl.innerText = "Validando la red de la empresa…";
+      errorEl.innerText = "Ingresá el código de la TV…";
       btnEnviar.disabled = true;
       let pase;
-      try { pase = await asegurarPaseRed(legajo); } finally { btnEnviar.disabled = false; }
+      try { pase = await asegurarPaseTv(legajo); } finally { btnEnviar.disabled = false; }
       if (!pase.ok) { errorEl.style.color = "red"; errorEl.innerText = pase.mensaje; return; }
       errorEl.innerText = pase.pendiente
-        ? "Sin conexión: el mensaje queda en la cola y se envía cuando se valide la red de la empresa."
+        ? "Sin conexión: el mensaje queda en la cola y se envía cuando ingreses el código de la TV."
         : "";
     }
 
@@ -3566,7 +3685,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   window.addEventListener("focus", () => { flushQueue(); flushStockQueue(); });
   window.addEventListener("online", async () => {
-    _paseUltimoIntento = 0;   // v3.0.1: volvió internet → preguntar por la red de la empresa ya, sin esperar el intervalo
+    updateSyncBadge();   // v3.0.4: volvió internet → el aviso de «código de la TV» muestra su botón
     const end = Date.now() + 3000;
     while (Date.now() < end && readQueue().length) await flushQueue();
     flushStockQueue();

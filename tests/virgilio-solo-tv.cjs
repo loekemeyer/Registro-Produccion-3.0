@@ -9,6 +9,8 @@
    6) código correcto → «＋ No estoy en la lista» → pide el ALTA con su nombre (gv_operario_alta_crear) y NO entra;
       está el botón «Entrevista / prueba»
    7) una sesión de Google vieja en localStorage (el origen se comparte con GP2) ni cuenta ni se borra
+   8) v30.12: cada ingreso con la TV deja el REGISTRO del equipo (reg_prod_3_0_registrar_ingreso: legajo, id gv_dispositivo,
+      huella, navegador, pantalla); si esa llamada falla, el operario entra igual
    Sale 1 si falla. */
 let chromium;
 try { ({ chromium } = require("/opt/node22/lib/node_modules/playwright")); }
@@ -29,10 +31,10 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
   const res = [];
   const chequeo = (n, ok) => { res.push([n, !!ok]); if (!ok) console.log("  ✗ " + n); };
 
-  async function pagina(extraInit) {
+  async function pagina(extraInit, opts) {
     const ctx = await b.newContext({ serviceWorkers: "block" });
     ctx.setDefaultTimeout(8000);
-    const est = { google: 0, validar: 0, alta: null };
+    const est = { google: 0, validar: 0, alta: null, ingresos: [] };
     if (extraInit) await ctx.addInitScript(extraInit);
     await ctx.route("**/*.supabase.co/**", async (route) => {
       const req = route.request(); const url = req.url();
@@ -48,6 +50,11 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
         try { est.alta = JSON.parse(req.postData() || "{}"); } catch {}
         return json({ id: 7, nombre: (est.alta && est.alta.p_nombre) || "", estado: "pendiente" });
       }
+      if (url.includes("/rpc/reg_prod_3_0_registrar_ingreso")) {
+        try { est.ingresos.push(JSON.parse(req.postData() || "{}")); } catch {}
+        if (opts && opts.ingresoFalla) return route.fulfill({ status: 500, headers: { ...CORS, "content-type": "application/json" }, body: "{}" });
+        return json(1);
+      }
       if (url.includes("/rest/v1/Empleados")) return json([{ Legajo: "999", Empleado: "Prueba TV" }]);
       return route.abort();
     });
@@ -62,7 +69,7 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
   const visible = (p, sel) => p.locator(sel).first().isVisible();
 
   // ---- 1) pantalla ----
-  { const { ctx, p } = await pagina();
+  { const { ctx, p, est } = await pagina();
     await p.waitForFunction(() => /código de la TV/.test(document.getElementById("authStatus").textContent));
     chequeo("1 no se ve el botón de Google", !(await visible(p, "#googleSignInBtn")));
     chequeo("1 no se ve el separador «o»", !(await visible(p, "#authBlock .auth-divider")));
@@ -105,6 +112,13 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     await p.waitForSelector("#optionsScreen:not(.hidden)");
     const ses = JSON.parse((await leer(p, "vir_legajo_auth")) || "null");
     chequeo("5 al elegir su nombre cae en la botonera con la sesión del día", ses && ses.legajo === "999" && !(await visible(p, "#plantSelector")));
+    // 8) registro del equipo
+    await p.waitForFunction(() => true); await pausa(600);
+    const ing = est.ingresos[0] || {};
+    chequeo("8 el ingreso deja UN registro con app y legajo", est.ingresos.length === 1 && ing.p_app === "virgilio" && ing.p_legajo === "999" && ing.p_nombre === "Prueba TV");
+    chequeo("8 el registro lleva el id del equipo (gv_dispositivo), la huella y el navegador", !!ing.p_dispositivo && ing.p_dispositivo === (await leer(p, "gv_dispositivo")) && !!ing.p_huella && /Mozilla|Chrome/.test(ing.p_navegador || ""));
+    chequeo("8 el registro lleva pantalla, zona e idioma", !!(ing.p_extra && ing.p_extra.pantalla && "zona" in ing.p_extra && "idioma" in ing.p_extra));
+    chequeo("8 el método es clave_tv", ing.p_metodo === "clave_tv");
     await ctx.close(); }
 
   // ---- 6) código correcto → «No estoy en la lista» → nombre: pide el alta y ENTRA con el 600 (v30.08 ≡ Gestión v27.37) ----
@@ -120,6 +134,17 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     const ses6 = JSON.parse((await leer(p, "vir_legajo_auth")) || "null");
     chequeo("6 pide el alta con el nombre", est.alta && est.alta.p_nombre === "Juan Perez");
     chequeo("6 y entra con el legajo 600 y su nombre", ses6 && ses6.legajo === "600" && ses6.nombre === "Juan Perez");
+    await ctx.close(); }
+
+  // ---- 8b) si el registro falla, el operario entra igual ----
+  { const { ctx, p, est } = await pagina(null, { ingresoFalla: true });
+    await p.fill("#tvClaveInput", "1234");
+    await p.click("#tvClaveStep .primary-btn");
+    await p.waitForSelector("#tvNombreStep:not(.hidden)");
+    await p.click("#tvNombreLista button");
+    await p.waitForSelector("#optionsScreen:not(.hidden)");
+    await pausa(500);
+    chequeo("8 si el registro falla (500) el operario entra igual", est.ingresos.length === 1 && !!(await leer(p, "vir_legajo_auth")));
     await ctx.close(); }
 
   // ---- 7) sesión de Google vieja ----

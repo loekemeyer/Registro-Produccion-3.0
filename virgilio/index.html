@@ -5139,7 +5139,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.11";
+const APP_VERSION = "v30.12";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -5196,6 +5196,61 @@ function gvRegistrarIngreso(ident, metodo) {
       }),
       keepalive: true
     }).then(function (r) { if (r && r.ok) { try { localStorage.setItem(clave, "1"); } catch (_e) {} } }).catch(function () {});
+  } catch (_e) {}
+}
+
+/* v30.12 (Registro Producción 3.0, Elías 07/10): cada ingreso con el código de la TV deja, además, una fila en
+   public.reg_prod_3_0_ingresos con lo que el celular NO puede dar solo: la IP que ve el servidor (la anota la
+   función al recibir el pedido). Más el id del equipo (gv_dispositivo, el MISMO que usa Cervantes), una huella de
+   sus características, el navegador y el modelo. Es un REGISTRO, no bloquea, y es lo que el celular DECLARA: la
+   fila queda con verificado = false. El navegador no da la MAC. Best-effort: si falla no pasa nada. Se lee así:
+     select * from public.reg_prod_3_0_ingresos order by at desc; */
+async function rpHuella(txt) {
+  try {
+    if (window.crypto && crypto.subtle && window.TextEncoder) {
+      var h = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(txt)));
+      return Array.from(h.slice(0, 8)).map(function (x) { return x.toString(16).padStart(2, "0"); }).join("");
+    }
+  } catch (_e) {}
+  var f = 2166136261;
+  for (var i = 0; i < txt.length; i++) { f ^= txt.charCodeAt(i); f = Math.imul(f, 16777619); }
+  return (f >>> 0).toString(16).padStart(8, "0");
+}
+async function rpInfoEquipo() {
+  var n = navigator, s = window.screen || {}, zona = "";
+  try { zona = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (_e) {}
+  var extra = {
+    pantalla: (s.width || 0) + "x" + (s.height || 0) + "@" + (window.devicePixelRatio || 1),
+    idioma: n.language || "", zona: zona, plataforma: n.platform || "",
+    nucleos: n.hardwareConcurrency || null, memoria_gb: n.deviceMemory || null, tactil: n.maxTouchPoints || 0
+  };
+  try {
+    if (n.userAgentData && n.userAgentData.getHighEntropyValues) {
+      var h = await n.userAgentData.getHighEntropyValues(["model", "platform", "platformVersion"]);
+      extra.modelo = h.model || "";
+      extra.so = ((h.platform || "") + " " + (h.platformVersion || "")).trim();
+    }
+  } catch (_e) {}
+  var navegador = String(n.userAgent || "").slice(0, 300);
+  var huella = await rpHuella([navegador, extra.pantalla, extra.idioma, extra.zona, extra.plataforma,
+    extra.nucleos, extra.memoria_gb, extra.modelo || ""].join("|"));
+  return { navegador: navegador, huella: huella, extra: extra };
+}
+function rpRegistrarIngresoTv(ident, metodo) {
+  try {
+    if (!ident || ident.type !== "operario") return;
+    var leg = (ident.emp && ident.emp.legajo) ? String(ident.emp.legajo) : "";
+    rpInfoEquipo().then(function (info) {
+      return fetch(SUPABASE_URL + "/rest/v1/rpc/reg_prod_3_0_registrar_ingreso", {
+        method: "POST",
+        headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          p_app: "virgilio", p_legajo: leg, p_nombre: ident.nombre || null, p_metodo: metodo || null,
+          p_dispositivo: gvDispositivoId(), p_huella: info.huella, p_navegador: info.navegador, p_extra: info.extra
+        }),
+        keepalive: true
+      });
+    }).catch(function () {});
   } catch (_e) {}
 }
 
@@ -17223,7 +17278,7 @@ function _renderIdentity() {
   else showOperario(__identity.emp);
 }
 function _routeAfterAuth() {
-  try { gvRegistrarIngreso(__identity, window.__gvLoginMetodo || "sesion_guardada"); window.__gvLoginMetodo = null; } catch (_e) {}
+  try { var _rpM = window.__gvLoginMetodo; gvRegistrarIngreso(__identity, _rpM || "sesion_guardada"); if (_rpM) rpRegistrarIngresoTv(__identity, _rpM); window.__gvLoginMetodo = null; } catch (_e) {}
   /* v30.01 (Registro Producción 3.0): la planta ya se eligió en la pantalla de inicio del sitio (../),
      así que acá no hay segundo selector: el operario cae directo en su botonera y el supervisor en su panel. */
   __plantChosen = true;
