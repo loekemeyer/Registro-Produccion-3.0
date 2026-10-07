@@ -95,10 +95,11 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
      operarios» siguen como estaban; esto agrega la IP y a Cervantes.
    - Cómo se lee: `select * from public.reg_prod_3_0_ingresos order by at desc;`. Un equipo con varios legajos el mismo día:
      `select dispositivo, count(distinct legajo) from public.reg_prod_3_0_ingresos where ok group by 1 having count(distinct legajo) > 1;`.
-   - **Hay que crear la tabla, las funciones, la vista y el cron en la base** (SQL pendiente de aprobación). Hasta entonces
-     `cervantes/` no puede validar (la pantalla deja pasar y los mensajes quedan retenidos) y Virgilio no registra nada (no se nota).
-     **El cambio de la tarjeta y la v3.0.5 no se suben a `main` hasta que el SQL esté aplicado y verificado**: con la tarjeta
-     apuntando a `cervantes/` y sin la función, ningún mensaje de Cervantes saldría.
+   - **Ya está creado en la base** (07/10, migración `reg_prod_3_0_ingresos`; el SQL exacto está en `sql/reg_prod_3_0_ingresos.sql`):
+     la tabla, las 2 funciones internas, las 2 que llaman las apps, la vista de la alerta y el cron. Se probó por HTTP con la clave
+     pública: código bueno y malo, legajo inexistente, que `anon` no lee la tabla ni llama a las internas, y que la IP **no se
+     falsifica** con `X-Forwarded-For` (la fila guarda la IP real en `ip` y el header tal cual en `xff`; sale de `cf-connecting-ip`).
+     Dependencias: `GP2.monitor_clave_validar` (de GP2), `tg_enqueue`, `tg_outbox_flush`, `es_legajo_test`, `ip_en_red_empresa`.
 
 ## Qué se recortó (Virgilio, 06/10/2026)
 
@@ -221,7 +222,7 @@ supervisor). De esos tests se trajeron 8 de operario.
 
 - `modulo-minimizar-anular` es **intermitente** (falla «BR re-entrar = mismo tramo» algunas corridas): pasa igual en el
   código original de Gestión Virgilio y falló 1 de 3 corridas sin estos cambios. No se tocó.
-- **No se probó**: nada contra Supabase real (`reg_prod_3_0_cerv_ingresar`, `gv_tv_clave_validar` y las tablas están simulados), el
+- **No se probó**: las pruebas de Playwright simulan Supabase (`reg_prod_3_0_cerv_ingresar`, `gv_tv_clave_validar` y las tablas); las funciones nuevas se probaron aparte por HTTP contra la base real, pero la app de punta a punta con un celular y la TV, no, el
   *background sync* del service worker (en las pruebas está bloqueado), ni el login con Google de GP2.
 
 ## Fuente de verdad
