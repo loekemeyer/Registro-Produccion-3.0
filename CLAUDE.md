@@ -135,9 +135,9 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
   (JWT `eyJhbGciOiJIUzI1NiIs…`) ni dejar una `sb_secret_` / `service_role` en un archivo de este repo.
 - **Todo cambio de JS/CSS/HTML de una app bumpea su versión** en el mismo commit (los celulares cachean fuerte):
   `?v=` del `<script>`/`<link>` y la versión propia de esa app (`APP_VERSION` en `virgilio/index.html`, `SW_VERSION` en
-  `virgilio/sw.js` y `virgilio/version.json`; `LOCAL_VERSION` + `CACHE_VERSION` en `cervantes/`; `SW_VERSION` en el
-  `sw.js` de la raíz; `version.js` en `gp2/`).
-- **Series de versión de este repo**: Virgilio `v30.NN`, Cervantes `v3.0.N`. Virgilio las compara con `_verNum`, que sólo
+  `virgilio/sw.js` y `virgilio/version.json`; `LOCAL_VERSION` + `CACHE_VERSION` en `cervantes/`; `APP_VERSION` en `cervantes-gp2/app.js` + `SW_VERSION` en `cervantes-gp2/sw.js` +
+  `?v=` y `MI_V` en `cervantes-gp2/index.html`; `SW_VERSION` en el `sw.js` de la raíz; `version.js` en `gp2/`).
+- **Series de versión de este repo**: Virgilio `v30.NN`, Cervantes `v3.0.N`, botonera nueva de Cervantes (`cervantes-gp2/`) `v3.1.N`. Virgilio las compara con `_verNum`, que sólo
   acepta `vMAYOR.MENOR`: no agregar sufijos.
 
 ## Convenciones de este repo
