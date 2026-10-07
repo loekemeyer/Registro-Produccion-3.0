@@ -20,7 +20,7 @@
     (function(){
       // El operario ya no tiene version propia: se compara el TOKEN de cache compartido
       // (el mismo ?v= que llevan todos los assets). Si cambia, el HTML cacheado es viejo.
-      var MI_V = '3.1.3';
+      var MI_V = '3.1.4';
       function chequear(){
         fetch(location.pathname, { cache: 'no-store' }).then(function(r){ return r.text(); }).then(function(html){
           var m = html.match(/app\.js\?v=([\w.]+)/);
@@ -90,8 +90,13 @@
     .mz.sel .mz-n { color: #0f172a; }
     .mz.sel .mz-d { color: #334155; }
     /* Matriz elegida con pieza: la pieza queda a la DERECHA del numero [usuario 2026-08-31] */
-    .mz.has-chip { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .mz-chip { flex: 0 0 auto; background: #fef9c3; color: #854d0e; font-weight: 900; font-size: 17px; padding: 8px 12px; border-radius: 8px; text-align: center; line-height: 1.1; }
+    /* La card con chip ocupa la fila entera pero mide lo que su contenido (justify-self: start): en una celda de 150px
+       el chip no entraba y quedaba AFUERA de la tarjeta, y el nombre se partia a mitad de palabra [usuario 2026-10-07].
+       Si falta lugar, el chip parte su texto por palabras; el nombre de la matriz no se achica. */
+    .mz.has-chip { grid-column: 1 / -1; justify-self: start; display: flex; align-items: center; gap: 12px; }
+    .mz.has-chip .mz-main { flex: 0 0 auto; max-width: 55%; }
+    .mz.has-chip .mz-d { overflow-wrap: break-word; }
+    .mz-chip { flex: 0 1 auto; background: #fef9c3; color: #854d0e; font-weight: 900; font-size: 17px; padding: 8px 12px; border-radius: 8px; text-align: center; line-height: 1.1; }
     .mz-chip small { display: block; font-size: 10px; font-weight: 700; opacity: .8; margin-top: 1px; }
     .mz-empty { grid-column: 1 / -1; color: #475569; font-size: 14px; padding: 10px; text-align: center; }
     /* Selector de pieza (matrices con varias salidas) */
@@ -273,6 +278,6 @@
   </div>
 </div>
 
-<script src="app.js?v=3.1.3"></script>
+<script src="app.js?v=3.1.4"></script>
 </body>
 </html>

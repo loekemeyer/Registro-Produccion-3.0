@@ -79,6 +79,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
       llamadas: [],                  // { fn, perfil, cuerpo }
       eventos: [],                   // cuerpos de reg_prod_3_0_registrar_evento aceptados
       anulados: [],
+      anularRechazo: false,          // true = la base rechaza la baja por los datos (P0001)
     };
   }
   const llamadas = (base, fn) => base.llamadas.filter((c) => c.fn === fn);
@@ -122,6 +123,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
       }
       if (fn === "reg_prod_3_0_anular_evento") {
         if (!conPase) return paseMal();
+        if (base.anularRechazo) return json(400, { code: "P0001", details: null, hint: null, message: "no se puede anular" });
         base.anulados.push(cuerpo.p_id_ejecucion);
         return json(200, { ok: true, anulados: 1 });
       }
@@ -203,7 +205,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.3" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.4" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -278,6 +280,47 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   await p.waitForSelector("#legajoScreen:not(.hidden)");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C" && e.p.matriz === "322"));
   chequeo("6b el C de la 322 también lleva la pieza", (base.eventos.find((e) => e.p.toque.opcion === "C" && e.p.matriz === "322") || { p: {} }).p.comp_salida_id === 2);
+
+  // ============ 6c) 🗑 sin señal: la baja queda en cola, UNA vez, y sale DESPUÉS de los eventos ============
+  // [Elías, 07/10: «en cola, pero asegurate de que no tenga o no se tome su duplicado»]
+  await esperar(() => p.evaluate(() => /al día/.test(document.getElementById("syncBadge").textContent) && /ENVIADO/.test(document.getElementById("daySummary").textContent)));
+  const idC322 = base.eventos.find((e) => e.p.toque.opcion === "C" && e.p.matriz === "322").p.id_ejecucion;
+  const colaBajas = () => p.evaluate(() => JSON.parse(localStorage.getItem("rp3c_aqueue") || "[]"));
+  const enHistorial = (id) => p.evaluate((x) => readState("19").last2.some((i) => i.id === x), id);
+  await p.fill("#legajoInput", "19");
+  await p.waitForSelector("#daySummary .hist-del");
+  base.caida = true;
+  const anuAntes = base.anulados.length;
+  await p.locator("#daySummary .hist-del").first().click();          // el de arriba = el C de la 322, ya ENVIADO
+  await esperar(async () => (await colaBajas()).length === 1);
+  chequeo("6c 🗑 sin señal: no hay que repetirlo, la baja queda en su cola", JSON.stringify(await colaBajas()) === JSON.stringify([idC322]));
+  chequeo("6c y el toque sale del historial", !(await enHistorial(idC322)));
+  chequeo("6c el badge cuenta la baja pendiente", await p.evaluate(() => /1 sin enviar/.test(document.getElementById("syncBadge").textContent)));
+  await p.evaluate((id) => enqueueAnular(id), idC322);                // otro 🗑 o un reintento no la duplica
+  chequeo("6c la misma baja no se anota dos veces", (await colaBajas()).length === 1);
+  await ponerLegajo(p, "19");
+  await enviarOpcion(p, "PB");                                         // un toque nuevo, también sin señal
+  await esperar(() => p.evaluate(() => /2 sin enviar/.test(document.getElementById("syncBadge").textContent)));
+  base.caida = false;
+  const desde6c = base.llamadas.length;
+  await p.click("#syncBadge");
+  await esperar(() => base.anulados.length === anuAntes + 1);
+  const orden6c = base.llamadas.slice(desde6c).map((c) => c.fn);
+  chequeo("6c con señal sale primero el toque y después la baja", orden6c.indexOf("reg_prod_3_0_registrar_evento") > -1 && orden6c.indexOf("reg_prod_3_0_registrar_evento") < orden6c.indexOf("reg_prod_3_0_anular_evento"));
+  chequeo("6c la baja llega con el id del toque", base.anulados[anuAntes] === idC322);
+  await esperar(() => p.evaluate(() => /al día/.test(document.getElementById("syncBadge").textContent)));
+  await p.click("#syncBadge"); await pausa(400);
+  chequeo("6c y llega UNA sola vez (la cola queda vacía)", base.anulados.length === anuAntes + 1 && (await colaBajas()).length === 0);
+  // rechazo de la base por los datos: avisa y NO se borra de la pantalla (quedaría vivo en la base)
+  const idPB = base.eventos[base.eventos.length - 1].p.id_ejecucion;
+  await p.fill("#legajoInput", "19");
+  await esperar(() => p.evaluate(() => /ENVIADO/.test(document.getElementById("daySummary").textContent)));
+  base.anularRechazo = true;
+  await p.locator("#daySummary .hist-del").first().click();          // el PB recién enviado
+  await esperar(() => llamadas(base, "reg_prod_3_0_anular_evento").some((c) => c.cuerpo.p_id_ejecucion === idPB));
+  await pausa(300);
+  chequeo("6c baja rechazada por la base: el toque sigue en el historial y no va a la cola", (await enHistorial(idPB)) && (await colaBajas()).length === 0);
+  base.anularRechazo = false;
 
   // ============ 7) base caída ============
   // 7a) con pase y catálogo guardados: se abre igual

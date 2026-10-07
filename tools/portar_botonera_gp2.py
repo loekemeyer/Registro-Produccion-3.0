@@ -417,7 +417,7 @@ async function flushQueue() {
   flushing = true;
   try {
     const q = readQueue();
-    if (!q.length && !readRolloQueue().length) return;
+    if (!q.length && !readRolloQueue().length && !readAnularQueue().length) return;
     if (!paseVigente()) { verificarEntrada(); return; }       // sin pase no se manda: queda en la cola y se pide el código
     const enviados = new Set();
     for (const payload of q) {
@@ -429,6 +429,16 @@ async function flushQueue() {
     }
     // Re-leer la cola: pudo haber items nuevos encolados mientras se enviaba
     if (enviados.size) writeQueue(readQueue().filter(x => !enviados.has(x.id)));
+    // Bajas pendientes (🗑 sin señal o sin pase), una por toque, DESPUÉS de los eventos: nunca llegan antes que el alta. La base anula
+    // y devuelve el stock una sola vez, así que repetirla no hace daño; un rechazo por los datos se descarta.
+    let aq = readAnularQueue();
+    while (aq.length && paseVigente()) {
+      const id = aq[0];
+      const { error } = await rpc("reg_prod_3_0_anular_evento", { p_id_ejecucion: id });
+      if (error && error.code === "28000") { pasePerdido(); break; }
+      if (error && !esRechazoDefinitivo(error)) break;
+      aq = readAnularQueue().filter(x => x !== id); writeAnularQueue(aq);
+    }
     // Rollos pendientes (tomar/cerrar que no pudieron salir): FIFO, corta al primer fallo de red o de pase.
     let rq = readRolloQueue();
     while (rq.length) {
@@ -543,14 +553,16 @@ def portar_js(src, version):
     src = sub(src, 'const LS_PREFIX  = "gp2_op_state";', 'const LS_PREFIX  = "rp3c_state";', 'clave del estado')
     src = sub(src, 'const LS_QUEUE   = "gp2_op_queue";', 'const LS_QUEUE   = "rp3c_queue";', 'clave de la cola')
     # 4) la cola de rollos de GP2 se reemplaza por la de 3.0 (va con las funciones de rollo)
-    src = cut(src, '/* Cola aparte para las RPCs de rollo', 'function enqueue(payload) {', '', 'cola de rollos de GP2')
-    # 5) markSent limpia el último error
-    src = sub(src, 'if (item) { item.status = "sent"; item.sentAt = isoNow(); }',
-              'if (item) { item.status = "sent"; item.sentAt = isoNow(); delete item.lastError; }', 'markSent')
+    src = cut(src, '/* Cola aparte para las RPCs de rollo', '/* Cola de ANULACIONES', '', 'cola de rollos de GP2')
+    src = sub(src, 'const LS_AQUEUE = "gp2_op_aqueue";', 'const LS_AQUEUE = "rp3c_aqueue";', 'clave de la cola de bajas')
+    src = sub(src, '(anular_evento_prod devuelve el stock una sola vez)', '(reg_prod_3_0_anular_evento devuelve el stock una sola vez)', 'comentario de la cola de bajas')
+    # 5) markSent limpia el último error (GP2 lo trae desde 20261007f; si deja de traerlo, avisar)
+    if 'if (item) { item.status = "sent"; item.sentAt = isoNow(); delete item.lastError; }' not in src:
+        raise Falta('markSent ya no borra lastError')
     # 6) envío con el pase + toque crudo + cola de rollos
     src = cut(src, 'let flushing = false;', '/* ============================================================\n   LLEGADA TARDE', FLUSH, 'flushQueue')
     # 7) rollos con pase (los prende el catálogo)
-    src = cut(src, 'async function tomarRollo(', '/* ============================================================\n   UI helpers', ROLLOS, 'tomarRollo/cerrarRollo')
+    src = cut(src, '/* ROLLOS SIN DUPLICADO', '/* ============================================================\n   UI helpers', ROLLOS, 'rolloLlamada/tomarRollo/cerrarRollo')
     src = sub(src, 'const all = isEd ? [...OPTIONS, CT_OPTION] : OPTIONS;',
               'const all = (isEd && rollosActivos()) ? [...OPTIONS, CT_OPTION] : OPTIONS;', 'botón CT')
     src = sub(src, '''function actualizarRolloPicker(n_matriz) {
@@ -562,9 +574,8 @@ def portar_js(src, version):
               'selector de rollo')
     src = sub(src, 'if (isEduardo() && opt.code === "PR") {', 'if (rollosActivos() && isEduardo() && opt.code === "PR") {', '«quedó resto»')
     # 8) badge de la cola + aviso del código
-    src = sub(src, '''function renderSyncBadge() {
-  const q = readQueue();''', '''function renderSyncBadge() {
-  const q = readQueue().concat(readRolloQueue());''', 'badge: cola de rollos')
+    if 'const q = readQueue().concat(readAnularQueue(), readRolloQueue());' not in src:
+        raise Falta('badge: ya no cuenta eventos + bajas + rollos')
     src = sub(src, '''  el.innerText = q.length ? `⚠ ${q.length} sin enviar` : `✓ al día`;''',
               '''  const espera = q.length > 0 && !paseVigente();
   el.innerText = espera ? `📺 ${q.length} esperan el código` : q.length ? `⚠ ${q.length} sin enviar` : `✓ al día`;''', 'badge: texto')
@@ -573,15 +584,21 @@ def portar_js(src, version):
   actualizarAvisoRed(q.length);
 }''', 'badge: aviso')
     # 9) anular en la base (con pase)
-    src = sub(src, '''      const { error } = await SB.rpc("anular_evento_prod", { p_id_ejecucion: item.id });
-      if (error) throw error;
-    } catch (e) {
-      console.warn("No se pudo marcar eliminado:", e);''', '''      const { error } = await rpc("reg_prod_3_0_anular_evento", { p_id_ejecucion: item.id });
-      if (error) throw error;
-    } catch (e) {
-      console.warn("No se pudo marcar eliminado:", e);
-      if (e && e.code === "28000") { pasePerdido(); alert("Hace falta el código de la TV para eliminar. Ingresalo y probá de nuevo."); return; }''',
-              'anular')
+    src = cut(src, '''  } else if (item.id && item.status === "sent") {''', '  s.last2.splice(idx, 1);', '''  } else if (item.id && item.status === "sent") {
+    const { error } = await rpc("reg_prod_3_0_anular_evento", { p_id_ejecucion: item.id });
+    if (error) {
+      console.warn("No se pudo marcar eliminado:", error);
+      if (error.code === "28000") pasePerdido();          // sin pase: la baja espera en la cola y sale al ingresar el código
+      else if (esRechazoDefinitivo(error)) {
+        // La base lo rechazo por el dato: NO borrarlo localmente (quedaria vivo en la BD mientras aca figura eliminado).
+        alert("No se pudo eliminar en el servidor: " + (error.message || error.code));
+        return;
+      }
+      enqueueAnular(item.id);                             // sin señal o sin pase: sale sola, una vez, después de los eventos
+    }
+  }
+
+''', 'anular')
     # 10) registro del legajo en el equipo
     src = sub(src, '''  $("btnBackLabel").innerText = `${nombre} · Legajo ${legajo}`;''', '''  $("btnBackLabel").innerText = `${nombre} · Legajo ${legajo}`;
   registrarLegajoEnEquipo(legajo, nombre);''', 'registro del legajo')

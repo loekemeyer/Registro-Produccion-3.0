@@ -58,6 +58,14 @@ const { servir } = require("./_servidor.cjs");
   await p.waitForURL(srv.url + "/", { timeout: 10000 });
   c.selectorViejoRedirige = (await p.locator(".card").count()) === 2;
 
+  // 5) «Volver al inicio» sin salir de la app instalada: el alcance (scope) de cada app cubre el inicio del sitio; si no, Chrome
+  //    muestra el inicio con la barra de «página fuera de la app» (la X y la dirección arriba) [Elías, 07/10, con captura].
+  c.lasAppsIncluyenElInicio = ["virgilio", "cervantes", "cervantes-gp2"].every((d) => {
+    const m = JSON.parse(fs.readFileSync(path.join(__dirname, "..", d, "manifest.json"), "utf8"));
+    const base = "https://x.test/Registro-Produccion-3.0/" + d + "/manifest.json";
+    return new URL(m.scope || "./", base).href === "https://x.test/Registro-Produccion-3.0/";
+  });
+
   const pass = Object.values(c).every(Boolean) && errs.length === 0 && sup404.length === 0;
   console.log("inicio-selector:", JSON.stringify(c), "· pageerrors:", errs.length ? errs.join("|") : "none", "· 4xx propios:", sup404.length ? sup404.join(", ") : "none", "·", pass ? "✓ OK" : "✗ FAIL");
   await b.close(); await srv.cerrar(); process.exit(pass ? 0 : 1);

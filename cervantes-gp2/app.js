@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.3)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.4)
    GENERADO por tools/portar_botonera_gp2.py desde la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de
    loekemeyer/Gestion-Productiva-2.0). Para traer un cambio de GP2 se vuelve a correr el script; no editar a mano lo que
    viene de GP2 (se pierde en el próximo port): lo propio de 3.0 vive en el script.
@@ -21,7 +21,7 @@
    Eduardo Barrionuevo (legajo "19"): CT button + rollo en E/PR (sólo con rollos_activos).
    ============================================================ */
 
-const APP_VERSION = "v3.1.3";
+const APP_VERSION = "v3.1.4";
 const LEGAJO_EDUARDO = "19";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
@@ -569,6 +569,15 @@ function markFailed(legajo, id, err) {
 function readQueue()  { try { return JSON.parse(localStorage.getItem(LS_QUEUE) || "[]"); } catch { return []; } }
 function writeQueue(q) { localStorage.setItem(LS_QUEUE, JSON.stringify(q || [])); }
 
+/* Cola de ANULACIONES (arreglo de Registro Produccion 3.0, 2026-10-07 [usuario: "en cola, pero asegurate de que no se tome
+   su duplicado"]): un 🗑 sin señal ya no obliga a repetirlo; la baja queda guardada y sale sola en flushQueue, DESPUES de los
+   eventos (asi nunca llega antes que el alta). Sin duplicados: una sola por toque (por id_ejecucion) y la base anula una sola
+   vez (reg_prod_3_0_anular_evento devuelve el stock una sola vez). */
+const LS_AQUEUE = "rp3c_aqueue";
+function readAnularQueue()  { try { return JSON.parse(localStorage.getItem(LS_AQUEUE) || "[]"); } catch { return []; } }
+function writeAnularQueue(q) { localStorage.setItem(LS_AQUEUE, JSON.stringify(q || [])); }
+function enqueueAnular(id) { const aq = readAnularQueue(); if (!aq.includes(id)) { aq.push(id); writeAnularQueue(aq); } }
+
 function enqueue(payload) {
   const q = readQueue();
   if (!q.some(x => x.id === payload.id)) q.push(payload);
@@ -656,7 +665,7 @@ async function flushQueue() {
   flushing = true;
   try {
     const q = readQueue();
-    if (!q.length && !readRolloQueue().length) return;
+    if (!q.length && !readRolloQueue().length && !readAnularQueue().length) return;
     if (!paseVigente()) { verificarEntrada(); return; }       // sin pase no se manda: queda en la cola y se pide el código
     const enviados = new Set();
     for (const payload of q) {
@@ -668,6 +677,16 @@ async function flushQueue() {
     }
     // Re-leer la cola: pudo haber items nuevos encolados mientras se enviaba
     if (enviados.size) writeQueue(readQueue().filter(x => !enviados.has(x.id)));
+    // Bajas pendientes (🗑 sin señal o sin pase), una por toque, DESPUÉS de los eventos: nunca llegan antes que el alta. La base anula
+    // y devuelve el stock una sola vez, así que repetirla no hace daño; un rechazo por los datos se descarta.
+    let aq = readAnularQueue();
+    while (aq.length && paseVigente()) {
+      const id = aq[0];
+      const { error } = await rpc("reg_prod_3_0_anular_evento", { p_id_ejecucion: id });
+      if (error && error.code === "28000") { pasePerdido(); break; }
+      if (error && !esRechazoDefinitivo(error)) break;
+      aq = readAnularQueue().filter(x => x !== id); writeAnularQueue(aq);
+    }
     // Rollos pendientes (tomar/cerrar que no pudieron salir): FIFO, corta al primer fallo de red o de pase.
     let rq = readRolloQueue();
     while (rq.length) {
@@ -837,7 +856,7 @@ function renderSummary() {
 }
 
 function renderSyncBadge() {
-  const q = readQueue().concat(readRolloQueue());
+  const q = readQueue().concat(readAnularQueue(), readRolloQueue());
   const el = $("syncBadge");
   // El badge NO muestra version [usuario 2026-08-31]: solo el estado de la cola. Toca para
   // forzar el envio. La version del cache vive en el ?v= del <script>, no a la vista.
@@ -1343,17 +1362,21 @@ async function deleteHistItem(legajo, idx) {
 
   // Baja logica en la base (si ya se habia enviado). Va por RPC: con RLS activo
   // la clave anon ya no puede tocar la tabla produccion directo.
-  if (item.id && item.status === "sent") {
-    try {
-      const { error } = await rpc("reg_prod_3_0_anular_evento", { p_id_ejecucion: item.id });
-      if (error) throw error;
-    } catch (e) {
-      console.warn("No se pudo marcar eliminado:", e);
-      if (e && e.code === "28000") { pasePerdido(); alert("Hace falta el código de la TV para eliminar. Ingresalo y probá de nuevo."); return; }
-      // Si el server no lo anulo, NO borrarlo localmente: quedaria vivo en la BD
-      // (produccion + stock) mientras aca figura como eliminado.
-      alert("No se pudo eliminar en el servidor (¿sin señal?). Probá de nuevo cuando vuelva la conexión.");
-      return;
+  if (item.id && item.status !== "sent" && flushing) {
+    // Estaba saliendo justo ahora: puede llegar a la base aunque aca figure pendiente. La baja va a la cola y
+    // sale DESPUES del alta (flushQueue manda primero los eventos).
+    enqueueAnular(item.id);
+  } else if (item.id && item.status === "sent") {
+    const { error } = await rpc("reg_prod_3_0_anular_evento", { p_id_ejecucion: item.id });
+    if (error) {
+      console.warn("No se pudo marcar eliminado:", error);
+      if (error.code === "28000") pasePerdido();          // sin pase: la baja espera en la cola y sale al ingresar el código
+      else if (esRechazoDefinitivo(error)) {
+        // La base lo rechazo por el dato: NO borrarlo localmente (quedaria vivo en la BD mientras aca figura eliminado).
+        alert("No se pudo eliminar en el servidor: " + (error.message || error.code));
+        return;
+      }
+      enqueueAnular(item.id);                             // sin señal o sin pase: sale sola, una vez, después de los eventos
     }
   }
 
