@@ -26,6 +26,42 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 `v26/v27` y `v1.9.x` de Gestión Virgilio en los logs. Virgilio compara versiones con `_verNum`, que sólo acepta
 `vMAYOR.MENOR`: no se le pueden poner sufijos.
 
+## Hacia dónde va (acordado con Elías, 07/10/2026)
+
+- **Registro Producción 3.0 es la página de los operarios** (Cervantes y Virgilio). **GP2 y Gestión Virgilio quedan sólo como páginas
+  de admin.** La botonera de Cervantes pasa a ser la de la tablet de GP2 («como funciona hoy GP2»).
+- **Los operarios entran sólo con el código de la TV**, sin Google. El pase lo firma la base (hoy es una marca local).
+- **Un solo par de tablas nuevas** en el schema propio `reg_prod_3_0`: una **cruda** y una **procesada**, con el campo `sede`
+  (Cervantes o Virgilio). La procesada la arma la base, en la misma transacción que guarda la cruda (como hoy
+  `GP2.registrar_evento_prod`, que no tiene cruda). Todo en tablas protegidas: se escribe sólo por funciones con pase.
+- **Mientras se arma, los operarios siguen con las originales** (`Registros Produccion Cervantes`, `db_n8n_espejo`,
+  `Registros_Produccion_Virgilio`). Cuando dejen el sistema anterior se migran los registros viejos a las tablas nuevas (con
+  `origen` e `id_origen`, para poder repetir la copia sin duplicar) y se reapuntan los lectores.
+- **Lo que hay que reapuntar en el corte** (medido el 07/10/2026): de Cervantes, 16 funciones, 1 vista, 1 trigger y 1 cron; de
+  Virgilio, 85 funciones, 44 vistas, 19 triggers y 1 cron. Para volver a medirlo:
+
+```sql
+with t(nombre, grupo) as (values ('Registros Produccion Cervantes', 'Cervantes'), ('db_n8n_espejo', 'Cervantes'),
+                                 ('Registros_Produccion_Virgilio', 'Virgilio')),
+dep as (
+  select 'función' tipo, n.nspname || '.' || p.proname objeto, t.grupo
+    from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    join t on pg_get_functiondef(p.oid) ilike '%' || t.nombre || '%'
+   where n.nspname not in ('pg_catalog', 'information_schema', 'zz_backups') and p.prokind = 'f'
+  union
+  select 'vista', v.schemaname || '.' || v.viewname, t.grupo from pg_views v join t on v.definition ilike '%' || t.nombre || '%'
+   where v.schemaname not in ('pg_catalog', 'information_schema', 'zz_backups')
+  union
+  select 'cron', j.jobname, t.grupo from cron.job j join t on j.command ilike '%' || t.nombre || '%'
+  union
+  select 'trigger', c.relname || ' → ' || tg.tgname, t.grupo
+    from pg_trigger tg join pg_class c on c.oid = tg.tgrelid join t on t.nombre = c.relname where not tg.tgisinternal)
+select grupo, tipo, objeto from dep order by grupo, tipo, objeto;   -- sin la última línea, con count(distinct objeto) por grupo y tipo
+```
+
+- **Decisiones que siguen abiertas**: si la función nueva también mueve el stock de GP2 (`GP2.fabricar_stock`), y qué es «la
+  armada» de Virgilio (hoy lo armado sale de triggers y vistas de Gestión Virgilio sobre la cruda).
+
 ## Qué cambió respecto de la copia (06/10/2026)
 
 1. **Inicio**: la raíz es la pantalla «¿Dónde vas a trabajar hoy?». Virgilio se movió entero a `virgilio/`. En Virgilio
