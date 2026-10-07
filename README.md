@@ -125,7 +125,7 @@ en `/cervantes-gp2/`; la tarjeta «Cervantes» del inicio sigue abriendo `cervan
   marca también la cruda · `segundos_historico` se llena (GP2 lo deja vacío) · los kg usados del rollo y `cerrar_rollo` suman lo de GP2 y lo
   de 3.0 **sin contar lo anulado** (GP2 cuenta lo anulado) · un error de red deja el toque PENDIENTE (en GP2, ERROR) · los toques fuera de
   horario quedan en `reg_prod_3_0.auditoria` · el catálogo se guarda en el celular.
-- **Mejor que GP2: Fase 1d** (`sql/reg_prod_3_0_fase_1d.sql`; **aplicada salvo la pieza de anular**, que va por el SQL Editor) [Elías: «que devuelva el stock» · «sistema anti duplicado»]:
+- **Mejor que GP2: Fase 1d** (`sql/reg_prod_3_0_fase_1d.sql`, **aplicada el 07/10**; la pieza de anular la pegó Elías en el SQL Editor) [Elías: «que devuelva el stock» · «sistema anti duplicado»]:
   anular un toque **devuelve el stock** (se borran sus movimientos, como hace `GP2.anular_recepcion`, y el trigger de `GP2.movimiento`
   revierte el inventario; una sola vez) y tomar/cerrar rollo llevan un **id anti-duplicado** (`reg_prod_3_0.rollo_llamadas`), como ya lo
   tenían los toques: un reintento no descuenta otro rollo ni cierra el siguiente. En GP2 (tablet y base) no existe ninguna de las dos

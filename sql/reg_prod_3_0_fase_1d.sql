@@ -1,7 +1,6 @@
--- ESTADO: APLICADO EN PARTE el 07/10/2026 (migraciones fase_1d_a_columnas, _b_registrar, _c_rollos_antiduplicado, _d_catalogo).
--- FALTA: el punto 2 (reg_prod_3_0_gp2_revertir_movimientos) y el 4 (reg_prod_3_0_anular_evento): tienen un DELETE (directo o a través
--- de la interna) y la herramienta de Claude no los puede aplicar; van por el SQL Editor. Verificado por la API: el catálogo trae
--- rollos_antiduplicado y un rollo_cerrar repetido con el mismo id devuelve dup:true (legajo 1, sin rollo abierto).
+-- ESTADO: APLICADO el 07/10/2026. Partes A–D por migración (fase_1d_a_columnas, _b_registrar, _c_rollos_antiduplicado, _d_catalogo);
+-- los puntos 2 y 4 (devolver el stock al anular) los pegó Elías en el SQL Editor (tienen DELETE). Verificado: anular llama a la interna,
+-- la interna borra sólo movimientos de fabricación y no se puede llamar desde la API; un rollo_cerrar repetido devuelve dup:true.
 -- Registro Producción 3.0 — FASE 1d (07/10/2026, Elías: «que devuelva el stock» · «sistema anti duplicado»). Sin tocar el código de GP2.
 --
 -- 1) ANULAR DEVUELVE EL STOCK. Cada toque guarda qué movimientos de stock hizo (procesado_cervantes.movimientos). Al anularlo se borran
