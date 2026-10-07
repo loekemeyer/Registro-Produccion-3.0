@@ -54,16 +54,29 @@ function artsDePieza(n, codigoPieza) {
   const p = piezasEnvasado(n).find(x => String(x.pieza_codigo || "").trim() === String(codigoPieza || "").trim());
   return (p && p.arts) || [];
 }
-// Un artículo por línea: «Art. 394 · Espátula Lisa Nylon 1 Pza» y debajo la marca.
-function lineasArt(arts) {
-  return (arts || []).map(a =>
-    `<div class="mz-a">Art. ${esc(a.codigo || "")}${a.nombre ? " · " + esc(a.nombre) : ""}</div>` +
-    (a.marca ? `<div class="mz-m">${esc(a.marca)}</div>` : "")).join("");
+// Marca como la ve el operario [usuario 07/10/2026]: LK = Loeke (diminutivo de Loekemeyer), CH = Chef; las demás, tal cual (LOKE).
+const MARCA_CORTA = { "LOEKE": "LK", "CHEF": "CH" };
+function marcaCorta(m) { const k = String(m || "").trim(); return MARCA_CORTA[k.toUpperCase()] || k; }
+// ¿Todas las piezas de esa matriz son el MISMO artículo (mismo nombre)? Entonces el nombre no distingue nada y se muestra
+// sólo la MARCA [usuario 07/10/2026]; si los nombres son distintos, nombre y marca. Sin marca no se puede: nombre y código.
+function soloMarcaDe(n) {
+  const arts = piezasEnvasado(n).flatMap(p => p.arts || []);
+  if (arts.length < 2 || !arts.every(a => a.marca)) return false;
+  const norm = s => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+  return new Set(arts.map(a => norm(a.nombre))).size === 1;
 }
-// Lo mismo en una línea de texto: «Art. 394 · Espátula Lisa Nylon 1 Pza (LOEKE)».
-function textoArt(arts) {
-  return (arts || []).map(a =>
-    `Art. ${a.codigo || ""}${a.nombre ? " · " + a.nombre : ""}${a.marca ? " (" + a.marca + ")" : ""}`).join(" / ");
+// Un artículo por línea: «Art. 394 · Espátula Lisa Nylon 1 Pza» y debajo la marca corta (LK / CH), o sólo la marca (ver soloMarcaDe).
+function lineasArt(arts, soloMarca) {
+  return (arts || []).map(a => soloMarca
+    ? `<div class="mz-m solo">${esc(marcaCorta(a.marca))}</div>`
+    : `<div class="mz-a">Art. ${esc(a.codigo || "")}${a.nombre ? " · " + esc(a.nombre) : ""}</div>` +
+      (a.marca ? `<div class="mz-m">${esc(marcaCorta(a.marca))}</div>` : "")).join("");
+}
+// Lo mismo en una línea de texto: «Art. 394 · Espátula Lisa Nylon 1 Pza (LOEKE)», o sólo «LOEKE».
+function textoArt(arts, soloMarca) {
+  return (arts || []).map(a => soloMarca
+    ? marcaCorta(a.marca)
+    : `Art. ${a.codigo || ""}${a.nombre ? " · " + a.nombre : ""}${a.marca ? " (" + marcaCorta(a.marca) + ")" : ""}`).join(" / ");
 }
 
 async function cargarBundle() {
@@ -561,7 +574,7 @@ function renderMatrizInfo() {
   // v3.0.1: artículo (nombre y marca) si es una matriz de envasado. Con una sola pieza no hay pieza guardada: es esa.
   const piezasEnv = piezasEnvasado(nm);
   const artsAct = s.lastMatrix.pieza ? artsDePieza(nm, s.lastMatrix.pieza) : (piezasEnv.length === 1 ? piezasEnv[0].arts : []);
-  const artTxt = artsAct && artsAct.length ? `<br><b>${esc(textoArt(artsAct))}</b>` : "";
+  const artTxt = artsAct && artsAct.length ? `<br><b>${esc(textoArt(artsAct, soloMarcaDe(nm)))}</b>` : "";
   // Rollo en uso: cuanto queda, estimado con lo producido (uni / ppk por cajon).
   // Si la tablet perdio el estado (otro dia, otro equipo o storage borrado), cae
   // al uso abierto persistido en el servidor: rollos_abiertos trae kg_usados
@@ -667,7 +680,7 @@ function renderPiezaPicker(n) {
     btn.type = "button"; btn.className = "pieza-cambiar";
     // v3.0.1: nombre y marca del artículo (RPC de envasado); sin RPC, el código que trae el bundle, como antes
     const artsSel = artsDePieza(n, piezaSel.codigo);
-    const arts = artsSel.length ? ` (${esc(textoArt(artsSel))})` : (piezaSel.arts ? ` (art. ${esc(piezaSel.arts)})` : "");
+    const arts = artsSel.length ? ` (${esc(textoArt(artsSel, soloMarcaDe(n)))})` : (piezaSel.arts ? ` (art. ${esc(piezaSel.arts)})` : "");
     btn.innerHTML = `Fabricás <b>${esc(piezaSel.codigo || "")}</b> · ${esc(piezaSel.descripcion || "")}${arts} — <u>cambiar</u>`;
     btn.addEventListener("click", () => {
       piezaSel = null;
@@ -687,7 +700,7 @@ function renderPiezaPicker(n) {
     // Los articulos que usan esa pieza (la 237 saca 3 piezas para 542/543/570, 720/722 y 858):
     // el operario piensa en el articulo, no en el codigo del intermedio. [usuario 2026-10-05]
     // v3.0.1: nombre y marca (RPC de envasado); sin RPC, el código que trae el bundle, como antes
-    const arts = lineasArt(artsDePieza(n, sa.codigo)) || (sa.arts ? `<div class="mz-a">Art. ${esc(sa.arts)}</div>` : "");
+    const arts = lineasArt(artsDePieza(n, sa.codigo), soloMarcaDe(n)) || (sa.arts ? `<div class="mz-a">Art. ${esc(sa.arts)}</div>` : "");
     el.innerHTML = `<div class="mz-n">${esc(sa.codigo || "")}</div><div class="mz-d">${esc(sa.descripcion || "")}</div>${arts}`;
     el.addEventListener("click", () => {
       piezaSel = sa; $("error").innerText = "";

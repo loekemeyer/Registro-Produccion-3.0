@@ -124,17 +124,26 @@ document.addEventListener("DOMContentLoaded", () => {
       console.warn("Articulos de envasado (se sigue sin nombres):", err && err.message ? err.message : err);
     }
   }
+  // Marca como la ve el operario [usuario 07/10/2026]: LK = Loeke (diminutivo de Loekemeyer), CH = Chef; las demás, tal cual (LOKE).
+  const MARCA_CORTA = { "LOEKE": "LK", "CHEF": "CH" };
+  function marcaCorta(m) { const k = String(m || "").trim(); return MARCA_CORTA[k.toUpperCase()] || k; }
   // Bloque HTML con el/los artículo(s) de una matriz de envasado ("" si no es de envasado).
   function articulosEnvasadoHtml(nm) {
     const piezas = ENV_ARTS[String(nm || "").trim()] || [];
-    const lineas = [];
-    piezas.forEach(p => (p.arts || []).forEach(a => {
-      lineas.push(`<div style="margin-top:3px;">Art. ${escapeHtml(a.codigo || "")}${a.nombre ? " · " + escapeHtml(a.nombre) : ""}` +
-        (a.marca ? ` <span style="display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:#e7ebf8;color:#1e40af;">${escapeHtml(a.marca)}</span>` : "") + `</div>`);
-    }));
-    if (!lineas.length) return "";
-    return `<div class="art-env" style="margin-top:8px;padding:8px;border-radius:8px;background:#fef9c3;color:#854d0e;font-weight:800;">` +
-      `${lineas.length > 1 ? "Artículos de esta matriz:" : "Artículo:"}${lineas.join("")}</div>`;
+    const arts = piezas.flatMap(p => p.arts || []);
+    if (!arts.length) return "";
+    const chip = (m) => `<span style="display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:#e7ebf8;color:#1e40af;margin-right:4px;">${escapeHtml(marcaCorta(m))}</span>`;
+    const caja = (titulo, cuerpo) => `<div class="art-env" style="margin-top:8px;padding:8px;border-radius:8px;background:#fef9c3;color:#854d0e;font-weight:800;">${titulo}${cuerpo}</div>`;
+    // Mismo artículo (mismo nombre) con varias marcas [usuario 07/10/2026]: el nombre no distingue nada, lo que cambia es la
+    // marca. Acá no hay selector de pieza, así que el nombre va UNA vez y las marcas al lado.
+    const norm = (s) => String(s || "").trim().toLowerCase().replace(/\s+/g, " ");
+    if (arts.length >= 2 && arts.every(a => a.marca) && new Set(arts.map(a => norm(a.nombre))).size === 1) {
+      return caja("Artículo:", `<div style="margin-top:3px;">${escapeHtml(arts[0].nombre || "")} ${arts.map(a => chip(a.marca)).join(" ")}</div>`);
+    }
+    // Artículos distintos: nombre y marca de cada uno.
+    const lineas = arts.map(a => `<div style="margin-top:3px;">Art. ${escapeHtml(a.codigo || "")}${a.nombre ? " · " + escapeHtml(a.nombre) : ""} ` +
+      (a.marca ? chip(a.marca) : "") + `</div>`);
+    return caja(lineas.length > 1 ? "Artículos de esta matriz:" : "Artículo:", lineas.join(""));
   }
 
   // (v1.8.53) Balancines activos (para el selector de "Cambiar Matriz").
@@ -320,7 +329,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* ================= VERSION (unica fuente de verdad) ================= */
   // Serie v3.0.N = Registro Producción 3.0 (no pisa las v1.9.x de la copia de Gestión Virgilio).
-  const LOCAL_VERSION = "v3.0.2";
+  const LOCAL_VERSION = "v3.0.3";
 
   /* ================= KEYS STORAGE ================= */
   const APP_TAG = "_Cervantes";

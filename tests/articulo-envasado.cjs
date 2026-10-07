@@ -3,15 +3,18 @@
      322 → 2 piezas: 394 LOEKE y 842 CHEF, las dos «Espátula Lisa Nylon 1 Pza» (sólo se distinguen por la marca)
      321 → 1 pieza, 10 → no es de envasado
 
+   Regla [usuario 07/10/2026]: dentro de una matriz, si las piezas son el MISMO artículo (mismo nombre) se muestra sólo la
+   MARCA; si los nombres son distintos, nombre y marca.
    GP2
-     1) las tarjetas del selector de pieza llevan «Art. 394 · Espátula Lisa Nylon 1 Pza» y la marca, y las 2 se distinguen
-     2) al elegir una, la línea colapsada dice el artículo
-     3) una matriz de envasado con UNA pieza muestra el artículo en la card de la matriz
-     4) una matriz que no es de envasado no muestra nada
+     Marca en pantalla: LOEKE → LK, CHEF → CH (diminutivos), las demás tal cual.
+   1) 322 (mismo nombre, otra marca): las tarjetas llevan sólo la marca (LK / CH), sin nombre, y se distinguen
+     2) al elegir una, la línea colapsada dice sólo la marca
+     3) 389 (nombres distintos): las tarjetas llevan nombre y marca
+     4) una matriz de envasado con UNA pieza muestra nombre y marca en la card; una que no es de envasado no muestra nada
      5) si la RPC falla, el selector queda como en la v1.245.2 («Art. 394» con el código del bundle) y sin errores
    Cervantes
-     6) al tipear la matriz en «Empecé matriz», el aviso lista los artículos con nombre y marca
-     7) con un solo artículo dice «Artículo:», con varios «Artículos de esta matriz:»
+     6) 322 (mismo nombre): el aviso dice el nombre UNA vez y las dos marcas
+     7) 389 (nombres distintos): «Artículos de esta matriz:» con nombre y marca de cada uno; con un solo artículo, «Artículo:»
      8) una matriz que no es de envasado no muestra el bloque
      9) si la RPC falla, no se rompe nada
    Sale 1 si falla. */
@@ -38,12 +41,18 @@ const ARTICULOS = {
   "321": [
     { pieza_codigo: "321T", pieza_desc: "321 Terminado", arts: [{ codigo: "321", nombre: "Espátula Calada Nylon", marca: "LOEKE" }] },
   ],
+  "389": [
+    { pieza_codigo: "207", pieza_desc: "207 Terminado", arts: [{ codigo: "207", nombre: "Ñoquera Madera Mgo Redondo", marca: "LOEKE" }] },
+    { pieza_codigo: "229", pieza_desc: "229 Terminado", arts: [{ codigo: "229", nombre: "Ñoquera Madera", marca: "LOEKE" }] },
+    { pieza_codigo: "909", pieza_desc: "909 Terminado", arts: [{ codigo: "909", nombre: "Ñoquera Madera", marca: "CHEF" }] },
+  ],
 };
 const BUNDLE = {
   empleados: { "999": { nombre: "Prueba Envasado", activo: true, hora_entrada: "08:30:00" } },
   matrices: [
     { n: "322", d: "Env Espatula NY", ppk: 1, uxg: 1, maq: "", act: true },
     { n: "321", d: "Env espatula calada NY", ppk: 1, uxg: 1, maq: "", act: true },
+    { n: "389", d: "Env Ñoquera", ppk: 1, uxg: 1, maq: "", act: true },
     { n: "10", d: "Varilla c/ Cuchilla", ppk: 1, uxg: 1, maq: "", act: true },
   ],
   registro_en_golpes: false,
@@ -51,6 +60,11 @@ const BUNDLE = {
     "322": [
       { comp_id: 1, codigo: "394", descripcion: "394 Terminado", arts: "394" },
       { comp_id: 2, codigo: "842", descripcion: "842 Terminado", arts: "842" },
+    ],
+    "389": [
+      { comp_id: 3, codigo: "207", descripcion: "207 Terminado", arts: "207" },
+      { comp_id: 4, codigo: "229", descripcion: "229 Terminado", arts: "229" },
+      { comp_id: 5, codigo: "909", descripcion: "909 Terminado", arts: "909" },
     ],
   },
   matriz_fleje: {}, matriz_fleje_pieza: {}, envasado: {}, rollos_saldo: [], rollos_abiertos: {},
@@ -77,7 +91,7 @@ const BUNDLE = {
       if (url.includes("/rpc/reg_prod_3_0_envasado_articulos")) return rpcArticulos === "falla" ? json(404, { message: "function not found" }) : json(200, ARTICULOS);
       if (url.includes("/rpc/registro_operarios_bundle")) return json(200, BUNDLE);
       if (url.includes("/rest/v1/Empleados")) return json(200, [{ Legajo: "999", Empleado: "Prueba Envasado", Activo: "SI", hora_entrada: "08:30:00" }]);
-      if (url.includes("/rest/v1/Matrices")) return json(200, [{ N_Matriz: "322", Matriz: "Env Espatula NY" }, { N_Matriz: "321", Matriz: "Env espatula calada NY" }, { N_Matriz: "10", Matriz: "Varilla c/ Cuchilla" }]);
+      if (url.includes("/rest/v1/Matrices")) return json(200, [{ N_Matriz: "322", Matriz: "Env Espatula NY" }, { N_Matriz: "321", Matriz: "Env espatula calada NY" }, { N_Matriz: "389", Matriz: "Env Ñoquera" }, { N_Matriz: "10", Matriz: "Varilla c/ Cuchilla" }]);
       if (m === "GET") return json(200, []);
       return json(201, []);
     });
@@ -108,32 +122,43 @@ const BUNDLE = {
   { const { ctx, p } = await abrirGP2("ok");
     await p.fill("#textInput", "322");
     await p.waitForSelector("#piezaGrid .mz");
-    const cards = await p.locator("#piezaGrid .mz").allTextContents();
+    const cards = await p.locator("#piezaGrid .mz").allInnerTexts();
     chequeo("1 el selector ofrece las 2 piezas de la 322", cards.length === 2);
-    chequeo("1 la tarjeta del 394 dice artículo, nombre y marca", /Art\. 394/.test(cards[0]) && /Espátula Lisa Nylon 1 Pza/.test(cards[0]) && /LOEKE/.test(cards[0]));
-    chequeo("1 la tarjeta del 842 dice artículo, nombre y marca", /Art\. 842/.test(cards[1]) && /Espátula Lisa Nylon 1 Pza/.test(cards[1]) && /CHEF/.test(cards[1]));
-    chequeo("1 las 2 tarjetas se distinguen (mismo nombre, otra marca y otro artículo)", cards[0] !== cards[1]);
+    chequeo("1 322 (mismo artículo): la tarjeta del 394 lleva sólo la marca LK", /\bLK\b/.test(cards[0]) && !/LOEKE/.test(cards[0]) && !/Espátula/.test(cards[0]) && !/Art\./.test(cards[0]));
+    chequeo("1 322 (mismo artículo): la tarjeta del 842 lleva sólo la marca CH", /\bCH\b/.test(cards[1]) && !/CHEF/.test(cards[1]) && !/Espátula/.test(cards[1]) && !/Art\./.test(cards[1]));
+    chequeo("1 las 2 tarjetas se distinguen", cards[0] !== cards[1]);
     await p.click("#piezaGrid .mz >> nth=0");
     await p.waitForSelector("#piezaGrid .pieza-cambiar");
     const linea = await p.textContent("#piezaGrid .pieza-cambiar");
-    chequeo("2 la línea colapsada dice el artículo con nombre y marca", /Fabricás 394/.test(linea) && /Art\. 394 · Espátula Lisa Nylon 1 Pza \(LOEKE\)/.test(linea));
+    chequeo("2 la línea colapsada dice sólo la marca", /Fabricás 394/.test(linea) && /\(LK\)/.test(linea) && !/Espátula/.test(linea));
+
+    // 389: nombres distintos → nombre y marca
+    await p.fill("#textInput", "389");
+    await p.waitForSelector("#piezaGrid .mz >> nth=2");
+    const c389 = await p.locator("#piezaGrid .mz").allInnerTexts();
+    chequeo("3 389 (nombres distintos): el 207 lleva nombre y marca", c389.length === 3 && /Art\. 207 · Ñoquera Madera Mgo Redondo/.test(c389[0]) && /\bLK\b/.test(c389[0]));
+    chequeo("3 389: el 229 lleva nombre y marca LK", /Art\. 229 · Ñoquera Madera/.test(c389[1]) && /\bLK\b/.test(c389[1]));
+    chequeo("3 389: el 909 lleva nombre y marca CH", /Art\. 909 · Ñoquera Madera/.test(c389[2]) && /\bCH\b/.test(c389[2]));
+    await p.click("#piezaGrid .mz >> nth=2");
+    await p.waitForSelector("#piezaGrid .pieza-cambiar");
+    chequeo("3 389: la línea colapsada dice artículo, nombre y marca", /Art\. 909 · Ñoquera Madera \(CH\)/.test(await p.textContent("#piezaGrid .pieza-cambiar")));
 
     await p.fill("#textInput", "321");
     await pausa(300);
-    const card321 = await p.locator('#matrizGrid .mz[data-n="321"]').textContent();
-    chequeo("3 matriz de envasado con una pieza: la card muestra el artículo", /Art\. 321 · Espátula Calada Nylon/.test(card321) && /LOEKE/.test(card321));
-    chequeo("3 y no hay selector de pieza", await p.locator("#piezaPicker").evaluate((el) => el.classList.contains("hidden")));
+    const card321 = await p.locator('#matrizGrid .mz[data-n="321"]').innerText();
+    chequeo("4 matriz de envasado con una pieza: la card muestra nombre y marca", /Art\. 321 · Espátula Calada Nylon/.test(card321) && /\bLK\b/.test(card321));
+    chequeo("4 y no hay selector de pieza", await p.locator("#piezaPicker").evaluate((el) => el.classList.contains("hidden")));
 
     await p.fill("#textInput", "10");
     await pausa(300);
-    const card10 = await p.locator('#matrizGrid .mz[data-n="10"]').innerHTML();
-    chequeo("4 una matriz que no es de envasado no muestra artículo", !/mz-a/.test(card10));
+    const lineasArt10 = await p.locator('#matrizGrid .mz[data-n="10"] .mz-a, #matrizGrid .mz[data-n="10"] .mz-m').count();
+    chequeo("4 una matriz que no es de envasado no muestra artículo", lineasArt10 === 0);
     await ctx.close(); }
 
   { const { ctx, p } = await abrirGP2("falla");
     await p.fill("#textInput", "322");
     await p.waitForSelector("#piezaGrid .mz");
-    const cards = await p.locator("#piezaGrid .mz").allTextContents();
+    const cards = await p.locator("#piezaGrid .mz").allInnerTexts();
     // sin la RPC queda lo de la v1.245.2: «Art. 394» con el código que trae el bundle, sin nombre ni marca
     chequeo("5 con la RPC caída el selector sigue andando, con el código del bundle y sin nombre ni marca", cards.length === 2 && /Art\. 394/.test(cards[0]) && /Art\. 842/.test(cards[1]) && cards.every((t) => !/Espátula/.test(t) && !/LOEKE|CHEF/.test(t)));
     await ctx.close(); }
@@ -154,16 +179,23 @@ const BUNDLE = {
 
   { const { ctx, p } = await abrirCervantes("ok");
     await p.fill("#textInput", "322");
-    await esperar(() => p.evaluate(() => /Art\. 394/.test(document.getElementById("matrizInfo").textContent)));
-    const info = await p.textContent("#matrizInfo");
-    chequeo("6 el aviso de la 322 lista los 2 artículos con nombre y marca", /Art\. 394 · Espátula Lisa Nylon 1 Pza/.test(info) && /LOEKE/.test(info) && /Art\. 842 · Espátula Lisa Nylon 1 Pza/.test(info) && /CHEF/.test(info));
-    chequeo("7 con varios artículos dice «Artículos de esta matriz:»", /Artículos de esta matriz:/.test(info));
+    await esperar(() => p.evaluate(() => /LK/.test(document.getElementById("matrizInfo").textContent)));
+    const info = await p.innerText("#matrizInfo");
+    if (process.env.TRAZA) console.log("   · info 322 Cervantes:", JSON.stringify(info));
+    chequeo("6 322 (mismo nombre): el aviso dice el nombre UNA sola vez", (info.match(/Espátula Lisa Nylon 1 Pza/g) || []).length === 1);
+    chequeo("6 322: las dos marcas, abreviadas (LK y CH)", /\bLK\b/.test(info) && /\bCH\b/.test(info) && !/LOEKE|CHEF/.test(info));
+    chequeo("6 322: «Artículo:» y no la lista de artículos", /Artículo:/.test(info) && !/Artículos de esta matriz/.test(info));
     chequeo("6 el aviso es visible", await p.isVisible("#matrizInfo"));
+
+    await p.fill("#textInput", "389");
+    await esperar(() => p.evaluate(() => /Art\. 909/.test(document.getElementById("matrizInfo").textContent)));
+    const info389 = await p.innerText("#matrizInfo");
+    chequeo("7 389 (nombres distintos): «Artículos de esta matriz:» con nombre y marca de cada uno", /Artículos de esta matriz:/.test(info389) && /Art\. 207 · Ñoquera Madera Mgo Redondo/.test(info389) && /Art\. 229 · Ñoquera Madera/.test(info389) && /Art\. 909 · Ñoquera Madera/.test(info389) && /\bCH\b/.test(info389) && /\bLK\b/.test(info389));
 
     await p.fill("#textInput", "321");
     await esperar(() => p.evaluate(() => /Art\. 321/.test(document.getElementById("matrizInfo").textContent)));
-    const info321 = await p.textContent("#matrizInfo");
-    chequeo("7 con un solo artículo dice «Artículo:»", /Artículo:/.test(info321) && !/Artículos de esta matriz/.test(info321) && /Espátula Calada Nylon/.test(info321));
+    const info321 = await p.innerText("#matrizInfo");
+    chequeo("7 con un solo artículo dice «Artículo:», nombre y marca", /Artículo:/.test(info321) && !/Artículos de esta matriz/.test(info321) && /Espátula Calada Nylon/.test(info321) && /\bLK\b/.test(info321));
 
     await p.fill("#textInput", "10");
     await pausa(500);

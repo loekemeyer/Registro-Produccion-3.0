@@ -55,12 +55,16 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
      es sólo local; la prueba de presencia es la fila `ok` del log del servidor.
    - Cervantes **no usa la sesión de Virgilio** ni rebota al inicio por no tener sesión.
 5. **Virgilio recortado a la botonera** (v30.03 y v30.04): ver la sección siguiente.
-6. **Nombre del artículo en las matrices de ENVASADO** (07/10/2026; tablet de GP2 `v1.245.2+3.0.1` y `cervantes/` v3.0.2), sólo
-   para las que cierran un terminado (21 matrices, 42 artículos). Las tarjetas del selector de pieza («¿Qué pieza vas a
-   fabricar?») y la línea de «matriz activa» muestran «Art. 394 · Espátula Lisa Nylon 1 Pza» **y la marca** en un recuadro,
-   porque hay artículos que se llaman igual y se distinguen sólo por la marca (322: el 394 es LOEKE y el 842 es CHEF). Los datos
-   salen de la RPC `GP2.reg_prod_3_0_envasado_articulos` (una llamada, ~6 KB). Sin la RPC la tablet queda como estaba
-   («Art. 394» con el código del bundle) y `cervantes/` sin nombres.
+6. **Nombre del artículo en las matrices de ENVASADO** (07/10/2026; tablet de GP2 `v1.245.2+3.0.2` y `cervantes/` v3.0.3), sólo
+   para las que cierran un terminado (21 matrices, 42 artículos). Regla [Elías, 07/10]: dentro de una matriz, **si las piezas
+   son el mismo artículo (mismo nombre) se muestra sólo la marca; si los nombres son distintos, nombre y marca**. En la 322
+   el 394 y el 842 se llaman igual («Espátula Lisa Nylon 1 Pza») y se ven como **LK** y **CH**; en la 389 los nombres
+   difieren («Ñoquera Madera Mgo Redondo» y «Ñoquera Madera») y se ve «Art. 229 · Ñoquera Madera» + LK, «Art. 909 · …» + CH.
+   La marca va abreviada: **LK** = Loeke (diminutivo de Loekemeyer), **CH** = Chef; las demás tal cual (LOKE). Se ve en las
+   tarjetas del selector de pieza, en la línea «Fabricás …» y en la de «matriz activa» (tablet de GP2), y en el aviso de
+   «Empecé matriz» / «matriz en uso» (`cervantes/`, donde no hay selector: con el mismo artículo el nombre va una vez y las
+   marcas al lado). Los datos salen de la RPC `GP2.reg_prod_3_0_envasado_articulos` (una llamada, ~6 KB). Sin la RPC la
+   tablet queda como estaba («Art. 394» con el código del bundle) y `cervantes/` sin nombres.
 
 ## Qué se recortó (Virgilio, 06/10/2026)
 
@@ -140,7 +144,12 @@ hay que traer esa parte también. Un fix de operario que Gestión Virgilio ya te
   encontrado». El pase no lo resuelve (ya está registrado en la auditoría).
 - **La RPC `GP2.reg_prod_3_0_envasado_articulos` hay que crearla en la base** (SQL pendiente de aprobación): hasta entonces no
   se ven los nombres de artículo. La marca sale de `GP2.articulo.marca`, que tiene **LOEKE** (115 artículos), **CHEF** (73) y
-  **LOKE** (11): LOKE y LOEKE parecen la misma marca escrita de dos maneras; en envasado hoy sólo hay LOEKE y CHEF.
+  **LOKE** (11): LOKE y LOEKE parecen la misma marca escrita de dos maneras (en pantalla, LOEKE se ve LK y LOKE se ve LOKE);
+  en envasado hoy sólo hay LOEKE y CHEF.
+- **El login por Wi-Fi, el pase de las 17:45, el código manual de logística y el Cambio de Sede son para `cervantes/`** [Elías,
+  07/10], no para la tablet de GP2. Pero desde el 06/10 18:54 la tarjeta «Cervantes» del inicio abre la tablet de GP2 (decisión
+  de Nazareno), así que **ningún operario llega hoy a `cervantes/`**: para que el login por red se use, la tarjeta tiene que
+  volver a abrir `cervantes/`.
 - **Cambio de sede** (botón en Cervantes y Virgilio que mide el tiempo de viaje): no está hecho.
 
 ## ⚠ Lo que NO es lo que parece
@@ -176,7 +185,7 @@ supervisor). De esos tests se trajeron 8 de operario.
 |---|---|
 | `inicio-selector` | `/` con las 2 tarjetas; Virgilio abre `virgilio/` con su login; **Cervantes abre la tablet de GP2** (y su login vuelve a ella con `?next=`); el botón «Menú» de la tablet vuelve al inicio; `supabase.js` compartido; redirección de `selector/` |
 | `virgilio-solo-operario` | **el recorte**: los archivos de supervisor no están; la página carga sin 404 ni errores; la botonera tiene sus 20 botones y cada uno se toca sin error; las entradas de supervisor no existen y los 5 cascarones y los paneles están vacíos (51 chequeos). Con el código sin recortar falla en 19 |
-| `articulo-envasado` | nombre y marca del artículo en envasado, en la tablet de GP2 y en `cervantes/` (15 chequeos): tarjetas que se distinguen por la marca, línea colapsada, matriz de una sola pieza, matriz que no es de envasado y la RPC caída |
+| `articulo-envasado` | nombre y marca del artículo en envasado, en la tablet de GP2 y en `cervantes/` (21 chequeos): regla «mismo artículo → sólo marca» (322) y «nombres distintos → nombre y marca» (389), abreviaturas LK/CH, línea colapsada, matriz de una sola pieza, matriz que no es de envasado y la RPC caída |
 | `virgilio-solo-tv` | login de Virgilio sólo con TV, sin entrada por legajo y con la entrada por nombre (v30.08) |
 | `cervantes-red` | login de `cervantes/` por la red (29 chequeos): fuera de la red, en la red, vigencia 17:44/17:50, antes de las 08:30, sin internet, recarga, vuelta de internet, legajo no habilitado |
 | `operario-queda-botonera`, `modulo-minimizar-anular`, `tarea-abierta-otro-dia`, `botonera-tm-historial`, `mg-reentrada`, `toggle-anular`, `rr-sin-remitos-cierra`, `encoding-utf8` | de Gestión Virgilio, con las rutas nuevas. `operario-queda-botonera` sin el segundo selector ni `chooseVirgilio` (lo llamaba el selector de planta); `modulo-minimizar-anular` sin el chequeo del monitor |
