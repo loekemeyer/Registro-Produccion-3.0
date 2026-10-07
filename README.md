@@ -125,11 +125,15 @@ en `/cervantes-gp2/`; la tarjeta «Cervantes» del inicio sigue abriendo `cervan
   marca también la cruda · `segundos_historico` se llena (GP2 lo deja vacío) · los kg usados del rollo y `cerrar_rollo` suman lo de GP2 y lo
   de 3.0 **sin contar lo anulado** (GP2 cuenta lo anulado) · un error de red deja el toque PENDIENTE (en GP2, ERROR) · los toques fuera de
   horario quedan en `reg_prod_3_0.auditoria` · el catálogo se guarda en el celular.
-- **Mejor que GP2: Fase 1d** (`sql/reg_prod_3_0_fase_1d.sql`, **sin aplicar**) [Elías: «que devuelva el stock» · «sistema anti duplicado»]:
+- **Mejor que GP2: Fase 1d** (`sql/reg_prod_3_0_fase_1d.sql`; **aplicada salvo la pieza de anular**, que va por el SQL Editor) [Elías: «que devuelva el stock» · «sistema anti duplicado»]:
   anular un toque **devuelve el stock** (se borran sus movimientos, como hace `GP2.anular_recepcion`, y el trigger de `GP2.movimiento`
   revierte el inventario; una sola vez) y tomar/cerrar rollo llevan un **id anti-duplicado** (`reg_prod_3_0.rollo_llamadas`), como ya lo
   tenían los toques: un reintento no descuenta otro rollo ni cierra el siguiente. En GP2 (tablet y base) no existe ninguna de las dos
   cosas. La app usa las funciones nuevas sólo si el catálogo trae `rollos_antiduplicado`.
+- **Llevado al original** [Elías: «los cambios/parches … aplicalos también al original»]: `sql/gp2_arreglos_desde_3_0.sql` (los mismos tres
+  arreglos en el schema GP2: anular devuelve el stock, rollos con id anti-duplicado, lo anulado no cuenta para el rollo) y, para que GP2
+  lea lo de 3.0, la vista `reg_prod_3_0.produccion_gp2` (`sql/reg_prod_3_0_vista_produccion_gp2.sql`, con la forma de `GP2.produccion`).
+  **Sin aplicar todavía**; la tablet de GP2 se cambia después de aplicar el SQL de GP2.
 - **Para el corte**: los informes de GP2 leen `GP2.produccion` (15 funciones: `informes_bundle`, `produccion_bundle`, `alertas_bundle`,
   `inicio_bundle`, `problemas_matrices_bundle`…) y **no van a ver lo de 3.0** hasta que se reapunten; por eso la procesada ya guarda
   `matriz_id`. Hoy `GP2.produccion` recibe poco: 41 filas en 30 días, de 1 legajo.
