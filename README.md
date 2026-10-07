@@ -18,7 +18,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 | `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Desde el 07/10 no tiene enlace desde el inicio** (los operarios usan `cervantes/` en su celular) | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | Google + lista blanca (sin cambios) |
 | `gp2/` (resto) | Lo mínimo que esa tablet necesita: `login.html`, `auth-guard.js`, `supabase-config.js`, `gp2-ui.js`, `pwa.js`, `sw.js`, `version.js`, manifest e íconos | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | — |
 | `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Es lo que abre «Cervantes» en el inicio** (desde el 07/10, v3.0.5): ingreso por el código de la TV antes de entrar y registro del equipo | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
-| `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.0, 07/10/2026): entra con el código de la TV, usa el **pase firmado** y escribe en `reg_prod_3_0`. **Todavía sin enlace desde el inicio** (la tarjeta «Cervantes» sigue abriendo `cervantes/`) hasta que se resuelva la Fase 1c (stock y rollos). Ver «Cervantes · botonera de GP2» | `gp2/Produccion/RegistroApp/` (`operarios_gp2.js`, `Operarios_GP2.html`) de este mismo repo, portada | `v3.1.N` | **el código de la TV de Cervantes** + pase |
+| `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.1, 07/10/2026): entra con el código de la TV, usa el **pase firmado** y escribe en `reg_prod_3_0`. **Todavía sin enlace desde el inicio** (la tarjeta «Cervantes» sigue abriendo `cervantes/`) hasta que la Fase 1c (stock y rollos, `sql/reg_prod_3_0_fase_1c.sql`) esté aplicada y probada. Ver «Cervantes · botonera de GP2» | `gp2/Produccion/RegistroApp/` (`operarios_gp2.js`, `Operarios_GP2.html`) de este mismo repo, portada | `v3.1.N` | **el código de la TV de Cervantes** + pase |
 | `supabase.js` (raíz) | supabase-js propio, compartido: `virgilio/` y `cervantes/` lo cargan con `../supabase.js` | `loekemeyer/Gestion-Virgilio` | — | — |
 | `selector/` | Sólo una redirección a `/` (URL vieja) | — | — | — |
 | `tests/` | Pruebas con Playwright (ver «Pruebas») | 8 de `Gestion-Virgilio` + 5 nuevas | — | — |
@@ -76,16 +76,16 @@ dep as (
 select grupo, tipo, objeto from dep order by grupo, tipo, objeto;   -- sin la última línea, con count(distinct objeto) por grupo y tipo
 ```
 
-- **Decisiones que siguen abiertas**: cómo mueve el stock de GP2 la función nueva (**Fase 1c**: `GP2.fabricar_stock`, `tomar_rollo`,
-  `cerrar_rollo` exigen una cuenta de Google en `GP2._autorizado()`; la propuesta es que `reg_prod_3_0_*` verifique el pase y, sólo
-  durante esa transacción, deje pasar la llamada interna, sin tocar GP2), y qué es «la armada» de Virgilio (hoy lo armado sale de
-  triggers y vistas de Gestión Virgilio sobre la cruda).
+- **Fase 1c aprobada por Elías el 07/10** [«1 sí … y no se toca GP2»]: el stock (`GP2.fabricar_stock`) y los rollos (`tomar_rollo`,
+  `cerrar_rollo`) los mueven las funciones `reg_prod_3_0_*` después de verificar el pase, **sin cambiar nada de GP2** (ver «Cervantes ·
+  botonera de GP2»). Escrita en `sql/reg_prod_3_0_fase_1c.sql` y probada en local; **pendiente de aplicar**. Sigue abierta una decisión: qué
+  es «la armada» de Virgilio (hoy lo armado sale de triggers y vistas de Gestión Virgilio sobre la cruda).
 
-## Cervantes · botonera de GP2 (`cervantes-gp2/`, v3.1.0, 07/10/2026)
+## Cervantes · botonera de GP2 (`cervantes-gp2/`, v3.1.1, 07/10/2026)
 
 Es la tablet de GP2 (`gp2/Produccion/RegistroApp/Operarios_GP2.html` + `operarios_gp2.js`) portada al celular del operario
 [Elías: «tendría que ser el de GP2, como está funcionando actualmente»]. **No tiene enlace todavía**: se abre a mano en
-`/cervantes-gp2/`; la tarjeta «Cervantes» del inicio sigue abriendo `cervantes/` hasta resolver la Fase 1c.
+`/cervantes-gp2/`; la tarjeta «Cervantes» del inicio sigue abriendo `cervantes/` hasta que la Fase 1c esté aplicada y probada.
 
 - **Entrada**: pantalla del código de la TV de Cervantes (misma que `cervantes/`), antes de entrar. La base devuelve un **pase firmado**
   (`reg_prod_3_0_cerv_ingresar` → `{ok, pase, vence}`) que se guarda en el celular (`rp3c_pase`) y vale hasta las 17:45 (3 h si se entra
@@ -101,16 +101,23 @@ Es la tablet de GP2 (`gp2/Produccion/RegistroApp/Operarios_GP2.html` + `operario
   abierta se vuelven a pedir cada 30 min.
 - **Botonera**: los 13 botones de GP2 (E, C, PB, BC, MOV, LIMP, Perm, AL, PR, PC, MOV P, PM, RM), llegada tarde (LT) y fin de jornada (FJ),
   historial del día con 🗑 (anula en la base), historial de días anteriores, nombre y marca del artículo de envasado.
-- **Apagado hasta la Fase 1c** (`ROLLOS_ACTIVOS = false` en `app.js`): el selector de rollo, «¿quedó resto?» y el botón **CT de Eduardo
-  (legajo 19)**. **Los toques de esta app NO mueven stock** (`GP2.fabricar_stock`): por eso no se puede cortar a esta app mientras
-  tanto, aunque el resto ande.
+- **Stock y rollos = Fase 1c** (`sql/reg_prod_3_0_fase_1c.sql`, **todavía sin aplicar en la base**). Sin ella los toques de esta app
+  **NO mueven stock** (`GP2.fabricar_stock`) y el selector de rollo, «¿quedó resto?» y el botón **CT de Eduardo (legajo 19)** no se
+  ven: la app los muestra sólo si el catálogo trae `rollos_activos` (lo trae el `reg_prod_3_0_bundle` de la 1c), así que **no hay que
+  coordinar el orden de los deploys**: al aplicar la 1c se prenden solos. Con la 1c: `reg_prod_3_0_registrar_evento` mueve el stock
+  en la misma transacción (misma lógica que `GP2.registrar_evento_prod`) y `reg_prod_3_0_tomar_rollo` / `_cerrar_rollo` manejan los
+  rollos, todos con pase. **No se toca GP2**: tras verificar el pase, cada función marca el pedido como interno (`request.jwt.claims`
+  = `service_role`) sólo durante esa transacción, llama a `GP2.fabricar_stock` / `tomar_rollo` / `cerrar_rollo` y lo deja como estaba.
+  Las que hacen la marca (`reg_prod_3_0_gp2_*`) no se pueden llamar desde la API; `reg_prod_3_0_gp2_diagnostico(pase, equipo)` es de
+  sólo lectura y dice si la marca anda desde la API. Igual que GP2: anular un toque no devuelve el stock.
 - **Ya no pasa lo que pasaba en la tablet**: un error de red marca el toque PENDIENTE (no ERROR) y se reintenta; el ERROR queda para
   rechazos de la base por los datos. Claves de `localStorage` propias (`rp3c_*`), porque el origen lo comparten todas las apps del sitio.
 - **Qué botones de la app vieja no están** (uso en los últimos 60 días, `Registros Produccion Cervantes`): **CM** 66 toques, 1 operario
   (último 06/10); **MM** 2 toques, 1 operario (04/09). REM, PCM, TRM, TL y RD no tuvieron ningún toque. La tablet de GP2 sacó CM el
   29/08 («con E alcanza para cambiar de matriz»).
-- **Prueba**: `node tests/cervantes-gp2.cjs` (40 chequeos con Supabase simulado: código de la TV, pase, catálogo, E/C, historial y anular, sin
-  señal, pase vencido, base caída, y que no se llame a GP2).
+- **Prueba**: `node tests/cervantes-gp2.cjs` (50 chequeos con Supabase simulado: código de la TV, pase, catálogo, E/C, historial y anular, sin
+  señal, pase vencido, base caída, rollos y CT, y que no se llame a GP2). La Fase 1c se probó además en una base local (14 casos: marca y
+  restauración de claims, stock una sola vez, rollback si falla el stock, rollos, pase falso).
 
 ## Qué cambió respecto de la copia (06/10/2026)
 

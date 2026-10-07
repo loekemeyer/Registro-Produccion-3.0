@@ -1,4 +1,4 @@
-/* Cervantes · botonera de GP2 (cervantes-gp2/, v3.1.0) — entra con el código de la TV, usa el PASE y habla con el schema reg_prod_3_0.
+/* Cervantes · botonera de GP2 (cervantes-gp2/, v3.1.1) — entra con el código de la TV, usa el PASE y habla con el schema reg_prod_3_0.
    Supabase está simulado: la base de mentira exige el pase (igual que reg_prod_3_0_pase_ok) y guarda lo que le llega.
      1) sin pase aparece la pantalla del código; código malo no entra; código bueno entra, guarda el pase y trae el catálogo
         con el pase, el id del equipo y la cabecera Content-Profile: reg_prod_3_0
@@ -9,7 +9,9 @@
      6) pase vencido en la base: vuelve el código de la TV, el toque espera en la cola y sale con el pase nuevo
      7) base caída al abrir: se abre con el catálogo guardado en el celular y sin pase se puede cargar (queda en la cola, con aviso)
         hasta que vuelve y se ingresa el código
-     8) NO se llama a nada de GP2 (registro_operarios_bundle, registrar_evento_prod, anular_evento_prod, tomar_rollo, cerrar_rollo)
+     8) rollos (Fase 1c): sólo si el catálogo trae rollos_activos; elegir rollo en E y «CT» / «PR quedó resto» de Eduardo; sin señal esperan
+        en su cola y salen en orden
+     9) NO se llama a nada de GP2 (registro_operarios_bundle, registrar_evento_prod, anular_evento_prod, tomar_rollo, cerrar_rollo)
    Sale 1 si falla. */
 const fs = require("fs");
 const path = require("path");
@@ -39,6 +41,12 @@ const BUNDLE = {
   registro_en_golpes: true,
   matriz_salidas: {}, matriz_fleje: {}, matriz_fleje_pieza: {}, envasado: {}, rollos_saldo: [], rollos_abiertos: {},
 };
+// Catálogo de la Fase 1c: trae `rollos_activos` y los flejes (la 10 corta del fleje 100; hay 4 rollos de 25 kg)
+const BUNDLE_ROLLOS = Object.assign({}, BUNDLE, {
+  rollos_activos: true,
+  matriz_fleje: { "10": { comp_id: 100, codigo: "FL94", descripcion: "Fleje 94" } },
+  rollos_saldo: [{ comp_id: 100, codigo: "FL94", kg_por_rollo: 25, rollos: 4 }],
+});
 const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", arts: [{ codigo: "394", nombre: "Espátula Lisa Nylon 1 Pza", marca: "LOEKE" }] }] };
 
 (async () => {
@@ -56,6 +64,8 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
       paseNuevo: "PASE.OK1",         // el que entrega al ingresar el código
       vence: new Date(Date.now() + 3 * 3600 * 1000).toISOString(),
       caida: false,                  // true = sin respuesta (como sin señal)
+      bundle: BUNDLE,                // lo que devuelve reg_prod_3_0_bundle (hoy sin rollos; la Fase 1c los trae)
+      rollos: [],                    // llamadas aceptadas de tomar/cerrar rollo
       llamadas: [],                  // { fn, perfil, cuerpo }
       eventos: [],                   // cuerpos de reg_prod_3_0_registrar_evento aceptados
       anulados: [],
@@ -83,7 +93,12 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
         return json(200, { ok: false, error: "codigo" });
       }
       if (fn === "reg_prod_3_0_registrar_ingreso") return json(200, 1);
-      if (fn === "reg_prod_3_0_bundle") return conPase ? json(200, BUNDLE) : paseMal();
+      if (fn === "reg_prod_3_0_bundle") return conPase ? json(200, base.bundle) : paseMal();
+      if (fn === "reg_prod_3_0_tomar_rollo" || fn === "reg_prod_3_0_cerrar_rollo") {
+        if (!conPase) return paseMal();
+        base.rollos.push({ fn, cuerpo });
+        return json(200, { ok: true });
+      }
       if (fn === "reg_prod_3_0_envasado_articulos") return conPase ? json(200, ARTICULOS) : paseMal();
       if (fn === "reg_prod_3_0_registrar_evento") {
         if (!conPase) return paseMal();
@@ -166,7 +181,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   chequeo("2 al volver a entrar con el mismo legajo no se anota otra vez", llamadas(base, "reg_prod_3_0_registrar_ingreso").length === 1);
   await p.click("#btnBackTop");
   await ponerLegajo(p, "19");
-  chequeo("2 Eduardo (19) no tiene CT mientras los rollos estén apagados", (await p.$$eval(".box", (els) => els.map((e) => e.dataset.code))).indexOf("CT") === -1);
+  chequeo("2 Eduardo (19) no tiene CT si el catálogo no trae rollos_activos", (await p.$$eval(".box", (els) => els.map((e) => e.dataset.code))).indexOf("CT") === -1);
   await p.click("#btnBackTop");
   await ponerLegajo(p, "999");
 
@@ -176,7 +191,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.0" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.1" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -275,10 +290,61 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   chequeo("7 y el aviso desaparece", await p3.evaluate(() => !document.getElementById("redAviso")));
   await ctx2.close();
 
-  // ============ 8) nada de GP2 ============
-  const todas = base.llamadas.concat(base2.llamadas);
-  chequeo("8 no se llamó a ninguna función de GP2 (bundle, registrar, anular, rollos, stock)", todas.length > 0 && todas.every((c) => !GP2_FNS.test(c.url)));
-  chequeo("8 todas las funciones son reg_prod_3_0_*", todas.every((c) => /^reg_prod_3_0_/.test(c.fn)));
+  // ============ 8) rollos (Fase 1c) ============
+  const base3 = nuevaBase(); base3.bundle = BUNDLE_ROLLOS;
+  const { ctx: ctx3, p: p4 } = await contexto(base3);
+  await p4.goto(srv.url + "/cervantes-gp2/", { waitUntil: "domcontentloaded" });
+  await entrarConCodigo(p4, CODIGO_TV);
+  await p4.waitForSelector("#tvClaveModal", { state: "detached" });
+  await esperar(() => p4.evaluate(() => typeof D !== "undefined" && !!(D.empleados && D.empleados["999"]) && D.rollos_activos === true));
+  await ponerLegajo(p4, "999");
+  await p4.click('.box[data-code="E"]');
+  await p4.fill("#textInput", "10");
+  await p4.waitForSelector("#rolloGrid .rl");
+  chequeo("8 con rollos_activos, al elegir la matriz 10 se ofrece el rollo de 25 kg del fleje 94", /25 kg/.test(await p4.textContent("#rolloGrid .rl")) && /FL94/.test(await p4.textContent("#rolloGrid .rl")));
+  await p4.click("#rolloGrid .rl");
+  await p4.click("#btnEnviar");
+  await p4.waitForSelector("#legajoScreen:not(.hidden)");
+  await esperar(() => base3.rollos.length === 1);
+  const tom = base3.rollos[0];
+  chequeo("8 el E con rollo llama a tomar_rollo con legajo, fleje, kg y matriz", !!tom && tom.fn === "reg_prod_3_0_tomar_rollo" && tom.cuerpo.p_legajo === "999" && tom.cuerpo.p_comp_id === 100 && tom.cuerpo.p_kg_por_rollo === 25 && tom.cuerpo.p_matriz === "10" && !!tom.cuerpo.p_fecha);
+  chequeo("8 y va con pase y equipo", !!tom && tom.cuerpo.p_pase === "PASE.OK1" && !!tom.cuerpo.p_dispositivo);
+  await esperar(() => base3.eventos.some((e) => e.p.toque.opcion === "E"));
+  chequeo("8 el toque E sale igual", base3.eventos.some((e) => e.p.toque.opcion === "E" && e.p.matriz === "10"));
+  // Eduardo: el CT y «quedó resto» existen sólo con rollos
+  await p4.click("#btnBackTop").catch(() => {});
+  await p4.fill("#legajoInput", "19"); await p4.click("#btnContinuar"); await p4.waitForSelector("#optionsScreen:not(.hidden)");
+  chequeo("8 Eduardo (19) tiene el botón CT cuando hay rollos", (await p4.$$eval(".box", (els) => els.map((e) => e.dataset.code))).includes("CT"));
+  await p4.click('.box[data-code="PR"]');
+  chequeo("8 en PR aparece «¿quedó resto?»", await p4.isVisible("#quedoRestoWrap"));
+  await p4.check("#quedoRestoChk");
+  await p4.click("#btnEnviar");
+  await p4.waitForSelector("#legajoScreen:not(.hidden)");
+  await esperar(() => base3.rollos.length === 2);
+  const cer = base3.rollos[1];
+  chequeo("8 PR con «quedó resto» llama a cerrar_rollo con quedo_resto = true", !!cer && cer.fn === "reg_prod_3_0_cerrar_rollo" && cer.cuerpo.p_legajo === "19" && cer.cuerpo.p_quedo_resto === true && cer.cuerpo.p_pase === "PASE.OK1");
+  // sin señal: tomar y cerrar esperan en orden
+  await ponerLegajo(p4, "999");
+  await enviarOpcion(p4, "C", "10");                          // el cajón de la matriz abierta, para poder empezar otra
+  await esperar(() => base3.eventos.some((e) => e.p.toque.opcion === "C"));
+  await ponerLegajo(p4, "999");
+  base3.caida = true;
+  await p4.click('.box[data-code="E"]'); await p4.fill("#textInput", "10"); await p4.waitForSelector("#rolloGrid .rl"); await p4.click("#rolloGrid .rl");
+  await p4.click("#btnEnviar"); await p4.waitForSelector("#legajoScreen:not(.hidden)");
+  await esperar(() => p4.evaluate(() => JSON.parse(localStorage.getItem("rp3c_rqueue") || "[]").length === 1));
+  chequeo("8 sin señal el tomar_rollo espera en su cola y el badge lo cuenta", await p4.evaluate(() => JSON.parse(localStorage.getItem("rp3c_rqueue") || "[]").length === 1 && /sin enviar/.test(document.getElementById("syncBadge").textContent)) && base3.rollos.length === 2);
+  base3.caida = false;
+  await p4.click("#syncBadge");
+  await esperar(() => base3.rollos.length === 3);
+  chequeo("8 al volver la señal sale el tomar_rollo guardado, con su fecha original", base3.rollos.length === 3 && base3.rollos[2].fn === "reg_prod_3_0_tomar_rollo" && !!base3.rollos[2].cuerpo.p_fecha);
+  await esperar(() => p4.evaluate(() => JSON.parse(localStorage.getItem("rp3c_rqueue") || "[]").length === 0 && /al día/.test(document.getElementById("syncBadge").textContent)));
+  chequeo("8 y las colas quedan vacías", await p4.evaluate(() => JSON.parse(localStorage.getItem("rp3c_rqueue") || "[]").length === 0 && JSON.parse(localStorage.getItem("rp3c_queue") || "[]").length === 0));
+  await ctx3.close();
+
+  // ============ 9) nada de GP2 ============
+  const todas = base.llamadas.concat(base2.llamadas, base3.llamadas);
+  chequeo("9 no se llamó a ninguna función de GP2 (bundle, registrar, anular, rollos, stock)", todas.length > 0 && todas.every((c) => !GP2_FNS.test(c.url)));
+  chequeo("9 todas las funciones son reg_prod_3_0_*", todas.every((c) => /^reg_prod_3_0_/.test(c.fn)));
 
   await ctx.close();
   const fallas = res.filter(([, ok]) => !ok);

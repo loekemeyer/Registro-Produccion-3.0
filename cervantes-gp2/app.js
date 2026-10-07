@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.1)
    Es la tablet de GP2 (gp2/Produccion/RegistroApp/operarios_gp2.js) llevada al celular del operario:
      · se entra con el CÓDIGO DE LA TV (4 números), no con Google. La base devuelve un PASE firmado, atado a este
        equipo, que vale hasta las 17:45 (o 3 h si se entra más tarde);
@@ -10,13 +10,13 @@
        La base guarda la CRUDA tal cual vino y arma la PROCESADA en la misma transacción;
      · sin internet se carga igual: los toques quedan en la cola del celular y se envían, con su hora original, cuando hay
        pase e internet. El catálogo (empleados, matrices, envasado) se guarda en el celular para poder abrir sin señal;
-     · ROLLOS: tomar/cerrar rollo y el stock los sigue moviendo GP2 (Fase 1c, todavía no). Por eso el selector de rollo y el
-       botón CT de Eduardo están apagados (ROLLOS_ACTIVOS = false) y los toques de esta app NO mueven stock.
+     · STOCK Y ROLLOS (Fase 1c): los mueve la base, en la misma transacción que el toque (reg_prod_3_0_registrar_evento →
+       GP2.fabricar_stock) y con reg_prod_3_0_tomar_rollo / _cerrar_rollo, siempre con el pase. Mientras la base no lo tenga, el
+       catálogo no trae `rollos_activos` y el selector de rollo, «¿quedó resto?» y el botón CT de Eduardo quedan apagados.
    Eduardo Barrionuevo (legajo "19"): CT button + rollo en E/PR (apagado, ver arriba).
    ============================================================ */
 
-const APP_VERSION = "v3.1.0";
-const ROLLOS_ACTIVOS = false;
+const APP_VERSION = "v3.1.1";
 const LEGAJO_EDUARDO = "19";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
@@ -713,7 +713,7 @@ async function flushQueue() {
   flushing = true;
   try {
     const q = readQueue();
-    if (!q.length) return;
+    if (!q.length && !readRolloQueue().length) return;
     if (!paseVigente()) { verificarEntrada(); return; }       // sin pase no se manda: queda en la cola y se pide el código
     const enviados = new Set();
     for (const payload of q) {
@@ -725,6 +725,14 @@ async function flushQueue() {
     }
     // Re-leer la cola: pudo haber items nuevos encolados mientras se enviaba
     if (enviados.size) writeQueue(readQueue().filter(x => !enviados.has(x.id)));
+    // Rollos pendientes (tomar/cerrar que no pudieron salir): FIFO, corta al primer fallo de red o de pase.
+    let rq = readRolloQueue();
+    while (rq.length) {
+      const { error } = await rpc(rq[0].fn, rq[0].args);
+      if (error && error.code === "28000") { pasePerdido(); break; }
+      if (error && !esRechazoDefinitivo(error)) break;
+      rq = readRolloQueue(); rq.shift(); writeRolloQueue(rq);
+    }
   } finally { flushing = false; }
 }
 
@@ -794,9 +802,34 @@ function rollosDeTodosLosFlejes(n_matriz) {
   return (D.rollos_saldo || []).filter(r => ids.has(r.comp_id) && Number(r.rollos) > 0);
 }
 
-// Fase 1c: hoy el stock y los rollos los mueve GP2 y esta app todavía no los toca (ROLLOS_ACTIVOS = false).
-async function tomarRollo() { /* Fase 1c */ }
-async function cerrarRollo() { /* Fase 1c */ }
+/* Los rollos los maneja la base (Fase 1c): sólo se muestran si el catálogo dice rollos_activos. Si no se puede mandar al
+   momento (sin pase, sin señal), la llamada espera en su cola (FIFO, para respetar el orden tomar → cerrar) y sale con la
+   fecha original. */
+function rollosActivos() { return D.rollos_activos === true; }
+
+const LS_RQUEUE = "rp3c_rqueue";
+function readRolloQueue()  { try { return JSON.parse(localStorage.getItem(LS_RQUEUE) || "[]"); } catch { return []; } }
+function writeRolloQueue(q) { try { localStorage.setItem(LS_RQUEUE, JSON.stringify(q || [])); } catch { /* storage lleno */ } }
+function enqueueRollo(fn, args) { const rq = readRolloQueue(); rq.push({ fn, args }); writeRolloQueue(rq); }
+
+async function llamarRollo(fn, args) {
+  if (paseVigente()) {
+    const { error } = await rpc(fn, args);
+    if (!error) return;
+    if (error.code === "28000") pasePerdido();
+    else if (esRechazoDefinitivo(error)) { console.warn(fn + ":", error.message); return; }   // la base lo rechazó por los datos: no se reintenta
+    else console.error(fn + ":", error);
+  }
+  enqueueRollo(fn, args);
+}
+async function tomarRollo(legajo, comp_id, kg_por_rollo, matriz) {
+  await llamarRollo("reg_prod_3_0_tomar_rollo", {
+    p_legajo: String(legajo), p_comp_id: Number(comp_id), p_kg_por_rollo: Number(kg_por_rollo), p_matriz: String(matriz), p_fecha: isoNow()
+  });
+}
+async function cerrarRollo(legajo, quedoResto) {
+  await llamarRollo("reg_prod_3_0_cerrar_rollo", { p_legajo: String(legajo), p_quedo_resto: !!quedoResto, p_fecha: isoNow() });
+}
 
 /* ============================================================
    UI helpers
@@ -856,7 +889,7 @@ function renderSummary() {
 }
 
 function renderSyncBadge() {
-  const q = readQueue();
+  const q = readQueue().concat(readRolloQueue());
   const el = $("syncBadge");
   // El badge NO muestra version [usuario 2026-08-31]: solo el estado de la cola. Toca para
   // forzar el envio. La version del cache vive en el ?v= del <script>, no a la vista.
@@ -1030,7 +1063,7 @@ function renderOptions() {
   const isEd = isEduardo();
   [1, 2, 3, 4].forEach(r => { $(`row${r}`).innerHTML = ""; });
 
-  const all = (isEd && ROLLOS_ACTIVOS) ? [...OPTIONS, CT_OPTION] : OPTIONS;
+  const all = (isEd && rollosActivos()) ? [...OPTIONS, CT_OPTION] : OPTIONS;
   all.forEach(opt => {
     const el = document.createElement("div");
     el.className = "box" + (opt.isCT ? " ct-btn" : "");
@@ -1143,7 +1176,7 @@ function selectOption(opt) {
 
   // Eduardo: quedoResto para PR
   const quedoRestoWrap = $("quedoRestoWrap");
-  if (ROLLOS_ACTIVOS && isEduardo() && opt.code === "PR") {
+  if (rollosActivos() && isEduardo() && opt.code === "PR") {
     quedoRestoWrap.classList.remove("hidden");
     $("quedoRestoChk").checked = false;
   } else {
@@ -1157,7 +1190,7 @@ function selectOption(opt) {
 function actualizarRolloPicker(n_matriz) {
   const grid = $("rolloGrid");
   if (!grid) return;
-  if (!ROLLOS_ACTIVOS) { rolloSel = null; grid.innerHTML = ""; $("rolloPicker")?.classList.add("hidden"); return; }   // Fase 1c
+  if (!rollosActivos()) { rolloSel = null; grid.innerHTML = ""; $("rolloPicker")?.classList.add("hidden"); return; }   // sin rollos en la base
   const n = String(n_matriz || "").trim();
   const msg = (t) => { grid.innerHTML = `<div class="rl-msg">${esc(t)}</div>`; rolloSel = null; };
   // Matriz sin fleje: no hay rollo que elegir, el cartel entero se va. Se vuelve a
