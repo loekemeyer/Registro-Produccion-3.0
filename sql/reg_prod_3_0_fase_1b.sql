@@ -1,4 +1,4 @@
--- ESTADO: NO APLICADO en la base (07/10/2026). Espera el "sí" de Elías; al aplicarlo se cambia esta línea por "APLICADO" y la fecha.
+-- ESTADO: APLICADO en la base el 07/10/2026 (4 migraciones: fase_1b_a_horario, _b_catalogo, _c_registrar, _d_anular). Verificado: bundle 65 empleados, 413 matrices, 21 de envasado; pase falso o de otro equipo => 28000.
 -- Registro Producción 3.0 — FASE 1b (07/10/2026, Elías: «1b … con las tablas de crudo y procesado»).
 -- Las funciones que usa el operario: traer el catálogo, registrar un toque (cruda + procesada en la misma transacción) y anularlo.
 -- TODAS exigen el pase firmado de la Fase 1a y van atadas al equipo. Quedan en el schema reg_prod_3_0.
