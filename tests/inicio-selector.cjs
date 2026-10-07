@@ -1,13 +1,14 @@
 /* Registro Producción 3.0 — la pantalla de inicio (/) es el selector Virgilio | Cervantes. Virgilio vive en
-   virgilio/ y Cervantes es la TABLET DE OPERARIOS DE GP2 (gp2/Produccion/RegistroApp/), cada una con su login.
+   virgilio/ y Cervantes en cervantes/ (el operario entra desde su celular), cada una con su login por el código
+   de la TV de su planta.
    Verifica, sirviendo el repo por http:
-     1) / muestra las 2 tarjetas y apuntan a virgilio/ y a la tablet de GP2;
+     1) / muestra las 2 tarjetas y apuntan a virgilio/ y a cervantes/;
      2) entrar a Virgilio carga virgilio/ sin errores de JS y muestra SU login;
-     3) entrar a Cervantes lleva a la tablet de GP2 (sin sesión, al login de GP2, que vuelve a la tablet con ?next=) y
-        el botón «Menú» de la tablet vuelve al inicio del sitio;
+     3) entrar a Cervantes carga cervantes/ y, ANTES de entrar, muestra la pantalla del código de la TV (con «Volver al
+        inicio»); la tablet de GP2 ya no está en el inicio;
      4) /selector/ (URL vieja) redirige a /;
      5) virgilio/ llama a ../supabase.js (una sola copia, en la raíz).
-   (v30.03: Cervantes dejó de abrir cervantes/ —la app de Registro Producción 2.0— y abre la tablet de GP2.)
+   (07/10/2026 [Elías]: «ya no estamos en GP2, usan su celular personal»: la tarjeta volvió de la tablet de GP2 a cervantes/.)
    Sale 1 si falla. */
 const fs = require("fs");
 const path = require("path");
@@ -33,8 +34,8 @@ const { servir } = require("./_servidor.cjs");
   await p.goto(srv.url + "/", { waitUntil: "domcontentloaded" });
   c.dosTarjetas = (await p.locator(".card").count()) === 2;
   c.hrefVirgilio = (await p.getAttribute("#cardVir", "href")) === "virgilio/";
-  const TABLET = "gp2/Produccion/RegistroApp/Operarios_GP2.html";
-  c.hrefCervantes = (await p.getAttribute("#cardCer", "href")) === TABLET;
+  c.hrefCervantes = (await p.getAttribute("#cardCer", "href")) === "cervantes/";
+  c.cervantesNoAbreGP2 = !/gp2\//.test((await p.getAttribute("#cardCer", "href")) || "");
 
   // 2) Virgilio
   await Promise.all([p.waitForURL("**/virgilio/"), p.click("#cardVir")]);
@@ -42,16 +43,15 @@ const { servir } = require("./_servidor.cjs");
   c.virgilioMuestraSuLogin = (await p.locator("#googleSignInBtn").count()) === 1 && (await p.locator("#tvClaveStep").count()) === 1;
   c.virgilioCargaSupabaseJsDeLaRaiz = await p.evaluate(() => !!document.querySelector('script[src="../supabase.js"]') && typeof window.supabase !== "undefined");
 
-  // 3) Cervantes = la tablet de operarios de GP2
+  // 3) Cervantes = cervantes/, con el código de la TV antes de entrar (sin red a Supabase la validación no puede hacerse;
+  //    la pantalla aparece igual porque hay internet y falta el pase de hoy)
   await p.goto(srv.url + "/", { waitUntil: "domcontentloaded" });
-  await Promise.all([p.waitForURL("**/gp2/**"), p.click("#cardCer")]);
-  await p.waitForLoadState("domcontentloaded");
-  const url3 = new URL(p.url());
-  // sin sesión de Google el guard de GP2 manda a su login y le deja ?next= la tablet para volver
-  c.cervantesAbreGP2 = url3.pathname === "/" + TABLET || (url3.pathname === "/gp2/login.html" && decodeURIComponent(url3.searchParams.get("next") || "") === "/" + TABLET);
-  c.cervantesNoEsLaAppVieja = !url3.pathname.startsWith("/cervantes/");
-  const tablet = fs.readFileSync(path.join(__dirname, "..", TABLET), "utf8");
-  c.tabletMenuVuelveAlInicio = /id="btnMenu"[^>]*onclick="location\.href='\.\.\/\.\.\/\.\.\/'"/.test(tablet);
+  await Promise.all([p.waitForURL("**/cervantes/"), p.click("#cardCer")]);
+  await p.waitForSelector("#tvClaveModal", { state: "visible", timeout: 10000 });
+  c.cervantesPideElCodigoAntesDeEntrar = (await p.locator("#tvClaveInput").count()) === 1 && /Código de la TV/.test(await p.textContent("#tvClaveModal"));
+  c.cervantesPuedeVolverAlInicio = (await p.getAttribute("#tvClaveVolver", "href")) === "../";
+  await Promise.all([p.waitForURL(srv.url + "/"), p.click("#tvClaveVolver")]);
+  c.volverLlevaAlInicio = (await p.locator(".card").count()) === 2;
 
   // 4) URL vieja del selector
   await p.goto(srv.url + "/selector/", { waitUntil: "domcontentloaded" });

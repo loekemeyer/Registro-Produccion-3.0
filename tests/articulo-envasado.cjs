@@ -90,6 +90,8 @@ const BUNDLE = {
       if (url.includes("/auth/v1/token")) return json(200, { access_token: "x", refresh_token: "y", token_type: "bearer", expires_in: 3600, expires_at: 4102444800, user: { id: "u", email: "op@example.com" } });
       if (url.includes("/rpc/reg_prod_3_0_envasado_articulos")) return rpcArticulos === "falla" ? json(404, { message: "function not found" }) : json(200, ARTICULOS);
       if (url.includes("/rpc/registro_operarios_bundle")) return json(200, BUNDLE);
+      if (url.includes("/rpc/reg_prod_3_0_cerv_ingresar")) return json(200, { ok: true });   // v3.0.5: el código de la TV se acepta
+      if (url.includes("/rpc/reg_prod_3_0_registrar_ingreso")) return json(200, 1);
       if (url.includes("/rest/v1/Empleados")) return json(200, [{ Legajo: "999", Empleado: "Prueba Envasado", Activo: "SI", hora_entrada: "08:30:00" }]);
       if (url.includes("/rest/v1/Matrices")) return json(200, [{ N_Matriz: "322", Matriz: "Env Espatula NY" }, { N_Matriz: "321", Matriz: "Env espatula calada NY" }, { N_Matriz: "389", Matriz: "Env Ñoquera" }, { N_Matriz: "10", Matriz: "Varilla c/ Cuchilla" }]);
       if (m === "GET") return json(200, []);
@@ -167,6 +169,11 @@ const BUNDLE = {
   async function abrirCervantes(rpcArticulos) {
     const c = await contexto(rpcArticulos);
     await c.p.goto(srv.url + "/cervantes/", { waitUntil: "domcontentloaded" });
+    // v3.0.5: antes de entrar, el código de la TV (simulado: la base lo acepta)
+    await c.p.waitForSelector("#tvClaveModal", { state: "visible" });
+    await c.p.fill("#tvClaveInput", "4821");
+    await c.p.click("#tvClaveOk");
+    await c.p.waitForSelector("#tvClaveModal", { state: "detached" });
     await c.p.waitForSelector("#legajoScreen", { state: "visible" });
     if (rpcArticulos !== "falla") await esperar(() => c.p.evaluate(() => !!document.querySelector("#syncBadge")) , 2000);
     await pausa(900);   // catálogos + artículos cargados

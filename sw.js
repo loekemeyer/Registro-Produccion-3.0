@@ -6,7 +6,7 @@
    Scope de la raíz del sitio; virgilio/ y la tablet de GP2 registran su propio
    service worker, que tiene prioridad en sus carpetas.
    ========================================================= */
-const SW_VERSION = "inicio-v1.2";
+const SW_VERSION = "inicio-v1.3";
 
 self.addEventListener("install", () => {
   self.skipWaiting();

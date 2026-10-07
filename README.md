@@ -13,11 +13,11 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 
 | Carpeta | Qué es | Origen (commit) | Versión propia | Login |
 |---|---|---|---|---|
-| `/` | **Inicio**: elegir Virgilio o Cervantes | `selector/` de `loekemeyer/Gestion-Virgilio` · `e7a7bbd` | `sw.js` → `inicio-v1.2` | — |
+| `/` | **Inicio**: elegir Virgilio o Cervantes | `selector/` de `loekemeyer/Gestion-Virgilio` · `e7a7bbd` | `sw.js` → `inicio-v1.3` | — |
 | `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada | `v30.NN` (hoy `v30.05`) | **sólo el código de la TV** |
-| `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Es lo que abre «Cervantes» en el inicio** | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | Google + lista blanca (sin cambios) |
+| `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Desde el 07/10 no tiene enlace desde el inicio** (los operarios usan `cervantes/` en su celular) | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | Google + lista blanca (sin cambios) |
 | `gp2/` (resto) | Lo mínimo que esa tablet necesita: `login.html`, `auth-guard.js`, `supabase-config.js`, `gp2-ui.js`, `pwa.js`, `sw.js`, `version.js`, manifest e íconos | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | — |
-| `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Desde el 06/10 no tiene enlace desde el inicio**; con el ingreso por la TV y el registro de equipo (07/10) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
+| `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Es lo que abre «Cervantes» en el inicio** (desde el 07/10, v3.0.5): ingreso por el código de la TV antes de entrar y registro del equipo | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
 | `supabase.js` (raíz) | supabase-js propio, compartido: `virgilio/` y `cervantes/` lo cargan con `../supabase.js` | `loekemeyer/Gestion-Virgilio` | — | — |
 | `selector/` | Sólo una redirección a `/` (URL vieja) | — | — | — |
 | `tests/` | Pruebas con Playwright (ver «Pruebas») | 8 de `Gestion-Virgilio` + 5 nuevas | — | — |
@@ -36,30 +36,31 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
    (v30.08, igual que Gestión v27.37); un admin lo valida con su legajo en Gestión Virgilio (⚙️ → Validar Operarios)
    y desde ahí aparece en la lista. La entrevista usa el mismo camino. Una sesión de Google guardada se ignora (y no se borra: el origen se
    comparte con GP2). Los **supervisores no entran por este Virgilio**: su panel sigue en Gestión Virgilio.
-3. **Cervantes = la tablet de operarios de GP2** (inicio v1.2): la tarjeta «Cervantes» abría `cervantes/` (la visual de
-   Registro Producción 2.0); ahora abre `gp2/Produccion/RegistroApp/Operarios_GP2.html`. Sin sesión de Google, el guard
-   de GP2 manda a su login y vuelve a la tablet con `?next=`. El botón «Menú» de la tablet apuntaba a `GP2_MODULOS.html`
-   (no está acá): ahora vuelve al inicio del sitio. Token de caché de la tablet `20261006k` (el de GP2).
-4. **Cervantes, ingreso con el código de la TV** (`asegurarPaseTv`, `cervantes/app.js` v3.0.4) — reemplaza el login por
-   Wi-Fi de v3.0.1–v3.0.3 [Elías, 07/10: «ya no va a ser por wifi»; el código manual de logística también se descartó]. **Ya no
-   es la entrada** (la tarjeta abre la tablet de GP2, que no lo usa): vive en `cervantes/` con su prueba (`cervantes-tv`).
-   En el **primer mensaje del día** (antes de la Llegada Tarde, que no existe si llega antes de las 08:30) abre una pantalla
-   que pide los **4 números del monitor TV de Cervantes** (cambian cada minuto; vale el de este minuto y el anterior).
-   El monitor lo arma otro chat (tarea Planify 5274, en Gestión Productiva 2.0) con `GP2.monitor_clave_actual()`; este repo
-   sólo valida con `GP2.monitor_clave_validar()`, a través de `public.reg_prod_3_0_cerv_ingresar` (ver el punto 7).
-   - **Código bien** → queda un *pase* del legajo, válido hasta las **17:45** (hora de Buenos Aires). Con el pase, aunque se
-     corte la luz o internet, siguen registrando: la cola envía cuando vuelve internet. El pase es sólo local (no guarda el código).
-   - **Código mal o vencido** → vuelve a pedirlo (6 errores seguidos y corta). **Legajo no habilitado** (no está activo en
-     `Empleados`) o **demasiados intentos** → no se envía nada y lo dice.
-   - **Cancelar** la pantalla → no se envía nada.
-   - **Sin internet** (o función caída) → el mensaje se acepta pero queda **retenido** en la cola: no pasa al IndexedDB (así
-     el service worker no lo manda) y `reconcileQueueWithIDB` no lo da por enviado. **Al volver internet no valida solo**:
-     el código vence a los 2 minutos, así que aparece un aviso fijo arriba con el botón «Ingresar código»; con el código bien
-     se libera y se envía todo con su hora original.
+3. **Cervantes = `cervantes/`, desde el celular del operario** (inicio v1.3, 07/10) [Elías: «ya no estamos en GP2, no usan la tablet,
+   usan su celular personal»]. Entre el 06/10 18:54 y el 07/10 la tarjeta abría la tablet de GP2 (decisión de Nazareno);
+   volvió a abrir `cervantes/`. La tablet de GP2 sigue en el repo pero sin enlace (con el mismo cambio de envasado, abajo).
+4. **Cervantes, ingreso con el código de la TV** (`asegurarEntrada`, `cervantes/app.js` v3.0.5) — reemplaza el login por Wi-Fi
+   de v3.0.1–v3.0.3 [Elías, 07/10: «ya no va a ser por wifi»; el código manual de logística también se descartó]. **Se pide
+   antes de entrar** [Elías, 07/10: «antes de entrar, al elegir el lugar»]: al abrir `cervantes/` sin pase de hoy aparece una
+   pantalla que tapa todo y pide los **4 números del monitor TV de Cervantes** (cambian cada minuto; vale el de este minuto
+   y el anterior), con «← Volver al inicio». (En v3.0.4 se pedía en el primer mensaje del día; no llegó a usarse.) El monitor
+   lo armó el otro chat (GP2 v1.246.0, `Produccion/MonitorIngreso/MonitorIngreso_GP2.html`, pastilla «🔑 Monitor» del menú de
+   GP2) con `GP2.monitor_clave_actual()` (sólo un mail habilitado); este repo sólo valida con `GP2.monitor_clave_validar()`, a
+   través de `public.reg_prod_3_0_cerv_ingresar` (ver el punto 7).
+   - **Código bien** → entra y queda un *pase* del **equipo**, válido hasta las **17:45** (hora de Buenos Aires): todavía no hay
+     legajo, así que el pase no es por legajo. Con el pase, aunque se corte la luz o internet, siguen registrando: la cola
+     envía cuando vuelve internet. El pase es sólo local (no guarda el código).
+   - **Código mal o vencido** → la pantalla sigue. **Demasiados intentos** → lo dice y la pantalla sigue (el tope lo pone la base).
+   - **Sin internet** (o la función caída) → se puede entrar y cargar: el mensaje queda **retenido** en la cola: no pasa al
+     IndexedDB (así el service worker no lo manda) y `reconcileQueueWithIDB` no lo da por enviado. **Al volver internet no valida
+     solo** (el código vence a los 2 minutos): la pantalla vuelve a aparecer; si no se pudo verificar (función caída) no se abre sola
+     por 5 minutos y el aviso fijo de arriba ofrece «Ingresar código» (con «Ahora no»). Con el código bien se libera y se envía todo
+     con su hora original.
+   - Si se pasan las 17:45 con la app abierta, la pantalla vuelve al volver a ella; y el envío tiene la misma red de seguridad.
    - Cervantes **no usa la sesión de Virgilio** ni rebota al inicio por no tener sesión. La Edge Function `login-operario`
      sigue desplegada pero este repo ya no la llama.
 5. **Virgilio recortado a la botonera** (v30.03 y v30.04): ver la sección siguiente.
-6. **Nombre del artículo en las matrices de ENVASADO** (07/10/2026; tablet de GP2 `v1.245.2+3.0.2` y `cervantes/` v3.0.3), sólo
+6. **Nombre del artículo en las matrices de ENVASADO** (07/10/2026; `cervantes/` y, sin enlace, la tablet de GP2 `v1.245.2+3.0.2`), sólo
    para las que cierran un terminado (21 matrices, 42 artículos). Regla [Elías, 07/10]: dentro de una matriz, **si las piezas
    son el mismo artículo (mismo nombre) se muestra sólo la marca; si los nombres son distintos, nombre y marca**. En la 322
    el 394 y el 842 se llaman igual («Espátula Lisa Nylon 1 Pza») y se ven como **LK** y **CH**; en la 389 los nombres
@@ -69,7 +70,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
    «Empecé matriz» / «matriz en uso» (`cervantes/`, donde no hay selector: con el mismo artículo el nombre va una vez y las
    marcas al lado). Los datos salen de la RPC `GP2.reg_prod_3_0_envasado_articulos` (una llamada, ~6 KB). Sin la RPC la
    tablet queda como estaba («Art. 394» con el código del bundle) y `cervantes/` sin nombres.
-7. **Registro de quién entra y desde qué equipo** (07/10/2026; `cervantes/` v3.0.4 y `virgilio/` v30.12) [Elías: «que tome la IP o
+7. **Registro de quién entra y desde qué equipo** (07/10/2026; `cervantes/` v3.0.5 y `virgilio/` v30.12) [Elías: «que tome la IP o
    MAC del celular / dispositivo, para tener registro de eso»]. Cada ingreso con el código de la TV deja una fila en
    `public.reg_prod_3_0_ingresos`: hora del servidor, app, legajo, nombre, ok / motivo, **IP que ve el servidor**, la cabecera
    `x-forwarded-for` tal cual, si la IP está en `public.red_empresa` (sede), **id del equipo**, huella, navegador y modelo,
@@ -81,16 +82,23 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
    - **La IP la anota el servidor** (función SQL que lee `request.headers`), no el celular. Detrás del Wi-Fi de la empresa
      todos comparten la misma IP pública: sirve para saber si estaba adentro (`red_empresa`) o afuera (datos móviles), no
      para distinguir personas.
-   - **Cervantes** entra por `reg_prod_3_0_cerv_ingresar`, que valida el código **y** registra (fila con `verificado = true`).
-     **Virgilio** ya valida con `gv_tv_clave_validar` en Gestión; después de elegir el nombre llama a
-     `reg_prod_3_0_registrar_ingreso`, que sólo anota lo que el celular declara (`verificado = false`, no se le puede creer).
-     Si esa llamada falla, el operario entra igual.
+   - **Cervantes** valida el código por `reg_prod_3_0_cerv_ingresar` (fila con `verificado = true`, sin legajo: todavía no hay).
+     Al poner el legajo llama a `reg_prod_3_0_registrar_ingreso` (1 vez por legajo, equipo y día): anota qué legajo se usó en ese
+     celular. **Virgilio** valida con `gv_tv_clave_validar` en Gestión; después de elegir el nombre llama a la misma
+     `reg_prod_3_0_registrar_ingreso`. Esa sólo anota lo que el celular declara (`verificado = false`, no se le puede creer) y
+     marca `ok = false` si el legajo no está activo en `Empleados`. Si la llamada falla, el operario entra igual.
+   - **Alerta por Telegram** [Elías, 07/10: «sí»]: `reg_prod_3_0_alerta_dispositivo_multi_telegram()` (cron `7-59/10 * * * *`,
+     la vista es `reg_prod_3_0_dispositivo_multi_legajo`) avisa cuando un mismo celular entra con **2 o más legajos** el mismo día en
+     Cervantes, como ya hace Virgilio (`gv_alerta_dispositivo_multi_operario_telegram`). Mismo chat de Telegram; una alerta nueva
+     sólo cuando cambia el conjunto de legajos.
    - Convive con lo de Luis (v25.25): `GV_Dispositivo_Login`, la vista `gv_dispositivos` y la alerta diaria «un mismo celular con N
      operarios» siguen como estaban; esto agrega la IP y a Cervantes.
    - Cómo se lee: `select * from public.reg_prod_3_0_ingresos order by at desc;`. Un equipo con varios legajos el mismo día:
      `select dispositivo, count(distinct legajo) from public.reg_prod_3_0_ingresos where ok group by 1 having count(distinct legajo) > 1;`.
-   - **Hay que crear la tabla y las funciones en la base** (SQL pendiente de aprobación). Hasta entonces `cervantes/` no puede
-     validar (los mensajes quedan retenidos) y Virgilio no registra nada (no se nota).
+   - **Hay que crear la tabla, las funciones, la vista y el cron en la base** (SQL pendiente de aprobación). Hasta entonces
+     `cervantes/` no puede validar (la pantalla deja pasar y los mensajes quedan retenidos) y Virgilio no registra nada (no se nota).
+     **El cambio de la tarjeta y la v3.0.5 no se suben a `main` hasta que el SQL esté aplicado y verificado**: con la tarjeta
+     apuntando a `cervantes/` y sin la función, ningún mensaje de Cervantes saldría.
 
 ## Qué se recortó (Virgilio, 06/10/2026)
 
@@ -150,10 +158,10 @@ hay que traer esa parte también. Un fix de operario que Gestión Virgilio ya te
 
 ## Lo que falta o no coincide (a 06/10/2026)
 
-- **La tablet de GP2 (Cervantes) sigue con Google + lista blanca**, no con el ingreso por la TV que se hizo para
-  `cervantes/`. Si Cervantes tiene que entrar con el código de la TV, hay que llevar `asegurarPaseTv` a `operarios_gp2.js`.
-- **`cervantes/` quedó sin enlace** (la visual de Registro Producción 2.0). Se puede borrar cuando se confirme que no
-  hace falta; la historia queda en git.
+- **La tablet de GP2 quedó sin enlace** (07/10: los operarios usan su celular). Sigue con Google + lista blanca y sin el ingreso por
+  la TV; se puede borrar cuando se confirme que no hace falta (la historia queda en git).
+- **`cervantes/` es la visual de Registro Producción 2.0** con el ingreso por la TV y el registro de equipo encima. Falta ver con los
+  operarios que no les cambia nada más.
 - **El código de la TV se puede leer desde cualquier lado**: `gv_tv_clave_actual()` la ejecuta `anon` y la propia TV la
   llama con la clave pública. Hoy la TV sola no prueba presencia.
 - **La base sigue abierta**: `Registros Produccion Cervantes`, `db_n8n_espejo` y `Auditoria_Produccion` tienen
@@ -171,10 +179,6 @@ hay que traer esa parte también. Un fix de operario que Gestión Virgilio ya te
   se ven los nombres de artículo. La marca sale de `GP2.articulo.marca`, que tiene **LOEKE** (115 artículos), **CHEF** (73) y
   **LOKE** (11): LOKE y LOEKE parecen la misma marca escrita de dos maneras (en pantalla, LOEKE se ve LK y LOKE se ve LOKE);
   en envasado hoy sólo hay LOEKE y CHEF.
-- **El ingreso por la TV, el pase de las 17:45, el registro de IP y equipo y el Cambio de Sede son para `cervantes/`** [Elías, 07/10],
-  no para la tablet de GP2. Pero desde el 06/10 18:54 la tarjeta «Cervantes» del inicio abre la tablet de GP2 (decisión de
-  Nazareno), así que **ningún operario llega hoy a `cervantes/`**: para que se use, la tarjeta tiene que volver a abrir
-  `cervantes/` (decisión pendiente).
 - **Cambio de sede** (botón en Cervantes y Virgilio que mide el tiempo de viaje): no está hecho.
 
 ## ⚠ Lo que NO es lo que parece
@@ -208,11 +212,11 @@ supervisor). De esos tests se trajeron 8 de operario.
 
 | Prueba | Qué cubre |
 |---|---|
-| `inicio-selector` | `/` con las 2 tarjetas; Virgilio abre `virgilio/` con su login; **Cervantes abre la tablet de GP2** (y su login vuelve a ella con `?next=`); el botón «Menú» de la tablet vuelve al inicio; `supabase.js` compartido; redirección de `selector/` |
+| `inicio-selector` | `/` con las 2 tarjetas; Virgilio abre `virgilio/` con su login; **Cervantes abre `cervantes/`** y, antes de entrar, muestra la pantalla del código de la TV con «Volver al inicio»; `supabase.js` compartido; redirección de `selector/` |
 | `virgilio-solo-operario` | **el recorte**: los archivos de supervisor no están; la página carga sin 404 ni errores; la botonera tiene sus 20 botones y cada uno se toca sin error; las entradas de supervisor no existen y los 5 cascarones y los paneles están vacíos (51 chequeos). Con el código sin recortar falla en 19 |
 | `articulo-envasado` | nombre y marca del artículo en envasado, en la tablet de GP2 y en `cervantes/` (21 chequeos): regla «mismo artículo → sólo marca» (322) y «nombres distintos → nombre y marca» (389), abreviaturas LK/CH, línea colapsada, matriz de una sola pieza, matriz que no es de envasado y la RPC caída |
 | `virgilio-solo-tv` | login de Virgilio sólo con TV, sin entrada por legajo y con la entrada por nombre (v30.08); el registro del equipo en cada ingreso (v30.12) y que si falla el operario entra igual (24 chequeos) |
-| `cervantes-tv` | ingreso de `cervantes/` con el código de la TV (47 chequeos): código mal y bien, qué manda a la base (legajo, id del equipo, huella, navegador, pantalla), 2º mensaje sin pedir, vigencia 17:44/17:50, antes de las 08:30, cancelar, sin internet (retenido), recarga, vuelta de internet con «Ingresar código», legajo no habilitado, demasiados intentos, función caída o sin crear, 6 errores seguidos |
+| `cervantes-tv` | entrada de `cervantes/` con el código de la TV (52 chequeos): la pantalla aparece ANTES de la del legajo y la tapa, código mal y bien, qué manda a la base (app, código, id del equipo, huella, navegador, pantalla; sin legajo), anotación de cada legajo en el equipo (1 vez por día), recarga con pase, vigencia 17:44/17:50, 08:00 sin LT, arranque sin internet (retenido) y pantalla sola al volver, internet cortado con la pantalla abierta, «Ingresar código» / «Ahora no», demasiados intentos, función caída o sin crear, 7 códigos malos seguidos |
 | `operario-queda-botonera`, `modulo-minimizar-anular`, `tarea-abierta-otro-dia`, `botonera-tm-historial`, `mg-reentrada`, `toggle-anular`, `rr-sin-remitos-cierra`, `encoding-utf8` | de Gestión Virgilio, con las rutas nuevas. `operario-queda-botonera` sin el segundo selector ni `chooseVirgilio` (lo llamaba el selector de planta); `modulo-minimizar-anular` sin el chequeo del monitor |
 
 - `modulo-minimizar-anular` es **intermitente** (falla «BR re-entrar = mismo tramo» algunas corridas): pasa igual en el
