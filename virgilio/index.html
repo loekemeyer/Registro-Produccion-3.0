@@ -13507,7 +13507,7 @@ function gvRacksTramo(op, legajo, iniMs, texto) {
     tmMarcarEvento(leg, nowMs);
     if (typeof updateCoreButtonsState === "function") updateCoreButtonsState();
   } catch (_e) {}
-  if (leg === "0" || leg === "1") return;   // prueba: la tarea vive en el celular, el evento no se manda
+  if (leg === "0") return;   // prueba: la tarea vive en el celular, el evento no se manda (v30.10 ≡ Gestión v27.63, Thomas D13: el legajo 1 sí manda)
   if (typeof esOperadorPrueba === "function" && esOperadorPrueba()) return;
   const payload = { legajo: leg, opcion: op, descripcion: DESC[op] || op, texto: String(texto || ""), ts: nowMs,
     id: (op.toLowerCase() + "_" + leg + "_" + nowMs.toString(36)).replace(/[^a-zA-Z0-9_\-]/g, ""),
