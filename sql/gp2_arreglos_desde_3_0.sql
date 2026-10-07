@@ -1,4 +1,7 @@
--- ESTADO: NO APLICADO en la base (07/10/2026). Espera el "sí" de Elías. Va al schema GP2 (el ORIGINAL), no a reg_prod_3_0.
+-- ESTADO (07/10/2026, con el «sí» de Elías). Va al schema GP2 (el ORIGINAL), no a reg_prod_3_0.
+--   ✅ APLICADO: 1a, 1b, 2, 3a, 3b (verificado con md5 de pg_get_functiondef). Copia y prueba en Gestion-Productiva-2.0:
+--      db/migracion_arreglos_reg_prod_3_0_20261007.sql, tests/ui/test_op_e2e.js.
+--   ⏳ FALTA: 1c (anular_evento_prod devuelve el stock) — tiene DELETE, va por el SQL Editor.
 -- GP2 · los arreglos que se hicieron en Registro Producción 3.0, llevados al original
 -- [Elías, 07/10/2026: «los cambios/parches que hicimos arreglando los errores aplicalos también al original»].
 --
@@ -162,6 +165,8 @@ create table if not exists "GP2".rollo_llamadas (
 );
 alter table "GP2".rollo_llamadas enable row level security;
 revoke all on "GP2".rollo_llamadas from anon, authenticated;
+-- regla D de db/verificar.sql: toda tabla de GP2 tiene RLS y una policy de lectura (acá sin grant: nadie la lee desde la API)
+create policy p_gp2_select on "GP2".rollo_llamadas for select to anon, authenticated using (true);
 
 create or replace function "GP2".rollo_tomar(p_id text, p_legajo text, p_comp_id bigint, p_kg_por_rollo numeric,
   p_matriz text default null, p_fecha timestamptz default now())

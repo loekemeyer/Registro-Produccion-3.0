@@ -1416,6 +1416,9 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
       </div>
       <div id="legajoLoginError" class="small error"></div>
     </div>
+    <!-- v30.13 (Registro Producción 3.0, Elías 07/10: «necesita un botón de regresar, por si entró al equivocado»): vuelve a la
+         pantalla de inicio que separa Virgilio y Cervantes. Sólo en este repo: Gestión Virgilio no tiene esa pantalla. -->
+    <a id="tvVolverInicio" href="../" style="display:block;margin:16px auto 0;width:max-content;font-size:15px;font-weight:700;color:#1e6bd6;text-decoration:none;">← Volver al inicio</a>
   </div>
 
   <button id="btnInstructivo" onclick="showInstructivo()" style="margin:14px auto 0;display:block;background:none;border:none;color:#1e6bd6;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:underline;">❓ ¿Cómo se usa? — instructivo rápido</button>
@@ -5139,7 +5142,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.12";
+const APP_VERSION = "v30.13";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción

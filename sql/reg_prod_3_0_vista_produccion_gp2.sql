@@ -1,4 +1,4 @@
--- ESTADO: NO APLICADO en la base (07/10/2026). Espera el "sí" de Elías.
+-- ESTADO: ✅ APLICADO en la base (07/10/2026, con el «sí» de Elías). Verificado: la unión con GP2.produccion anda y anon no la lee.
 -- Registro Producción 3.0 — la producción de 3.0 CON LA FORMA DE GP2.produccion, para que GP2 lea de acá
 -- [Elías, 07/10/2026: «algo propio del schema de registro producción 3.0 y que después se modifica GP2 para leer de ahí»].
 --

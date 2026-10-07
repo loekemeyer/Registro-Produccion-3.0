@@ -85,6 +85,9 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
       const i = document.getElementById("tvClaveInput");
       return parseFloat(getComputedStyle(i, "::placeholder").letterSpacing) < 3 && parseFloat(getComputedStyle(i).letterSpacing) > 5;
     }));
+    // v30.13 (Elías): «necesita un botón de regresar, por si entró al equivocado»
+    chequeo("1 se ve «← Volver al inicio» y apunta al inicio del sitio", (await visible(p, "#tvVolverInicio")) &&
+      (await p.evaluate(() => new URL(document.getElementById("tvVolverInicio").href).pathname)) === "/");
 
     // ---- 2) Google cerrado también por código ----
     const urlAntes = p.url();
@@ -107,6 +110,7 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
     await p.fill("#tvClaveInput", "1234");
     await p.click("#tvClaveStep .primary-btn");
     await p.waitForSelector("#tvNombreStep:not(.hidden)");
+    chequeo("5 en «¿Quién sos?» también se puede volver al inicio", await visible(p, "#tvVolverInicio"));
     chequeo("5 con el código bien aparece la lista de nombres", (await p.locator("#tvNombreLista button").count()) === 1);
     await p.click("#tvNombreLista button");
     await p.waitForSelector("#optionsScreen:not(.hidden)");
