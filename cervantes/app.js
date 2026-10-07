@@ -106,6 +106,37 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  /* ARTÍCULOS DE LAS MATRICES DE ENVASADO (v3.0.2, Registro Producción 3.0) — sólo las que cierran un terminado.
+     Antes el operario veía sólo el nombre de la matriz («Env Espatula NY»). Ahora también el nombre del artículo y
+     su MARCA, porque hay artículos que se llaman igual y se distinguen sólo por la marca (322: «Espátula Lisa Nylon
+     1 Pza» es el 394 LOEKE y el 842 CHEF). Misma RPC que usa la tablet de GP2 (una llamada, ~6 KB):
+       { n_matriz: [ { pieza_codigo, pieza_desc, arts: [ { codigo, nombre, marca } ] } ] }
+     Si la RPC no está o falla, la pantalla queda como antes. */
+  let ENV_ARTS = {};
+  async function cargarArticulosEnvasado() {
+    try {
+      const { data, error } = await sb.schema("GP2").rpc("reg_prod_3_0_envasado_articulos");
+      if (error) throw error;
+      ENV_ARTS = (data && typeof data === "object") ? data : {};
+      if (selected && selected.code === "E") previewFaltanteMatrizE();
+      else if (selected && selected.code === "C") renderMatrizInfo();
+    } catch (err) {
+      console.warn("Articulos de envasado (se sigue sin nombres):", err && err.message ? err.message : err);
+    }
+  }
+  // Bloque HTML con el/los artículo(s) de una matriz de envasado ("" si no es de envasado).
+  function articulosEnvasadoHtml(nm) {
+    const piezas = ENV_ARTS[String(nm || "").trim()] || [];
+    const lineas = [];
+    piezas.forEach(p => (p.arts || []).forEach(a => {
+      lineas.push(`<div style="margin-top:3px;">Art. ${escapeHtml(a.codigo || "")}${a.nombre ? " · " + escapeHtml(a.nombre) : ""}` +
+        (a.marca ? ` <span style="display:inline-block;font-size:11px;padding:1px 7px;border-radius:6px;background:#e7ebf8;color:#1e40af;">${escapeHtml(a.marca)}</span>` : "") + `</div>`);
+    }));
+    if (!lineas.length) return "";
+    return `<div class="art-env" style="margin-top:8px;padding:8px;border-radius:8px;background:#fef9c3;color:#854d0e;font-weight:800;">` +
+      `${lineas.length > 1 ? "Artículos de esta matriz:" : "Artículo:"}${lineas.join("")}</div>`;
+  }
+
   // (v1.8.53) Balancines activos (para el selector de "Cambiar Matriz").
   function balancinesActivos() {
     return balancinesList.filter(b => b && b.Activo !== false);
@@ -289,7 +320,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   /* ================= VERSION (unica fuente de verdad) ================= */
   // Serie v3.0.N = Registro Producción 3.0 (no pisa las v1.9.x de la copia de Gestión Virgilio).
-  const LOCAL_VERSION = "v3.0.1";
+  const LOCAL_VERSION = "v3.0.2";
 
   /* ================= KEYS STORAGE ================= */
   const APP_TAG = "_Cervantes";
@@ -1651,7 +1682,8 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     const varianteLabel = s.lastMatrix.nombreOverride ? `<br><small style="color:#1e6bd6;font-weight:700;">${s.lastMatrix.nombreOverride}</small>` : "";
     matrizInfo.innerHTML = `Matriz en uso: <span style="font-size:22px;">${s.lastMatrix.texto}</span>${varianteLabel}
-      <small>Ultima matriz: ${s.lastMatrix.ts ? formatDateTimeAR(s.lastMatrix.ts) : ""}</small>`;
+      <small>Ultima matriz: ${s.lastMatrix.ts ? formatDateTimeAR(s.lastMatrix.ts) : ""}</small>` +
+      articulosEnvasadoHtml(s.lastMatrix.texto);   // v3.0.2: nombre y marca del artículo (sólo envasado)
     // (v1.8.40) Faltante para completar el cajon (stock compartido)
     const mtx = s.lastMatrix.texto;
     if (stockActivo(mtx)) {
@@ -1665,16 +1697,20 @@ document.addEventListener("DOMContentLoaded", () => {
   function previewFaltanteMatrizE() {
     if (!selected || selected.code !== "E") return;
     const nm = String(textInput.value || "").trim();
+    const artsHtml = nm ? articulosEnvasadoHtml(nm) : "";   // v3.0.2: nombre y marca del artículo (sólo envasado)
     if (nm && stockActivo(nm)) {
       const falta = faltanteCajon(nm);
       const act = Number(stockRow(nm)?.Uni_Actual) || 0;
       matrizInfo.classList.remove("hidden");
       matrizInfo.innerHTML = `Matriz <b>${escapeHtml(nm)}</b>: faltan <b>${falta}</b> unidades para completar el cajón` +
-        (act > 0 ? ` <small>(ya hay ${act})</small>` : "");
+        (act > 0 ? ` <small>(ya hay ${act})</small>` : "") + artsHtml;
       if (_lastPreviewMatriz !== nm) {
         _lastPreviewMatriz = nm;
         refreshStockMatriz(nm).then(() => { if (selected && selected.code === "E") previewFaltanteMatrizE(); });
       }
+    } else if (artsHtml) {
+      matrizInfo.classList.remove("hidden");
+      matrizInfo.innerHTML = `Matriz <b>${escapeHtml(nm)}</b>` + artsHtml;
     } else {
       matrizInfo.classList.add("hidden");
     }
@@ -3689,6 +3725,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateSyncBadge();
   });
   if (readQueue().length > 0) registerBackgroundSync();
+  cargarArticulosEnvasado();   // v3.0.2: nombre y marca de los artículos de envasado (si la RPC no está, sigue sin nombres)
   cargarCatalogos().then(() => {
     renderOptions();
     renderSummary();

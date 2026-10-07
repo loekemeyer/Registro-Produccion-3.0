@@ -28,6 +28,44 @@ const SB = GP2_SB();
    rollos_saldo [ {comp_id, codigo, kg_por_rollo, rollos} ]              */
 let D = {};
 
+/* ARTÍCULO DE CADA PIEZA DE ENVASADO (v3.0.1, Registro Producción 3.0) — sólo matrices de ENVASADO (las que cierran un
+   terminado, sector 12). El selector de pieza decía «Art. 394» (el código); ahora lleva el NOMBRE del artículo y la MARCA,
+   porque hay artículos que se llaman igual y se distinguen sólo por la marca (322: «Espátula Lisa Nylon 1 Pza» es el 394
+   LOEKE y el 842 CHEF). Viene de la RPC reg_prod_3_0_envasado_articulos (una sola llamada, ~6 KB):
+     { n_matriz: [ { pieza_codigo, pieza_desc, arts: [ { codigo, nombre, marca } ] } ] }
+   Si la RPC no está o falla, queda lo de siempre («Art. 394» con el código que trae el bundle). */
+let ENV_ARTS = {};
+
+async function cargarArticulosEnvasado() {
+  try {
+    const { data, error } = await SB.rpc("reg_prod_3_0_envasado_articulos");
+    if (error) throw error;
+    ENV_ARTS = (data && typeof data === "object") ? data : {};
+    if (selected && ["E", "CM"].includes(selected.code)) {   // repintar lo que ya estuviera en pantalla
+      renderMatrizPicker();
+      renderPiezaPicker(String($("textInput").value || "").trim());
+    }
+  } catch (e) {
+    console.warn("Artículos de envasado (se sigue sin nombres):", e?.message || e);
+  }
+}
+function piezasEnvasado(n) { return ENV_ARTS[String(n || "").trim()] || []; }
+function artsDePieza(n, codigoPieza) {
+  const p = piezasEnvasado(n).find(x => String(x.pieza_codigo || "").trim() === String(codigoPieza || "").trim());
+  return (p && p.arts) || [];
+}
+// Un artículo por línea: «Art. 394 · Espátula Lisa Nylon 1 Pza» y debajo la marca.
+function lineasArt(arts) {
+  return (arts || []).map(a =>
+    `<div class="mz-a">Art. ${esc(a.codigo || "")}${a.nombre ? " · " + esc(a.nombre) : ""}</div>` +
+    (a.marca ? `<div class="mz-m">${esc(a.marca)}</div>` : "")).join("");
+}
+// Lo mismo en una línea de texto: «Art. 394 · Espátula Lisa Nylon 1 Pza (LOEKE)».
+function textoArt(arts) {
+  return (arts || []).map(a =>
+    `Art. ${a.codigo || ""}${a.nombre ? " · " + a.nombre : ""}${a.marca ? " (" + a.marca + ")" : ""}`).join(" / ");
+}
+
 async function cargarBundle() {
   try {
     const { data, error } = await SB.rpc("registro_operarios_bundle");
@@ -520,6 +558,10 @@ function renderMatrizInfo() {
   const desc = nombreMatriz(nm);
   el.classList.remove("hidden");
   const pieza = s.lastMatrix.pieza ? ` · Pieza: ${esc(s.lastMatrix.pieza)}` : "";
+  // v3.0.1: artículo (nombre y marca) si es una matriz de envasado. Con una sola pieza no hay pieza guardada: es esa.
+  const piezasEnv = piezasEnvasado(nm);
+  const artsAct = s.lastMatrix.pieza ? artsDePieza(nm, s.lastMatrix.pieza) : (piezasEnv.length === 1 ? piezasEnv[0].arts : []);
+  const artTxt = artsAct && artsAct.length ? `<br><b>${esc(textoArt(artsAct))}</b>` : "";
   // Rollo en uso: cuanto queda, estimado con lo producido (uni / ppk por cajon).
   // Si la tablet perdio el estado (otro dia, otro equipo o storage borrado), cae
   // al uso abierto persistido en el servidor: rollos_abiertos trae kg_usados
@@ -534,7 +576,7 @@ function renderMatrizInfo() {
     rollo = `<br>🧻 Rollo de ${fmt1(r.kg_por_rollo)} kg (${esc(r.codigo || "fleje")}): ` +
             `<b style="color:${color}">quedan ~${fmt1(Math.max(0, queda))} kg</b>`;
   }
-  el.innerHTML = `<b>Matriz activa: ${esc(nm)}</b>${desc ? ` — ${esc(desc)}` : ""}${pieza}${rollo}`;
+  el.innerHTML = `<b>Matriz activa: ${esc(nm)}</b>${desc ? ` — ${esc(desc)}` : ""}${pieza}${artTxt}${rollo}`;
 }
 
 /* ============================================================
@@ -571,7 +613,10 @@ function renderMatrizPicker(filtro) {
     const conPieza = esElegida && piezaSel && salidasDeMatriz(n).length >= 2;
     el.className = "mz" + (esElegida ? " sel" : "") + (conPieza ? " has-chip" : "");
     el.dataset.n = n;
-    const cuerpo = `<div class="mz-main"><div class="mz-n">${esc(n)}</div><div class="mz-d">${esc(m.d || "")}</div></div>`;
+    // v3.0.1: matriz de envasado con UNA sola pieza → el artículo va en la card (con varias, se ve al elegir la pieza)
+    const piezasEnv = piezasEnvasado(n);
+    const artLinea = piezasEnv.length === 1 ? lineasArt(piezasEnv[0].arts) : "";
+    const cuerpo = `<div class="mz-main"><div class="mz-n">${esc(n)}</div><div class="mz-d">${esc(m.d || "")}</div>${artLinea}</div>`;
     const chip = conPieza ? `<div class="mz-chip">${esc(piezaSel.codigo || "")}<small>acá va el stock</small></div>` : "";
     el.innerHTML = cuerpo + chip;
     el.addEventListener("click", () => elegirMatriz(n));
@@ -620,7 +665,9 @@ function renderPiezaPicker(n) {
     wrap.classList.add("collapsed");
     const btn = document.createElement("button");
     btn.type = "button"; btn.className = "pieza-cambiar";
-    const arts = piezaSel.arts ? ` (art. ${esc(piezaSel.arts)})` : "";
+    // v3.0.1: nombre y marca del artículo (RPC de envasado); sin RPC, el código que trae el bundle, como antes
+    const artsSel = artsDePieza(n, piezaSel.codigo);
+    const arts = artsSel.length ? ` (${esc(textoArt(artsSel))})` : (piezaSel.arts ? ` (art. ${esc(piezaSel.arts)})` : "");
     btn.innerHTML = `Fabricás <b>${esc(piezaSel.codigo || "")}</b> · ${esc(piezaSel.descripcion || "")}${arts} — <u>cambiar</u>`;
     btn.addEventListener("click", () => {
       piezaSel = null;
@@ -639,7 +686,8 @@ function renderPiezaPicker(n) {
     el.className = "mz";
     // Los articulos que usan esa pieza (la 237 saca 3 piezas para 542/543/570, 720/722 y 858):
     // el operario piensa en el articulo, no en el codigo del intermedio. [usuario 2026-10-05]
-    const arts = sa.arts ? `<div class="mz-a">Art. ${esc(sa.arts)}</div>` : "";
+    // v3.0.1: nombre y marca (RPC de envasado); sin RPC, el código que trae el bundle, como antes
+    const arts = lineasArt(artsDePieza(n, sa.codigo)) || (sa.arts ? `<div class="mz-a">Art. ${esc(sa.arts)}</div>` : "");
     el.innerHTML = `<div class="mz-n">${esc(sa.codigo || "")}</div><div class="mz-d">${esc(sa.descripcion || "")}</div>${arts}`;
     el.addEventListener("click", () => {
       piezaSel = sa; $("error").innerText = "";
@@ -1150,6 +1198,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Cargar bundle en background
   cargarBundle().catch(e => console.warn("Bundle GP2:", e));
+  cargarArticulosEnvasado();   // v3.0.1: nombre y marca de los artículos de envasado (si la RPC no está, sigue como antes)
 
   // Legajo input: render summary on change
   $("legajoInput").addEventListener("input", () => { renderSummary(); });
