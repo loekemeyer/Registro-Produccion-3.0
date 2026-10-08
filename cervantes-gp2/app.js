@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.5)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.6)
    GENERADO por tools/portar_botonera_gp2.py desde la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de
    loekemeyer/Gestion-Productiva-2.0). Para traer un cambio de GP2 se vuelve a correr el script; no editar a mano lo que
    viene de GP2 (se pierde en el próximo port): lo propio de 3.0 vive en el script.
@@ -21,7 +21,7 @@
    Eduardo Barrionuevo (legajo "19"): CT button + rollo en E/PR (sólo con rollos_activos).
    ============================================================ */
 
-const APP_VERSION = "v3.1.5";
+const APP_VERSION = "v3.1.6";
 const LEGAJO_EDUARDO = "19";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
@@ -908,12 +908,14 @@ function renderMatrizPicker(filtro) {
   // el buscador de abajo era una segunda caja para lo mismo. Se saco. [usuario 2026-08-31]
   const elegida = String($("textInput").value || "").trim();
   const q = String(filtro != null ? filtro : elegida).trim().toLowerCase();
-  // 3.0 [Elías, 08/10]: sin nada escrito la lista queda vacía (y sin el rótulo); aparece desde la 1.ª letra o número.
-  const rotulo = document.querySelector("#matrizPicker .mp-label");
-  if (rotulo) rotulo.classList.toggle("hidden", !q);
+  // Sin nada escrito NO se muestra la lista (ni su titulo): aparece recien cuando se escribe algo. [usuario 2026-10-08:
+  // "que cuando no escribi nada no aparezca nada, que recien aparezca cuando escribi algo"]
+  const lbl = $("mpLabel");
+  if (lbl) lbl.classList.toggle("hidden", !q);
   if (!q) { grid.innerHTML = ""; return; }
   let matrices = (D.matrices || []).filter(m => {
     if (m.act === false) return false;          // matriz dada de baja: no se ofrece
+    if (!q) return true;
     return String(m.n || "").toLowerCase().includes(q) ||
            String(m.d || "").toLowerCase().includes(q);
   });

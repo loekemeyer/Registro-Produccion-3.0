@@ -573,18 +573,9 @@ def portar_js(src, version):
   if (!rollosActivos()) { rolloSel = null; grid.innerHTML = ""; $("rolloPicker")?.classList.add("hidden"); return; }   // sin rollos en la base''',
               'selector de rollo')
     src = sub(src, 'if (isEduardo() && opt.code === "PR") {', 'if (rollosActivos() && isEduardo() && opt.code === "PR") {', '«quedó resto»')
-    # 7b) lista de matrices: sin nada escrito no muestra ninguna (ni el rótulo); aparecen desde la 1.ª letra o número
-    #     [Elías, 08/10/2026: «que si no escribo nada no aparezca nada; después de escribir la 1.ª letra aparezcan cosas»]. Sólo 3.0.
-    src = sub(src, '''  const q = String(filtro != null ? filtro : elegida).trim().toLowerCase();
-  let matrices = (D.matrices || []).filter(m => {
-    if (m.act === false) return false;          // matriz dada de baja: no se ofrece
-    if (!q) return true;''', '''  const q = String(filtro != null ? filtro : elegida).trim().toLowerCase();
-  // 3.0 [Elías, 08/10]: sin nada escrito la lista queda vacía (y sin el rótulo); aparece desde la 1.ª letra o número.
-  const rotulo = document.querySelector("#matrizPicker .mp-label");
-  if (rotulo) rotulo.classList.toggle("hidden", !q);
-  if (!q) { grid.innerHTML = ""; return; }
-  let matrices = (D.matrices || []).filter(m => {
-    if (m.act === false) return false;          // matriz dada de baja: no se ofrece''', 'lista de matrices vacía sin texto')
+    # 7b) lista de matrices vacía hasta escribir: desde GP2 e110890 (v1.251.1) lo trae la tablet misma; si GP2 lo saca, avisar
+    if 'if (!q) { grid.innerHTML = ""; return; }' not in src:
+        raise Falta('lista de matrices: GP2 ya no la deja vacía hasta escribir (Elías, 08/10)')
     # 8) badge de la cola + aviso del código
     if 'const q = readQueue().concat(readAnularQueue(), readRolloQueue());' not in src:
         raise Falta('badge: ya no cuenta eventos + bajas + rollos')
