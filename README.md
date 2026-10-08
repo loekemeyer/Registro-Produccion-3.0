@@ -97,7 +97,12 @@ celular del operario [Elías: «tendría que ser el de GP2, como está funcionan
   `reg_prod_3_0`; lo cargado desde GP2 lleva `app_version` `gp2-…` y `p_app` `gp2`). Ida (3.0 → GP2): `tools/copiar_botonera_de_3_0.py`
   de GP2. Vuelta (lo terminado en GP2 → acá): `tools/traer_de_gp2.py`, con control de vuelta exacta y unión con `git merge-file` si los
   dos lados cambiaron (probado: sin cambios no escribe; cambio simple → v3.1.N y 69/69; punto de la copia tocado → frena; 3.0 cambió
-  otra línea → une; misma línea → frena). v3.1.7: los rollos van
+  otra línea → une; misma línea → frena).
+- **Cada función de GP2 de la tablet vieja tiene su par acá y hace lo mismo** (08/10) [Elías: «verificá que todas las funciones de GP2
+  tengan la función correspondiente en Reg Prod 3.0»]: `sql/verificar_gp2_vs_3_0.sql` corre las dos con los mismos datos en una
+  transacción que se deshace (no escribe nada) — 7 casos de toque, anular, duplicado, catálogo y rollos: todo igual. Las 4 de GP2 que
+  quedaron sin pantalla están anotadas para borrar en GP2 (`db/PENDIENTE_borrar_funciones_tablet_vieja.sql`); una de las condiciones
+  es que la copia vieja `gp2/` de este repo (sin enlace) todavía las llama. v3.1.7: los rollos van
   siempre con id anti-duplicado (`reg_prod_3_0_rollo_tomar` / `_rollo_cerrar`).
 - **Entrada**: pantalla del código de la TV de Cervantes (misma que `cervantes/`), antes de entrar. La base devuelve un **pase firmado**
   (`reg_prod_3_0_cerv_ingresar` → `{ok, pase, vence}`) que se guarda en el celular (`rp3c_pase`) y vale hasta las 17:45 (3 h si se entra
