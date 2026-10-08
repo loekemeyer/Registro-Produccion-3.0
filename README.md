@@ -80,7 +80,7 @@ select grupo, tipo, objeto from dep order by grupo, tipo, objeto;   -- sin la ú
   el 07/10.** Sigue abierta una decisión: qué es «la armada» de Virgilio (hoy lo armado sale de triggers y vistas de Gestión Virgilio
   sobre la cruda).
 
-## Cervantes · la botonera de Registro Producción 2.0 (v3.1.9, 08/10/2026)
+## Cervantes · la botonera de Registro Producción 2.0 (v3.1.9 y v3.1.10, 08/10/2026)
 
 [Elías, 08/10: «2.0», «todo lo del 10 debería ser como Reg Prod», «la 501 pone los kilos», «sacá el editar de momento», «que no se
 pueda eliminar el fin de jornada»]. Sobre la botonera de GP2 (que sigue para la E: picker, piezas por etiqueta, rollos) se trajo el
@@ -99,7 +99,24 @@ comportamiento de 2.0 (`cervantes/app.js`):
 - **Llegada tarde** con la hora de entrada de cada uno (Planify, si no Empleados, si no GP2; si no hay, 08:30) y en el historial.
 - **WhatsApp** como 2.0 (Matriz sin Tiempo / Paro Matriz / Rompio Matriz), **nunca con el legajo 0** (pruebas).
 - Legajo o matriz que no están: se vuelve a pedir el catálogo y se mira de nuevo. Sin «editar». El fin de jornada no se borra.
-- SQL: `sql/reg_prod_3_0_fase_2a_premio_con_tm.sql`, `sql/reg_prod_3_0_fase_2b_botonera.sql`. Prueba: `tests/cervantes-gp2.cjs` §10.
+- **v3.1.10 — contador de cajón** (fase 2c) [Elías: «6 debería, y podés usar lo que tiene GP2 de máximo de unidades por cajón»]: «Faltan
+  X unidades para completar el cajón» con `GP2.componente.uni_x_cajon` de la pieza; lo lleva la base al grabar el C (`reg_prod_3_0.
+  contador_cajon`, compartido entre operarios; un reintento no suma), y el C tiene la casilla «cajón completo» (vuelve a 0; el excedente
+  queda en la auditoría). Fuera, como 2.0: la 501 y el envasado.
+- **v3.1.10 — Terminar Día como 2.0** [«8 usar el de Reg Prod y que envíe todo el día como respaldo» · «18 como en 2.0»]: resumen; «ya
+  cerraste el día, se reemplaza»; el tiempo muerto abierto se cierra solo; matriz con contador → «¿Hiciste un último cajón?» (Sí: cantidad
+  + cajón completo · No: el tiempo muerto desde el último cajón); otra matriz sin cajón → «¿Vas a seguir mañana?». El FJ tiene id fijo
+  `fj_<legajo>_<día>` (la base pisa el anterior), lleva el día entero en el texto y después se reenvía el día en segundo plano. Distinto
+  de 2.0 a propósito: el «Sí, hice un último cajón» cierra primero el tiempo muerto abierto (en 2.0 se perdía) y la lista de tiempos
+  muertos es la del rol del operario.
+- **v3.1.10 — «⚡ Continuar»** [«4 se tiene que»]: si ayer dijo «sigo mañana», hoy aparece entre E y C; el cajón suma lo de ayer (hasta
+  su hora de salida, que ahora trae el catálogo) + lo de hoy, con `[CONT]`, y se descuentan sólo los tiempos muertos de hoy. Otro botón con
+  el «Continuar» a la vista pide el código de Logística.
+- **v3.1.10 — errores y envío** [«15 tiene que estar» · «16 como en 2.0»]: cada envío fallido va a `reg_prod_3_0.auditoria`
+  (`reg_prod_3_0_registrar_error_envio`, al 1.er intento y cada 5); con algo en la cola se reintenta cada 3 s; y la cola se copia al
+  IndexedDB (`rp3c-envio`) para que el service worker la mande con la app cerrada (background sync, con el pase), como 2.0.
+- SQL: `sql/reg_prod_3_0_fase_2a_premio_con_tm.sql`, `sql/reg_prod_3_0_fase_2b_botonera.sql`, `sql/reg_prod_3_0_fase_2c_fin_de_jornada_y_cajon.sql`.
+  Prueba: `tests/cervantes-gp2.cjs` §10 y §11.
 
 ## Cervantes · botonera de GP2 (`cervantes-gp2/`, v3.1.6, 08/10/2026)
 

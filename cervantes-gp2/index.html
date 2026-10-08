@@ -20,7 +20,7 @@
     (function(){
       // El operario ya no tiene version propia: se compara el TOKEN de cache compartido
       // (el mismo ?v= que llevan todos los assets). Si cambia, el HTML cacheado es viejo.
-      var MI_V = '3.1.9';
+      var MI_V = '3.1.10';
       function chequear(){
         fetch(location.pathname, { cache: 'no-store' }).then(function(r){ return r.text(); }).then(function(html){
           var m = html.match(/app\.js\?v=([\w.]+)/);
@@ -132,6 +132,25 @@
     #quedoRestoWrap { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
     #quedoRestoWrap label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #92400e; cursor: pointer; }
     #quedoRestoWrap input[type=checkbox] { width: 20px; height: 20px; }
+    /* C: «cajón completo» y lo que falta para completar el cajón (contador de 2.0, v3.1.10) */
+    #cajonCompletoWrap { background: #fff7ed; border: 1px solid #fed7aa; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
+    #cajonCompletoWrap label { display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: #9a3412; cursor: pointer; }
+    #cajonCompletoWrap input[type=checkbox] { width: 22px; height: 22px; }
+    .cajon-faltante { margin-top: 6px; font-size: 16px; font-weight: 800; color: #9a3412; }
+    /* «⚡ Continuar Matriz» (cajón del día anterior) */
+    .box.box-cont { background: #16a34a; color: #fff; border-color: #15803d; }
+    /* Aviso al tocar otro botón con «Continuar» a la vista (código de Logística) */
+    .adv-cont-modal { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 16px; }
+    .adv-cont-card { background: #fff; border-radius: 14px; width: 100%; max-width: 480px; overflow: hidden; }
+    .adv-cont-header { padding: 16px 20px; background: #dc2626; color: #fff; font-size: 18px; font-weight: 800; text-align: center; }
+    .adv-cont-body { padding: 18px 20px; font-size: 15px; color: #1f2937; }
+    .adv-cont-body p { margin: 0 0 10px; }
+    .adv-cont-body input { width: 100%; box-sizing: border-box; padding: 12px; font-size: 22px; border: 2px solid #d1d5db; border-radius: 8px; text-align: center; letter-spacing: 4px; }
+    .adv-cont-fb { margin-top: 8px; font-size: 14px; font-weight: 700; color: #b91c1c; min-height: 18px; }
+    .adv-cont-footer { padding: 14px 16px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; }
+    .adv-cont-cancel, .adv-cont-ok { flex: 1; padding: 14px; font-size: 15px; font-weight: 800; border-radius: 8px; border: 2px solid; min-height: 44px; }
+    .adv-cont-cancel { background: #fff; color: #1e40af; border-color: #1e40af; }
+    .adv-cont-ok { background: #dc2626; color: #fff; border-color: #991b1b; }
     /* Terminar Dia button */
     #btnTerminarDia { position: fixed; top: 10px; right: 10px; padding: 8px 14px; font-size: 14px; font-weight: 700; background: #b91c1c; color: #fff; border: 2px solid #991b1b; border-radius: 8px; cursor: pointer; z-index: 50; }
     /* Sync badge */
@@ -151,7 +170,34 @@
     .td-modal-body { font-size: 15px; color: #334155; margin-bottom: 16px; }
     .td-modal-footer { display: flex; justify-content: flex-end; }
     .td-confirm-btn { background: #b91c1c; color: #fff; border: none; border-radius: 8px; padding: 12px 24px; font-size: 16px; font-weight: 700; min-height: 44px; cursor: pointer; }
-    /* Edit modal */
+    .td-confirm-btn:disabled { background: #9ca3af; cursor: not-allowed; }
+    /* Terminar día como 2.0 (v3.1.10): resumen, «ya cerraste», tiempo muerto abierto, último cajón / ¿seguís mañana? */
+    .td-modal-card { max-height: 92vh; overflow-y: auto; box-sizing: border-box; }
+    .td-modal-body ul { margin: 4px 0 0; padding-left: 22px; }
+    .td-section { margin: 0 0 12px; }
+    .td-fj-warn { padding: 10px; background: #fef9c3; border: 1px solid #ca8a04; border-radius: 8px; font-size: 14px; color: #854d0e; margin-bottom: 12px; }
+    .td-warn-tm { padding: 10px; background: #fef2f2; border: 1px solid #dc2626; border-radius: 8px; margin: 12px 0; }
+    .td-warn-tm-title { font-weight: 800; color: #991b1b; margin-bottom: 4px; }
+    .td-cont-pregunta { padding: 12px; background: #eff6ff; border: 1px solid #1e6bd6; border-radius: 10px; margin: 12px 0; }
+    .td-cont-title { font-weight: 800; color: #1e3a8a; font-size: 17px; margin-bottom: 4px; }
+    .td-cont-mat { font-size: 15px; color: #1e3a8a; margin-bottom: 10px; }
+    .td-cont-ok { font-weight: 700; color: #15803d; margin: 8px 0; }
+    .td-cont-btns { display: flex; gap: 10px; }
+    .td-cont-btn-si, .td-cont-btn-no { flex: 1; padding: 12px; font-size: 16px; font-weight: 800; border-radius: 8px; border: 2px solid; min-height: 44px; }
+    .td-cont-btn-si { background: #16a34a; color: #fff; border-color: #15803d; }
+    .td-cont-btn-no { background: #fff; color: #b91c1c; border-color: #b91c1c; }
+    .td-cont-btn-si:disabled, .td-cont-btn-no:disabled { opacity: .5; }
+    .td-cont-feedback, .td-cont-no-feedback { margin-top: 8px; font-size: 14px; font-weight: 700; }
+    .td-cont-no-form { padding: 10px; background: #fef3c7; border: 1px solid #ca8a04; border-radius: 10px; margin-top: 10px; }
+    .td-cont-no-title { font-weight: 800; color: #854d0e; margin-bottom: 8px; }
+    .td-cont-no-row { margin-bottom: 8px; }
+    .td-cont-no-row label { display: block; font-size: 15px; color: #1f2937; margin-bottom: 4px; }
+    .td-cont-no-row label.td-chk { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #9a3412; }
+    .td-cont-no-row input[type=text], .td-cont-no-row select { width: 100%; box-sizing: border-box; padding: 10px; font-size: 20px; border: 1px solid #d1d5db; border-radius: 6px; }
+    .td-cont-no-row input[type=checkbox] { width: 22px; height: 22px; }
+    .td-cont-no-cargar { width: 100%; padding: 12px; font-size: 16px; font-weight: 800; background: #1e6bd6; color: #fff; border: none; border-radius: 8px; min-height: 44px; margin-top: 4px; }
+    .td-cont-no-cargar:disabled { opacity: .5; background: #94a3b8; }
+    .td-cont-pregunta .td-confirm-btn { width: 100%; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -220,6 +266,14 @@
       <div id="rolloGrid"></div>
     </div>
 
+    <!-- C: cajón completo (como 2.0: no hay más material, el contador del cajón vuelve a 0) -->
+    <div id="cajonCompletoWrap" class="hidden">
+      <label>
+        <input type="checkbox" id="cajonCompletoChk" />
+        Cajón completo (no hay más material: el contador vuelve a 0)
+      </label>
+    </div>
+
     <!-- Alimentador: ¿quedó resto? (en PR) -->
     <div id="quedoRestoWrap" class="hidden">
       <label>
@@ -247,6 +301,6 @@
   </div>
 </div>
 
-<script src="app.js?v=3.1.9"></script>
+<script src="app.js?v=3.1.10"></script>
 </body>
 </html>
