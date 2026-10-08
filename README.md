@@ -18,7 +18,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 | `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Desde el 07/10 no tiene enlace desde el inicio** (los operarios usan `cervantes/` en su celular) | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | Google + lista blanca (sin cambios) |
 | `gp2/` (resto) | Lo mínimo que esa tablet necesita: `login.html`, `auth-guard.js`, `supabase-config.js`, `gp2-ui.js`, `pwa.js`, `sw.js`, `version.js`, manifest e íconos | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | — |
 | `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Sin enlace desde el 08/10** (la tarjeta «Cervantes» pasó a `cervantes-gp2/`); se abre a mano. **Se borra cuando hayan pasado todos los operarios** a `cervantes-gp2/` [Elías, 08/10]; hasta entonces sigue publicada. Ingreso por el código de la TV antes de entrar y registro del equipo | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
-| `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.6, 08/10/2026; se **genera** con `tools/portar_botonera_gp2.py`): entra con el código de la TV, usa el **pase firmado**, escribe en `reg_prod_3_0` y mueve el stock de GP2 (Fase 1c). **Es lo que abre «Cervantes» en el inicio desde el 08/10** (Inicio v1.4) [Elías: «si»]. Ver «Cervantes · botonera de GP2» | `Produccion/RegistroApp/` de `loekemeyer/Gestion-Productiva-2.0` (hoy `e110890`), portada por script | `v3.1.N` | **el código de la TV de Cervantes** + pase |
+| `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.7, 08/10/2026; **es la fuente**: se edita acá y GP2 copia): entra con el código de la TV, usa el **pase firmado**, escribe en `reg_prod_3_0` y mueve el stock de GP2 (Fase 1c). **Es lo que abre «Cervantes» en el inicio desde el 08/10** (Inicio v1.4) [Elías: «si»]. Ver «Cervantes · botonera de GP2» | `Produccion/RegistroApp/` de `loekemeyer/Gestion-Productiva-2.0` (hoy `e110890`), portada por script | `v3.1.N` | **el código de la TV de Cervantes** + pase |
 | `supabase.js` (raíz) | supabase-js propio, compartido: `virgilio/` y `cervantes/` lo cargan con `../supabase.js` | `loekemeyer/Gestion-Virgilio` | — | — |
 | `selector/` | Sólo una redirección a `/` (URL vieja) | — | — | — |
 | `tests/` | Pruebas con Playwright (ver «Pruebas») | 8 de `Gestion-Virgilio` + 5 nuevas | — | — |
@@ -87,10 +87,12 @@ Es la tablet de GP2 (`Produccion/RegistroApp/operarios_gp2.js` + `Operarios_GP2.
 celular del operario [Elías: «tendría que ser el de GP2, como está funcionando actualmente»]. **Desde el 08/10 es lo que abre la tarjeta
 «Cervantes» del inicio** (antes, `cervantes/`, que queda sin enlace).
 
-- **Cómo se trae un cambio de GP2** (GP2 se sigue modificando y nada lo sincroniza): `app.js` e `index.html` **se generan** con
-  `python3 tools/portar_botonera_gp2.py --gp2 <clon de Gestion-Productiva-2.0> --version 3.1.N` y se revisa `git diff cervantes-gp2/`.
-  El script toma los archivos ACTUALES de GP2 y les aplica lo de 3.0; si GP2 tocó un pedazo que el script reemplaza, se corta y dice cuál.
-  **No editar a mano lo que viene de GP2** (se pierde en el próximo port). La v3.1.6 sale de GP2 `e110890` (v1.251.1, 08/10/2026: con los arreglos de 3.0, el chip de la pieza adentro de la tarjeta y la lista de matrices vacía hasta escribir).
+- **Desde el 08/10 la fuente es ESTE repo** [Elías: «se va a dejar de modificar en GP2 y modificar en este, y GP2 sólo hacer copia y hacer
+  modificaciones para testear»]: los cambios se hacen a mano en `cervantes-gp2/app.js` e `index.html` (con el bump `v3.1.N` en `APP_VERSION`,
+  `SW_VERSION`, `?v=` y `MI_V`). GP2 copia de acá y prueba en su copia; nada viene de GP2 hacia acá. Hasta la v3.1.6 se **generaba** desde la
+  tablet de GP2 con `tools/portar_botonera_gp2.py` (la última, desde GP2 `e110890`, v1.251.1: arreglos de 3.0, chip de la pieza adentro de
+  la tarjeta y lista de matrices vacía hasta escribir); el script se borró el 08/10 y queda en el historial de git. v3.1.7: los rollos van
+  siempre con id anti-duplicado (`reg_prod_3_0_rollo_tomar` / `_rollo_cerrar`).
 - **Entrada**: pantalla del código de la TV de Cervantes (misma que `cervantes/`), antes de entrar. La base devuelve un **pase firmado**
   (`reg_prod_3_0_cerv_ingresar` → `{ok, pase, vence}`) que se guarda en el celular (`rp3c_pase`) y vale hasta las 17:45 (3 h si se entra
   más tarde). Sin internet o con la base caída se puede cargar: los toques quedan en la cola con un aviso arriba («esperan el código de
@@ -107,7 +109,7 @@ celular del operario [Elías: «tendría que ser el de GP2, como está funcionan
   ven sólo si el catálogo trae `rollos_activos` (lo trae desde la 1c).
 - **Lista de matrices (E / CM) vacía hasta escribir** [Elías, 08/10: «que si no escribo nada no aparezca nada; después de escribir la
   1.ª letra aparezcan cosas»]: sin texto no se ve ninguna ni el rótulo «O elegila de la lista»; desde la 1.ª letra o número aparecen las
-  que coinciden por número o nombre. Lo trae la tablet de GP2 misma desde v1.251.1 (otra sesión); la v3.1.5 lo tuvo como parche propio.
+  que coinciden por número o nombre (v3.1.5; GP2 hizo lo mismo en su tablet, v1.251.1).
 - **Catálogo en el celular**: el bundle se guarda (`rp3c_bundle`) para poder abrir sin señal; con la app abierta se vuelve a pedir cada 30 min.
 - **Botonera**: la de GP2 hoy: 13 botones (E, C, PB, BC, MOV, LIMP, Perm, AL, PR, PC, MOV P, PM, RM; + CT para Eduardo), llegada tarde (LT),
   fin de jornada (FJ), historial del día con 🗑 (anula en la base; sin señal o sin pase la baja queda en su cola `rp3c_aqueue`, una sola

@@ -11,7 +11,8 @@ mismo proyecto (`hrxfctzncixxqmpfhskv`).
 
 **Fuente de verdad** `[usuario, 05/10/2026: «Se sigue trabajando desde los tres»]`: Gestión Virgilio, Gestión
 Productiva 2.0 y este repo se siguen modificando a la vez. No hay un origen único y nada los sincroniza, así que un
-archivo que existe en más de un repo puede estar distinto en cada uno. El commit de origen de cada carpeta está en
+archivo que existe en más de un repo puede estar distinto en cada uno. **Excepción desde el 08/10/2026: la botonera de Cervantes**
+(`cervantes-gp2/`) tiene su origen ACÁ; GP2 sólo copia (ver «Convenciones»). El commit de origen de cada carpeta está en
 `README.md`, junto con los comandos para medir la diferencia.
 
 Reglas que ya estaban dichas por el dueño y valen en TODOS los repos (copiadas acá porque este repo nació sin
@@ -157,7 +158,9 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
   `tests/virgilio-solo-operario.cjs` falla si vuelve lo recortado.
 - **El CSS de `virgilio/index.html` también está podado**: una regla nueva para una clase que sólo arma el JS por
   concatenación necesita que el prefijo aparezca como `"prefijo-" + x` o `` `prefijo-${x}` `` (así lo reconoció la poda).
-- **`cervantes-gp2/` se GENERA desde la tablet de GP2** `[Elías, 07/10/2026: «tendría que ser el de GP2, como está funcionando actualmente»]`:
-  `app.js` e `index.html` salen de `python3 tools/portar_botonera_gp2.py --gp2 <clon de Gestion-Productiva-2.0> --version 3.1.N`.
-  Un cambio de GP2 se trae volviendo a correr el script (no a mano); lo propio de 3.0 se cambia en el script. GP2 no se toca.
+- **`cervantes-gp2/` ES LA FUENTE de la botonera de Cervantes** `[Elías, 08/10/2026: «se va a dejar de modificar en GP2 y modificar en
+  este, y GP2 sólo hacer copia y hacer modificaciones para testear»]`: los cambios del operario de Cervantes se hacen ACÁ, a mano
+  (`cervantes-gp2/app.js` + `index.html`, con el bump de `v3.1.N`). La tablet de GP2 (`Produccion/RegistroApp/`) deja de ser el origen:
+  GP2 copia de acá y prueba cambios en su copia; **no se trae nada de GP2 hacia acá**. Nació de GP2 `e110890` (v1.251.1) con
+  `tools/portar_botonera_gp2.py`, que se retiró el 08/10 (está en el historial de git).
 - **Cambios en `main`** `[usuario, 06/10/2026]`: se hacen directo en `main`, sin pull request, salvo que se pida otra cosa.
