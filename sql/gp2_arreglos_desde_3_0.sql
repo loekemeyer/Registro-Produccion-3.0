@@ -1,7 +1,7 @@
--- ESTADO (07/10/2026, con el «sí» de Elías). Va al schema GP2 (el ORIGINAL), no a reg_prod_3_0.
+-- ESTADO (08/10/2026): TODO APLICADO, con el «sí» de Elías. Va al schema GP2 (el ORIGINAL), no a reg_prod_3_0.
 --   ✅ APLICADO: 1a, 1b, 2, 3a, 3b (verificado con md5 de pg_get_functiondef). Copia y prueba en Gestion-Productiva-2.0:
 --      db/migracion_arreglos_reg_prod_3_0_20261007.sql, tests/ui/test_op_e2e.js.
---   ⏳ FALTA: 1c (anular_evento_prod devuelve el stock) — tiene DELETE, va por el SQL Editor.
+--   ✅ 1c (anular_evento_prod devuelve el stock): lo pegó Elías en el SQL Editor el 08/10; probado en una transacción deshecha.
 -- GP2 · los arreglos que se hicieron en Registro Producción 3.0, llevados al original
 -- [Elías, 07/10/2026: «los cambios/parches que hicimos arreglando los errores aplicalos también al original»].
 --

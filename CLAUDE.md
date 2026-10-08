@@ -4,8 +4,8 @@ Apps de operario (Virgilio y Cervantes, que los operarios abren desde su celular
 operario**: lo de supervisor u oficina no está. **Leer `README.md` primero**: dice de dónde sale cada carpeta, qué cambió,
 qué se recortó y qué no se probó. Nació como copia de `loekemeyer/Gestion-Virgilio` y `loekemeyer/Gestion-Productiva-2.0`,
 pero **desde el 06/10/2026 ya no es una copia sin modificar**: la raíz (`/`) es el inicio que separa Cervantes y Virgilio;
-Virgilio vive en `virgilio/` con login sólo por el código de la TV, y Cervantes vive en `cervantes/` con login por el código de
-la TV de Cervantes, que se pide **antes de entrar** (`[Elías, 07/10/2026: «ya no estamos en GP2 … usan su celular personal»]`).
+Virgilio vive en `virgilio/` con login sólo por el código de la TV, y Cervantes vive en `cervantes-gp2/` (la botonera de GP2, desde el
+08/10; la app vieja `cervantes/` quedó sin enlace) con login por el código de la TV de Cervantes, que se pide **antes de entrar** (`[Elías, 07/10/2026: «ya no estamos en GP2 … usan su celular personal»]`).
 La tablet de GP2 (`gp2/Produccion/RegistroApp/`) quedó **sin enlace**. Supabase es el
 mismo proyecto (`hrxfctzncixxqmpfhskv`).
 

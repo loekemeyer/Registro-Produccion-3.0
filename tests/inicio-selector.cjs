@@ -34,8 +34,9 @@ const { servir } = require("./_servidor.cjs");
   await p.goto(srv.url + "/", { waitUntil: "domcontentloaded" });
   c.dosTarjetas = (await p.locator(".card").count()) === 2;
   c.hrefVirgilio = (await p.getAttribute("#cardVir", "href")) === "virgilio/";
-  c.hrefCervantes = (await p.getAttribute("#cardCer", "href")) === "cervantes/";
-  c.cervantesNoAbreGP2 = !/gp2\//.test((await p.getAttribute("#cardCer", "href")) || "");
+  // v1.4 (Elías, 08/10: «si»): la tarjeta Cervantes abre la botonera de GP2 portada (cervantes-gp2/), no la tablet de gp2/ ni la app vieja
+  c.hrefCervantes = (await p.getAttribute("#cardCer", "href")) === "cervantes-gp2/";
+  c.cervantesNoAbreGP2 = !/^(\.\/)?gp2\//.test((await p.getAttribute("#cardCer", "href")) || "");
 
   // 2) Virgilio
   await Promise.all([p.waitForURL("**/virgilio/"), p.click("#cardVir")]);
@@ -43,10 +44,10 @@ const { servir } = require("./_servidor.cjs");
   c.virgilioMuestraSuLogin = (await p.locator("#googleSignInBtn").count()) === 1 && (await p.locator("#tvClaveStep").count()) === 1;
   c.virgilioCargaSupabaseJsDeLaRaiz = await p.evaluate(() => !!document.querySelector('script[src="../supabase.js"]') && typeof window.supabase !== "undefined");
 
-  // 3) Cervantes = cervantes/, con el código de la TV antes de entrar (sin red a Supabase la validación no puede hacerse;
+  // 3) Cervantes = cervantes-gp2/, con el código de la TV antes de entrar (sin red a Supabase la validación no puede hacerse;
   //    la pantalla aparece igual porque hay internet y falta el pase de hoy)
   await p.goto(srv.url + "/", { waitUntil: "domcontentloaded" });
-  await Promise.all([p.waitForURL("**/cervantes/"), p.click("#cardCer")]);
+  await Promise.all([p.waitForURL("**/cervantes-gp2/"), p.click("#cardCer")]);
   await p.waitForSelector("#tvClaveModal", { state: "visible", timeout: 10000 });
   c.cervantesPideElCodigoAntesDeEntrar = (await p.locator("#tvClaveInput").count()) === 1 && /Código de la TV/.test(await p.textContent("#tvClaveModal"));
   c.cervantesPuedeVolverAlInicio = (await p.getAttribute("#tvClaveVolver", "href")) === "../";
@@ -65,6 +66,8 @@ const { servir } = require("./_servidor.cjs");
     const base = "https://x.test/Registro-Produccion-3.0/" + d + "/manifest.json";
     return new URL(m.scope || "./", base).href === "https://x.test/Registro-Produccion-3.0/";
   });
+  // la app Virgilio tenía el mismo id que Gestión Virgilio (/Produccion-Virgilio/, mismo dominio): Chrome las tomaba como UNA sola app
+  c.virgilioConIdPropio = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "virgilio", "manifest.json"), "utf8")).id === "/Registro-Produccion-3.0/virgilio/";
 
   const pass = Object.values(c).every(Boolean) && errs.length === 0 && sup404.length === 0;
   console.log("inicio-selector:", JSON.stringify(c), "· pageerrors:", errs.length ? errs.join("|") : "none", "· 4xx propios:", sup404.length ? sup404.join(", ") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

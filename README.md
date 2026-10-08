@@ -13,12 +13,12 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 
 | Carpeta | Qué es | Origen (commit) | Versión propia | Login |
 |---|---|---|---|---|
-| `/` | **Inicio**: elegir Virgilio o Cervantes | `selector/` de `loekemeyer/Gestion-Virgilio` · `e7a7bbd` | `sw.js` → `inicio-v1.3` | — |
+| `/` | **Inicio**: elegir Virgilio o Cervantes | `selector/` de `loekemeyer/Gestion-Virgilio` · `e7a7bbd` | `sw.js` → `inicio-v1.4` | — |
 | `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada | `v30.NN` (hoy `v30.05`) | **sólo el código de la TV** |
 | `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Desde el 07/10 no tiene enlace desde el inicio** (los operarios usan `cervantes/` en su celular) | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | Google + lista blanca (sin cambios) |
 | `gp2/` (resto) | Lo mínimo que esa tablet necesita: `login.html`, `auth-guard.js`, `supabase-config.js`, `gp2-ui.js`, `pwa.js`, `sw.js`, `version.js`, manifest e íconos | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | — |
-| `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Es lo que abre «Cervantes» en el inicio** (desde el 07/10, v3.0.5): ingreso por el código de la TV antes de entrar y registro del equipo | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
-| `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.4, 07/10/2026; se **genera** con `tools/portar_botonera_gp2.py`): entra con el código de la TV, usa el **pase firmado**, escribe en `reg_prod_3_0` y mueve el stock de GP2 (Fase 1c). **Todavía sin enlace desde el inicio** (la tarjeta «Cervantes» sigue abriendo `cervantes/`). Ver «Cervantes · botonera de GP2» | `Produccion/RegistroApp/` de `loekemeyer/Gestion-Productiva-2.0` (hoy `d4c8bf9`), portada por script | `v3.1.N` | **el código de la TV de Cervantes** + pase |
+| `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Sin enlace desde el 08/10** (la tarjeta «Cervantes» pasó a `cervantes-gp2/`); se abre a mano. Ingreso por el código de la TV antes de entrar y registro del equipo | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
+| `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.4, 07/10/2026; se **genera** con `tools/portar_botonera_gp2.py`): entra con el código de la TV, usa el **pase firmado**, escribe en `reg_prod_3_0` y mueve el stock de GP2 (Fase 1c). **Es lo que abre «Cervantes» en el inicio desde el 08/10** (Inicio v1.4) [Elías: «si»]. Ver «Cervantes · botonera de GP2» | `Produccion/RegistroApp/` de `loekemeyer/Gestion-Productiva-2.0` (hoy `d4c8bf9`), portada por script | `v3.1.N` | **el código de la TV de Cervantes** + pase |
 | `supabase.js` (raíz) | supabase-js propio, compartido: `virgilio/` y `cervantes/` lo cargan con `../supabase.js` | `loekemeyer/Gestion-Virgilio` | — | — |
 | `selector/` | Sólo una redirección a `/` (URL vieja) | — | — | — |
 | `tests/` | Pruebas con Playwright (ver «Pruebas») | 8 de `Gestion-Virgilio` + 5 nuevas | — | — |
@@ -84,8 +84,8 @@ select grupo, tipo, objeto from dep order by grupo, tipo, objeto;   -- sin la ú
 ## Cervantes · botonera de GP2 (`cervantes-gp2/`, v3.1.4, 07/10/2026)
 
 Es la tablet de GP2 (`Produccion/RegistroApp/operarios_gp2.js` + `Operarios_GP2.html` de `loekemeyer/Gestion-Productiva-2.0`) portada al
-celular del operario [Elías: «tendría que ser el de GP2, como está funcionando actualmente»]. **No tiene enlace todavía**: se abre a mano
-en `/cervantes-gp2/`; la tarjeta «Cervantes» del inicio sigue abriendo `cervantes/`.
+celular del operario [Elías: «tendría que ser el de GP2, como está funcionando actualmente»]. **Desde el 08/10 es lo que abre la tarjeta
+«Cervantes» del inicio** (antes, `cervantes/`, que queda sin enlace).
 
 - **Cómo se trae un cambio de GP2** (GP2 se sigue modificando y nada lo sincroniza): `app.js` e `index.html` **se generan** con
   `python3 tools/portar_botonera_gp2.py --gp2 <clon de Gestion-Productiva-2.0> --version 3.1.N` y se revisa `git diff cervantes-gp2/`.
@@ -134,7 +134,8 @@ en `/cervantes-gp2/`; la tarjeta «Cervantes» del inicio sigue abriendo `cervan
 - **Llevado al original** [Elías: «los cambios/parches … aplicalos también al original»]: `sql/gp2_arreglos_desde_3_0.sql` (los mismos tres
   arreglos en el schema GP2: anular devuelve el stock, rollos con id anti-duplicado, lo anulado no cuenta para el rollo) y, para que GP2
   lea lo de 3.0, la vista `reg_prod_3_0.produccion_gp2` (`sql/reg_prod_3_0_vista_produccion_gp2.sql`, con la forma de `GP2.produccion`).
-  **Aplicados el 07/10** (vista incluida) salvo `GP2.anular_evento_prod` con la devolución del stock (tiene DELETE: va por el SQL Editor).
+  **Aplicados el 07/10** (vista incluida); `GP2.anular_evento_prod` con la devolución del stock lo pegó Elías en el SQL Editor el 08/10 y se
+  probó en la base dentro de una transacción deshecha: registrar mueve el stock, anular lo deja idéntico y anular dos veces no devuelve de más.
   La tablet de GP2 ya los usa (GP2 `d4c8bf9`, v1.251.0: sin señal = PENDIENTE, 🗑 en cola, rollos con id) y `cervantes-gp2` v3.1.4 sale de ella.
 - **Para el corte**: los informes de GP2 leen `GP2.produccion` (15 funciones: `informes_bundle`, `produccion_bundle`, `alertas_bundle`,
   `inicio_bundle`, `problemas_matrices_bundle`…) y **no van a ver lo de 3.0** hasta que se reapunten; por eso la procesada ya guarda
@@ -314,8 +315,9 @@ hay que traer esa parte también. Un fix de operario que Gestión Virgilio ya te
 - **El alcance (`scope`) de las apps instalables es la raíz del sitio** (`"scope": "../"` en `virgilio/`, `cervantes/` y
   `cervantes-gp2/`), no su carpeta: si no, «← Volver al inicio» abría el inicio con la barra de Chrome de «página fuera de la
   app» (la X y la dirección arriba) [Elías, 07/10, con captura]. `tests/inicio-selector.cjs` lo verifica.
-- ⚠ **`virgilio/manifest.json` tiene el mismo `id` que Gestión Virgilio** (`/Produccion-Virgilio/`, mismo dominio
-  `loekemeyer.github.io`): para Chrome las dos son **la misma app instalada**. Sin decidir todavía (cambiarlo obliga a reinstalar).
+- **La app Virgilio tiene `id` propio** (`/Registro-Produccion-3.0/virgilio/`) desde el 08/10 [Elías: «si»; «no está usando nadie el
+  Registro Producción 3.0»]. Antes tenía el mismo que Gestión Virgilio (`/Produccion-Virgilio/`, mismo dominio `loekemeyer.github.io`) y
+  Chrome las tomaba como **una sola app instalada**. Quien la hubiera instalado antes tiene que reinstalarla. `inicio-selector` lo verifica.
 
 ## Enlaces que quedan rotos (están fuera a propósito)
 
@@ -385,8 +387,9 @@ GitHub Pages está activado desde el 05/10/2026 (rama `main`, carpeta `/ (root)`
 |---|---|
 | Inicio (elegir planta) | `/` |
 | Virgilio (operario) | `/virgilio/` |
-| Cervantes = GP2 Tablet Operarios | `/gp2/Produccion/RegistroApp/Operarios_GP2.html` (la tarjeta «Cervantes» del inicio) |
+| Cervantes = botonera de GP2 en el celular (la tarjeta «Cervantes» del inicio) | `/cervantes-gp2/` |
 | Registro Producción 2.0 (sin enlace) | `/cervantes/` |
+| GP2 Tablet Operarios (sin enlace) | `/gp2/Produccion/RegistroApp/Operarios_GP2.html` |
 
 - El origen es el mismo `loekemeyer.github.io` que Gestión Virgilio y GP2: comparten `localStorage` y la sesión de
   Supabase. El login de GP2 vuelve a `origin + pathname`: la URL nueva tiene que estar permitida en Supabase →
