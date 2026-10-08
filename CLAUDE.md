@@ -171,4 +171,8 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
   (`tests/ui/test_op_e2e.js` → `tests/cervantes-gp2.cjs`). Después: `node tests/cervantes-gp2.cjs`, revisar `git diff`, commit, y en
   GP2 volver a copiar con un token nuevo para que la copia diga la versión nueva. **Nunca portar a mano** lo de GP2: si el script frena,
   se le cuenta a Elías qué chocó.
+- **Antes de cambiar `cervantes-gp2/` acá** `[Elías, 08/10/2026: «antes de hacer un cambio fijate si había cambios en el original de
+  GP2»]`: `python3 tools/traer_de_gp2.py --gp2 <clon de GP2> --revisar` (no escribe nada). Si dice que en GP2 hay cambios sin traer,
+  avisarle a Elías ANTES de tocar (o traerlos primero, si él lo pide); si no, cambiar acá. Del otro lado, el script de copia de GP2
+  se niega a pisar la tablet si tiene cambios sin traer (salvo `--pisar`).
 - **Cambios en `main`** `[usuario, 06/10/2026]`: se hacen directo en `main`, sin pull request, salvo que se pida otra cosa.

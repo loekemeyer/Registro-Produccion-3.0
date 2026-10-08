@@ -17,6 +17,8 @@ Cómo funciona (y por qué no se equivoca):
      `git merge-file` usando como base esa versión de 3.0 sacada del historial; si chocan en las mismas líneas, se corta.
   4. Si no hay nada nuevo, no escribe nada. Si hay, escribe cervantes-gp2/app.js, index.html, sw.js y tests/cervantes-gp2.cjs
      con la versión nueva (APP_VERSION, SW_VERSION, MI_V, ?v=) y muestra qué cambió.
+Con --revisar sólo dice si hay algo nuevo en GP2 (sale 3 si lo hay) y no escribe: se corre ANTES de cambiar cervantes-gp2/ acá
+[Elías, 08/10: «antes de hacer un cambio fijate si había cambios en el original de GP2»].
 Después: `node tests/cervantes-gp2.cjs`, revisar `git diff`, commitear; y en GP2 volver a copiar
 (`python3 tools/copiar_botonera_de_3_0.py --rp3 <este repo> --token <nuevo>`) para que la copia diga la versión nueva.
 """
@@ -27,6 +29,8 @@ import os
 import re
 import subprocess
 import sys
+
+sys.dont_write_bytecode = True   # al cargar el script del otro repo no deja __pycache__ en ninguno de los dos
 import tempfile
 
 AQUI = os.path.dirname(os.path.abspath(__file__))
@@ -158,44 +162,68 @@ def mostrar(viejo, nuevo, nombre):
           f'{sum(1 for x in d if x.startswith("-") and not x.startswith("---"))} sacadas')
 
 
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('--gp2', required=True, help='clon de loekemeyer/Gestion-Productiva-2.0')
-    ap.add_argument('--version', required=True, help='versión nueva de cervantes-gp2, serie 3.1.N (sin la v)')
-    a = ap.parse_args()
-    if not re.fullmatch(r'3\.1\.\d+', a.version):
-        sys.exit('La versión de cervantes-gp2 es de la serie 3.1.N (ej. 3.1.8).')
-    spec = importlib.util.spec_from_file_location('copia_gp2', os.path.join(a.gp2, 'tools', 'copiar_botonera_de_3_0.py'))
+def cargar_copia(gp2):
+    spec = importlib.util.spec_from_file_location('copia_gp2', os.path.join(gp2, 'tools', 'copiar_botonera_de_3_0.py'))
     copia = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(copia)
-    js_gp2 = leer(os.path.join(a.gp2, 'Produccion', 'RegistroApp', 'operarios_gp2.js'))
-    html_gp2 = leer(os.path.join(a.gp2, 'Produccion', 'RegistroApp', 'Operarios_GP2.html'))
-    test_gp2 = leer(os.path.join(a.gp2, 'tests', 'ui', 'test_op_e2e.js'))
-    js30, html30, test30, sw30 = leer(APP), leer(HTML), leer(TEST), leer(SW)
+    return copia
+
+
+def traer(gp2, avisar=print):
+    """Lo de la tablet de GP2 llevado a 3.0, SIN escribir: (js, html, test, base, token). Lanza Falta / copia.Falta si no cierra."""
+    copia = cargar_copia(gp2)
+    js_gp2 = leer(os.path.join(gp2, 'Produccion', 'RegistroApp', 'operarios_gp2.js'))
+    html_gp2 = leer(os.path.join(gp2, 'Produccion', 'RegistroApp', 'Operarios_GP2.html'))
+    test_gp2 = leer(os.path.join(gp2, 'tests', 'ui', 'test_op_e2e.js'))
+    js30, html30, test30 = leer(APP), leer(HTML), leer(TEST)
     actual = re.search(r'const APP_VERSION = "(v[\d.]+)";', js30).group(1)
-    if [int(x) for x in a.version.split('.')] <= [int(x) for x in actual[1:].split('.')]:
-        sys.exit(f'La versión nueva ({a.version}) tiene que ser mayor que la de 3.0 ({actual}).')
     try:
         js, token_js, base = revertir_js(js_gp2, js30)
         html, token_html, guard = revertir_html(html_gp2, html30, base)
         test = revertir_test(test_gp2, copia, base)
-        # 2) vuelta exacta: copiar lo deshecho tiene que dar lo que hay en GP2
-        for que, ida, gp2 in (('operarios_gp2.js', copia.copiar_js(js, token_js)[0], js_gp2),
-                              ('Operarios_GP2.html', copia.copiar_html(html, token_html, guard), html_gp2),
-                              ('test_op_e2e.js', copia.copiar_test(test), test_gp2)):
-            if ida != gp2:
-                diff = '\n'.join(list(difflib.unified_diff(gp2.splitlines(), ida.splitlines(), 'GP2', 'vuelta', lineterm='', n=0))[:12])
+        # vuelta exacta: copiar lo deshecho tiene que dar lo que hay en GP2
+        for que, ida, gp2txt in (('operarios_gp2.js', copia.copiar_js(js, token_js)[0], js_gp2),
+                                 ('Operarios_GP2.html', copia.copiar_html(html, token_html, guard), html_gp2),
+                                 ('test_op_e2e.js', copia.copiar_test(test), test_gp2)):
+            if ida != gp2txt:
+                diff = '\n'.join(list(difflib.unified_diff(gp2txt.splitlines(), ida.splitlines(), 'GP2', 'vuelta', lineterm='', n=0))[:12])
                 raise Falta(f'{que}: la vuelta no es exacta (se tocó en GP2 uno de los puntos de la copia):\n{diff}')
-        # 3) si 3.0 cambió desde la copia, se unen los dos lados
+        # si 3.0 cambió desde la copia, se unen los dos lados
         if base != actual:
             sha, bjs, bhtml, btest = base_de_3_0(base)
-            print(f'3.0 cambió desde la copia ({base} -> {actual}): uno con la base {sha[:7]}.')
+            avisar(f'3.0 cambió desde la copia ({base} -> {actual}): uno con la base {sha[:7]}.')
             js, html, test = unir(js30, bjs, js, 'app.js'), unir(html30, bhtml, html, 'index.html'), unir(test30, btest, test, 'prueba')
-    except (Falta, copia.Falta) as e:          # copia.Falta: lo que dice el script de copia de GP2 al hacer la vuelta
+    except copia.Falta as e:
+        raise Falta(str(e))
+    return js, html, test, base, token_html
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument('--gp2', required=True, help='clon de loekemeyer/Gestion-Productiva-2.0')
+    ap.add_argument('--version', help='versión nueva de cervantes-gp2, serie 3.1.N (sin la v); no hace falta con --revisar')
+    ap.add_argument('--revisar', action='store_true', help='sólo dice si en GP2 hay algo nuevo; no escribe nada')
+    a = ap.parse_args()
+    js30, html30, test30, sw30 = leer(APP), leer(HTML), leer(TEST), leer(SW)
+    actual = re.search(r'const APP_VERSION = "(v[\d.]+)";', js30).group(1)
+    if not a.revisar:
+        if not a.version or not re.fullmatch(r'3\.1\.\d+', a.version):
+            sys.exit('Falta --version de la serie 3.1.N (ej. 3.1.8), o --revisar para sólo mirar.')
+        if [int(x) for x in a.version.split('.')] <= [int(x) for x in actual[1:].split('.')]:
+            sys.exit(f'La versión nueva ({a.version}) tiene que ser mayor que la de 3.0 ({actual}).')
+    try:
+        js, html, test, base, token_html = traer(a.gp2)
+    except Falta as e:
         sys.exit('NO SE TRAJO NADA — ' + str(e))
     if (js, html, test) == (js30, html30, test30):
         print(f'No hay nada nuevo en GP2: la tablet es igual a Cervantes {actual}. No se escribió nada.')
         return
+    if a.revisar:
+        print(f'En GP2 HAY cambios que no están en Cervantes {actual} (copia de {base}, token {token_html}):')
+        for nombre, viejo, nuevo in (('app.js', js30, js), ('index.html', html30, html), ('cervantes-gp2.cjs', test30, test)):
+            mostrar(viejo, nuevo, nombre)
+        print('Para traerlos: --version 3.1.N (sin --revisar). No se escribió nada.')
+        sys.exit(3)
     v = 'v' + a.version
     js = una(js, f'const APP_VERSION = "{actual}";', f'const APP_VERSION = "{v}";', 'versión en app.js')
     js = js.replace(f'botonera de GP2 ({actual})', f'botonera de GP2 ({v})', 1)
