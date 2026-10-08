@@ -1,4 +1,5 @@
--- ESTADO: NO APLICADO (08/10/2026). Va por el SQL Editor de Supabase (tiene DELETE y DROP: la herramienta de Claude se cuelga).
+-- ESTADO: ✅ APLICADO el 08/10/2026 (lo pegó Elías en el SQL Editor; tiene DELETE y DROP: la herramienta de Claude se cuelga).
+--   Verificado con el SELECT del final: todo en 0, y las 8 funciones que tienen que quedar siguen.
 -- Registro Producción 3.0 · limpieza final de lo que quedó de las pruebas [Elías: «cuando terminemos» → 08/10: «si»].
 --
 -- Medido en la base el 08/10 antes de escribir esto:
