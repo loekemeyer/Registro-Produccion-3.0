@@ -17,7 +17,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 | `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada | `v30.NN` (hoy `v30.05`) | **sólo el código de la TV** |
 | ~~`gp2/`~~ | **Borrada el 08/10/2026** [Elías: «2 si»]: era la copia vieja de la tablet de GP2 (`Operarios_GP2.html` + lo mínimo que necesitaba), sin enlace desde el 07/10 y lo único que seguía llamando a las 4 funciones de GP2 anotadas para borrar. Queda en el historial de git | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | — | — |
 | `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Sin enlace desde el 08/10** (la tarjeta «Cervantes» pasó a `cervantes-gp2/`); se abre a mano. **Se borra cuando hayan pasado todos los operarios** a `cervantes-gp2/` [Elías, 08/10]; hasta entonces sigue publicada. Ingreso por el código de la TV antes de entrar y registro del equipo | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
-| `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.7, 08/10/2026; **es la fuente**: se edita acá y GP2 copia): entra con el código de la TV, usa el **pase firmado**, escribe en `reg_prod_3_0` y mueve el stock de GP2 (Fase 1c). **Es lo que abre «Cervantes» en el inicio desde el 08/10** (Inicio v1.4) [Elías: «si»]. Ver «Cervantes · botonera de GP2» | `Produccion/RegistroApp/` de `loekemeyer/Gestion-Productiva-2.0` (hoy `e110890`), portada por script | `v3.1.N` | **el código de la TV de Cervantes** + pase |
+| `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.8, 08/10/2026; **es la fuente**: se edita acá y GP2 copia): entra con el código de la TV, usa el **pase firmado**, escribe en `reg_prod_3_0` y mueve el stock de GP2 (Fase 1c). **Es lo que abre «Cervantes» en el inicio desde el 08/10** (Inicio v1.4) [Elías: «si»]. Ver «Cervantes · botonera de GP2» | `Produccion/RegistroApp/` de `loekemeyer/Gestion-Productiva-2.0` (hoy `e110890`), portada por script | `v3.1.N` | **el código de la TV de Cervantes** + pase |
 | `supabase.js` (raíz) | supabase-js propio, compartido: `virgilio/` y `cervantes/` lo cargan con `../supabase.js` | `loekemeyer/Gestion-Virgilio` | — | — |
 | `selector/` | Sólo una redirección a `/` (URL vieja) | — | — | — |
 | `tests/` | Pruebas con Playwright (ver «Pruebas») | 8 de `Gestion-Virgilio` + 5 nuevas | — | — |
@@ -327,12 +327,17 @@ hay que traer esa parte también. Un fix de operario que Gestión Virgilio ya te
   supervisor): `grep` ya no lo trata como binario. Igual, modificarlo con parches y no reescribiéndolo como texto.
 - `Registro_GP2.html` (la **Carga Manual Producción** de oficina) se sacó; la carpeta `RegistroApp/` conserva su
   `manifest.json`, `sw.js` y `styles.css`, que comparte con la tablet.
-- **El alcance (`scope`) de las apps instalables es la raíz del sitio** (`"scope": "../"` en `virgilio/`, `cervantes/` y
-  `cervantes-gp2/`), no su carpeta: si no, «← Volver al inicio» abría el inicio con la barra de Chrome de «página fuera de la
-  app» (la X y la dirección arriba) [Elías, 07/10, con captura]. `tests/inicio-selector.cjs` lo verifica.
-- **La app Virgilio tiene `id` propio** (`/Registro-Produccion-3.0/virgilio/`) desde el 08/10 [Elías: «si»; «no está usando nadie el
-  Registro Producción 3.0»]. Antes tenía el mismo que Gestión Virgilio (`/Produccion-Virgilio/`, mismo dominio `loekemeyer.github.io`) y
-  Chrome las tomaba como **una sola app instalada**. Quien la hubiera instalado antes tiene que reinstalarla. `inicio-selector` lo verifica.
+- **Una sola app instalable** desde el 08/10 [Elías: «1 si»]: el inicio, `virgilio/` y `cervantes-gp2/` usan **el mismo manifiesto, el de
+  la raíz** (`manifest.json`: id `/Registro-Produccion-3.0/`, alcance y arranque en el inicio, íconos PNG de 192 y 512 en `icons/`,
+  sacados de `icon.svg`). Se instale desde donde se instale, es la misma app «Producción», arranca en el inicio (que marca la planta
+  de la «Última vez») y Virgilio y Cervantes quedan adentro, sin la barra de Chrome de «página fuera de la app».
+  - Antes había 3 apps (cada carpeta con su manifiesto e id, todas con alcance `../`). Una «Producción» instalada desde `virgilio/`
+    antes del 08/10 quedó **trabada con el alcance viejo** (sólo `virgilio/`): Chrome sólo actualiza una instalación desde un
+    manifiesto con el mismo id, y el id de Virgilio cambió (`/Produccion-Virgilio/` → `/Registro-Produccion-3.0/virgilio/`). Síntoma
+    [Elías, 08/10, con captura]: Cervantes con la barra y la X, y la X volvía al login de Virgilio. **Quien tenga esa app tiene que
+    desinstalarla e instalar desde el inicio.**
+  - La app vieja `cervantes/` (sin enlace) conserva su manifiesto, con alcance en la raíz.
+  - `tests/inicio-selector.cjs` lo verifica (`unaSolaApp`, `sinManifiestosPropios`, `manifiestoCubreTodo`, `iconosPng`).
 
 ## Enlaces que quedan rotos (están fuera a propósito)
 

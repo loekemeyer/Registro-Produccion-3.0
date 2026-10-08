@@ -22,7 +22,7 @@
    Eduardo Barrionuevo (legajo "19"): CT button + rollo en E/PR (sólo con rollos_activos).
    ============================================================ */
 
-const APP_VERSION = "v3.1.7";
+const APP_VERSION = "v3.1.8";
 const LEGAJO_EDUARDO = "19";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";

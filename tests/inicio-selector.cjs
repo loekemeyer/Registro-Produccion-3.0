@@ -59,15 +59,28 @@ const { servir } = require("./_servidor.cjs");
   await p.waitForURL(srv.url + "/", { timeout: 10000 });
   c.selectorViejoRedirige = (await p.locator(".card").count()) === 2;
 
-  // 5) «Volver al inicio» sin salir de la app instalada: el alcance (scope) de cada app cubre el inicio del sitio; si no, Chrome
-  //    muestra el inicio con la barra de «página fuera de la app» (la X y la dirección arriba) [Elías, 07/10, con captura].
-  c.lasAppsIncluyenElInicio = ["virgilio", "cervantes", "cervantes-gp2"].every((d) => {
-    const m = JSON.parse(fs.readFileSync(path.join(__dirname, "..", d, "manifest.json"), "utf8"));
-    const base = "https://x.test/Registro-Produccion-3.0/" + d + "/manifest.json";
-    return new URL(m.scope || "./", base).href === "https://x.test/Registro-Produccion-3.0/";
-  });
-  // la app Virgilio tenía el mismo id que Gestión Virgilio (/Produccion-Virgilio/, mismo dominio): Chrome las tomaba como UNA sola app
-  c.virgilioConIdPropio = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "virgilio", "manifest.json"), "utf8")).id === "/Registro-Produccion-3.0/virgilio/";
+  // 5) UNA SOLA APP INSTALABLE [Elías, 08/10: «1 si»]. Antes había 3 (inicio, virgilio/, cervantes-gp2/), cada una con su id y el
+  //    mismo alcance: según dónde se tocara «Instalar» salía otra app, y una instalada antes del id propio de Virgilio quedó trabada
+  //    con el alcance viejo (Cervantes con la barra de «página fuera de la app» y la X que volvía al login de Virgilio, con captura).
+  //    Ahora el inicio, Virgilio y Cervantes usan el MISMO manifiesto (el de la raíz), que cubre todo el sitio.
+  const raiz = "https://x.test/Registro-Produccion-3.0/";
+  const linkManifiesto = (d) => {
+    const html = fs.readFileSync(path.join(__dirname, "..", d, "index.html"), "utf8");
+    const m = html.match(/<link rel="manifest" href="([^"]+)"/);
+    return m ? new URL(m[1], raiz + (d === "." ? "" : d + "/")).href : null;
+  };
+  c.unaSolaApp = [".", "virgilio", "cervantes-gp2"].every((d) => linkManifiesto(d) === raiz + "manifest.json");
+  c.sinManifiestosPropios = !fs.existsSync(path.join(__dirname, "..", "virgilio", "manifest.json"))
+    && !fs.existsSync(path.join(__dirname, "..", "cervantes-gp2", "manifest.json"));
+  const mr = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "manifest.json"), "utf8"));
+  c.manifiestoCubreTodo = mr.id === "/Registro-Produccion-3.0/" && new URL(mr.scope, raiz + "manifest.json").href === raiz
+    && new URL(mr.start_url, raiz + "manifest.json").href === raiz;
+  // Android pide íconos PNG de 192 y 512 para instalar
+  c.iconosPng = ["192x192", "512x512"].every((t) => mr.icons.some((i) => i.sizes === t && i.type === "image/png"
+    && fs.existsSync(path.join(__dirname, "..", i.src))));
+  // la app vieja cervantes/ (sin enlace, se borra cuando pasen todos) conserva el suyo, con alcance en la raíz
+  const mc = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "cervantes", "manifest.json"), "utf8"));
+  c.cervantesViejaCubreElInicio = new URL(mc.scope || "./", raiz + "cervantes/manifest.json").href === raiz;
 
   const pass = Object.values(c).every(Boolean) && errs.length === 0 && sup404.length === 0;
   console.log("inicio-selector:", JSON.stringify(c), "· pageerrors:", errs.length ? errs.join("|") : "none", "· 4xx propios:", sup404.length ? sup404.join(", ") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

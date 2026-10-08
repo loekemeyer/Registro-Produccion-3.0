@@ -42,7 +42,7 @@ TEST = os.path.join(RAIZ, 'tests', 'cervantes-gp2.cjs')
 SW_INI = '/* ============================================================\n   SERVICE WORKER'
 INIT = '/* ============================================================\n   INIT'
 LLAMADA_SW = '  registrarServiceWorker();\n'
-MANIFIESTO = '  <link rel="manifest" href="manifest.json" />\n'
+MANIFIESTO = '  <link rel="manifest" href="../manifest.json" />\n'   # el del inicio: una sola app instalable (v3.1.8)
 
 
 class Falta(Exception):

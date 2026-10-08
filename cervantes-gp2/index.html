@@ -11,7 +11,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Registro Produccion</title>
-  <link rel="manifest" href="manifest.json" />
+  <link rel="manifest" href="../manifest.json" />
   <link rel="icon" href="data:," />
   <script>
     // Auto-recarga si el celular/tablet quedo con un HTML cacheado viejo.
@@ -20,7 +20,7 @@
     (function(){
       // El operario ya no tiene version propia: se compara el TOKEN de cache compartido
       // (el mismo ?v= que llevan todos los assets). Si cambia, el HTML cacheado es viejo.
-      var MI_V = '3.1.7';
+      var MI_V = '3.1.8';
       function chequear(){
         fetch(location.pathname, { cache: 'no-store' }).then(function(r){ return r.text(); }).then(function(html){
           var m = html.match(/app\.js\?v=([\w.]+)/);
@@ -278,6 +278,6 @@
   </div>
 </div>
 
-<script src="app.js?v=3.1.7"></script>
+<script src="app.js?v=3.1.8"></script>
 </body>
 </html>
