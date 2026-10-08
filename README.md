@@ -15,8 +15,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 |---|---|---|---|---|
 | `/` | **Inicio**: elegir Virgilio o Cervantes | `selector/` de `loekemeyer/Gestion-Virgilio` · `e7a7bbd` | `sw.js` → `inicio-v1.4` | — |
 | `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada | `v30.NN` (hoy `v30.05`) | **sólo el código de la TV** |
-| `gp2/Produccion/RegistroApp/` | **Tablet de operarios de GP2** (`Operarios_GP2.html`, la que corta en matrices). **Desde el 07/10 no tiene enlace desde el inicio** (los operarios usan `cervantes/` en su celular) | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | Google + lista blanca (sin cambios) |
-| `gp2/` (resto) | Lo mínimo que esa tablet necesita: `login.html`, `auth-guard.js`, `supabase-config.js`, `gp2-ui.js`, `pwa.js`, `sw.js`, `version.js`, manifest e íconos | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | la de GP2 | — |
+| ~~`gp2/`~~ | **Borrada el 08/10/2026** [Elías: «2 si»]: era la copia vieja de la tablet de GP2 (`Operarios_GP2.html` + lo mínimo que necesitaba), sin enlace desde el 07/10 y lo único que seguía llamando a las 4 funciones de GP2 anotadas para borrar. Queda en el historial de git | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | — | — |
 | `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Sin enlace desde el 08/10** (la tarjeta «Cervantes» pasó a `cervantes-gp2/`); se abre a mano. **Se borra cuando hayan pasado todos los operarios** a `cervantes-gp2/` [Elías, 08/10]; hasta entonces sigue publicada. Ingreso por el código de la TV antes de entrar y registro del equipo | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
 | `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.7, 08/10/2026; **es la fuente**: se edita acá y GP2 copia): entra con el código de la TV, usa el **pase firmado**, escribe en `reg_prod_3_0` y mueve el stock de GP2 (Fase 1c). **Es lo que abre «Cervantes» en el inicio desde el 08/10** (Inicio v1.4) [Elías: «si»]. Ver «Cervantes · botonera de GP2» | `Produccion/RegistroApp/` de `loekemeyer/Gestion-Productiva-2.0` (hoy `e110890`), portada por script | `v3.1.N` | **el código de la TV de Cervantes** + pase |
 | `supabase.js` (raíz) | supabase-js propio, compartido: `virgilio/` y `cervantes/` lo cargan con `../supabase.js` | `loekemeyer/Gestion-Virgilio` | — | — |
@@ -102,7 +101,7 @@ celular del operario [Elías: «tendría que ser el de GP2, como está funcionan
   tengan la función correspondiente en Reg Prod 3.0»]: `sql/verificar_gp2_vs_3_0.sql` corre las dos con los mismos datos en una
   transacción que se deshace (no escribe nada) — 7 casos de toque, anular, duplicado, catálogo y rollos: todo igual. Las 4 de GP2 que
   quedaron sin pantalla están anotadas para borrar en GP2 (`db/PENDIENTE_borrar_funciones_tablet_vieja.sql`); una de las condiciones
-  es que la copia vieja `gp2/` de este repo (sin enlace) todavía las llama. v3.1.7: los rollos van
+  era borrar la copia vieja `gp2/` de este repo, que todavía las llamaba: se borró el 08/10. v3.1.7: los rollos van
   siempre con id anti-duplicado (`reg_prod_3_0_rollo_tomar` / `_rollo_cerrar`).
 - **Entrada**: pantalla del código de la TV de Cervantes (misma que `cervantes/`), antes de entrar. La base devuelve un **pase firmado**
   (`reg_prod_3_0_cerv_ingresar` → `{ok, pase, vence}`) que se guarda en el celular (`rp3c_pase`) y vale hasta las 17:45 (3 h si se entra
@@ -171,7 +170,7 @@ celular del operario [Elías: «tendría que ser el de GP2, como está funcionan
    comparte con GP2). Los **supervisores no entran por este Virgilio**: su panel sigue en Gestión Virgilio.
 3. **Cervantes = `cervantes/`, desde el celular del operario** (inicio v1.3, 07/10) [Elías: «ya no estamos en GP2, no usan la tablet,
    usan su celular personal»]. Entre el 06/10 18:54 y el 07/10 la tarjeta abría la tablet de GP2 (decisión de Nazareno);
-   volvió a abrir `cervantes/`. La tablet de GP2 sigue en el repo pero sin enlace (con el mismo cambio de envasado, abajo).
+   volvió a abrir `cervantes/`. La tablet de GP2 quedó sin enlace (y se borró del repo el 08/10) (con el mismo cambio de envasado, abajo).
 4. **Cervantes, ingreso con el código de la TV** (`asegurarEntrada`, `cervantes/app.js` v3.0.5) — reemplaza el login por Wi-Fi
    de v3.0.1–v3.0.3 [Elías, 07/10: «ya no va a ser por wifi»; el código manual de logística también se descartó]. **Se pide
    antes de entrar** [Elías, 07/10: «antes de entrar, al elegir el lugar»]: al abrir `cervantes/` sin pase de hoy aparece una
@@ -296,7 +295,7 @@ hay que traer esa parte también. Un fix de operario que Gestión Virgilio ya te
 
 ## Lo que falta o no coincide (a 06/10/2026)
 
-- **La tablet de GP2 quedó sin enlace** (07/10: los operarios usan su celular). Sigue con Google + lista blanca y sin el ingreso por
+- **La tablet de GP2 quedó sin enlace** (07/10: los operarios usan su celular) **y se borró el 08/10** [Elías: «2 si»]. Sigue con Google + lista blanca y sin el ingreso por
   la TV; se puede borrar cuando se confirme que no hace falta (la historia queda en git).
 - **`cervantes/` es la visual de Registro Producción 2.0** con el ingreso por la TV y el registro de equipo encima. Falta ver con los
   operarios que no les cambia nada más.
@@ -337,9 +336,7 @@ hay que traer esa parte también. Un fix de operario que Gestión Virgilio ya te
 
 ## Enlaces que quedan rotos (están fuera a propósito)
 
-| Desde | Apunta a | Qué es |
-|---|---|---|
-| `gp2/login.html` | `GP2_MODULOS.html`, `envios-only.html` | Destinos por defecto cuando el login no trae `?next=` (desde la tablet siempre lo trae) |
+Ninguno desde el 08/10/2026: el único era `gp2/login.html`, que se fue con la carpeta `gp2/`.
 
 `virgilio/index.html` ya no apunta a `admin/`, `monitor/` ni `cervantes-admin/`: ese código se fue con el supervisor.
 
@@ -358,7 +355,7 @@ supervisor). De esos tests se trajeron 8 de operario.
 |---|---|
 | `inicio-selector` | `/` con las 2 tarjetas; Virgilio abre `virgilio/` con su login; **Cervantes abre `cervantes/`** y, antes de entrar, muestra la pantalla del código de la TV con «Volver al inicio»; `supabase.js` compartido; redirección de `selector/`; el alcance (`scope`) de las 3 apps instalables cubre el inicio |
 | `virgilio-solo-operario` | **el recorte**: los archivos de supervisor no están; la página carga sin 404 ni errores; la botonera tiene sus 20 botones y cada uno se toca sin error; las entradas de supervisor no existen y los 5 cascarones y los paneles están vacíos (51 chequeos). Con el código sin recortar falla en 19 |
-| `articulo-envasado` | nombre y marca del artículo en envasado, en la tablet de GP2 y en `cervantes/` (21 chequeos): regla «mismo artículo → sólo marca» (322) y «nombres distintos → nombre y marca» (389), abreviaturas LK/CH, línea colapsada, matriz de una sola pieza, matriz que no es de envasado y la RPC caída |
+| `articulo-envasado` | nombre y marca del artículo en envasado, en `cervantes/` (8 chequeos; la parte de la tablet de GP2 se fue con `gp2/` el 08/10): regla «mismo artículo → sólo marca» (322) y «nombres distintos → nombre y marca» (389), abreviaturas LK/CH, línea colapsada, matriz de una sola pieza, matriz que no es de envasado y la RPC caída |
 | `virgilio-solo-tv` | login de Virgilio sólo con TV, sin entrada por legajo y con la entrada por nombre (v30.08); el registro del equipo en cada ingreso (v30.12) y que si falla el operario entra igual (24 chequeos) |
 | `cervantes-tv` | entrada de `cervantes/` con el código de la TV (52 chequeos): la pantalla aparece ANTES de la del legajo y la tapa, código mal y bien, qué manda a la base (app, código, id del equipo, huella, navegador, pantalla; sin legajo), anotación de cada legajo en el equipo (1 vez por día), recarga con pase, vigencia 17:44/17:50, 08:00 sin LT, arranque sin internet (retenido) y pantalla sola al volver, internet cortado con la pantalla abierta, «Ingresar código» / «Ahora no», demasiados intentos, función caída o sin crear, 7 códigos malos seguidos |
 | `operario-queda-botonera`, `modulo-minimizar-anular`, `tarea-abierta-otro-dia`, `botonera-tm-historial`, `mg-reentrada`, `toggle-anular`, `rr-sin-remitos-cierra`, `encoding-utf8` | de Gestión Virgilio, con las rutas nuevas. `operario-queda-botonera` sin el segundo selector ni `chooseVirgilio` (lo llamaba el selector de planta); `modulo-minimizar-anular` sin el chequeo del monitor |
@@ -405,7 +402,6 @@ GitHub Pages está activado desde el 05/10/2026 (rama `main`, carpeta `/ (root)`
 | Virgilio (operario) | `/virgilio/` |
 | Cervantes = botonera de GP2 en el celular (la tarjeta «Cervantes» del inicio) | `/cervantes-gp2/` |
 | Registro Producción 2.0 (sin enlace) | `/cervantes/` |
-| GP2 Tablet Operarios (sin enlace) | `/gp2/Produccion/RegistroApp/Operarios_GP2.html` |
 
 - El origen es el mismo `loekemeyer.github.io` que Gestión Virgilio y GP2: comparten `localStorage` y la sesión de
   Supabase. El login de GP2 vuelve a `origin + pathname`: la URL nueva tiene que estar permitida en Supabase →

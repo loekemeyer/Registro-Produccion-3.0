@@ -6,7 +6,7 @@ qué se recortó y qué no se probó. Nació como copia de `loekemeyer/Gestion-V
 pero **desde el 06/10/2026 ya no es una copia sin modificar**: la raíz (`/`) es el inicio que separa Cervantes y Virgilio;
 Virgilio vive en `virgilio/` con login sólo por el código de la TV, y Cervantes vive en `cervantes-gp2/` (la botonera de GP2, desde el
 08/10; la app vieja `cervantes/` quedó sin enlace) con login por el código de la TV de Cervantes, que se pide **antes de entrar** (`[Elías, 07/10/2026: «ya no estamos en GP2 … usan su celular personal»]`).
-La tablet de GP2 (`gp2/Produccion/RegistroApp/`) quedó **sin enlace**. Supabase es el
+La copia vieja de la tablet de GP2 (`gp2/`) **se borró el 08/10/2026** `[Elías: «2 si»]` (está en el historial de git). Supabase es el
 mismo proyecto (`hrxfctzncixxqmpfhskv`).
 
 **Fuente de verdad** `[usuario, 05/10/2026: «Se sigue trabajando desde los tres»]`: Gestión Virgilio, Gestión
@@ -137,7 +137,7 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
 - **Todo cambio de JS/CSS/HTML de una app bumpea su versión** en el mismo commit (los celulares cachean fuerte):
   `?v=` del `<script>`/`<link>` y la versión propia de esa app (`APP_VERSION` en `virgilio/index.html`, `SW_VERSION` en
   `virgilio/sw.js` y `virgilio/version.json`; `LOCAL_VERSION` + `CACHE_VERSION` en `cervantes/`; `APP_VERSION` en `cervantes-gp2/app.js` + `SW_VERSION` en `cervantes-gp2/sw.js` +
-  `?v=` y `MI_V` en `cervantes-gp2/index.html`; `SW_VERSION` en el `sw.js` de la raíz; `version.js` en `gp2/`).
+  `?v=` y `MI_V` en `cervantes-gp2/index.html`; `SW_VERSION` en el `sw.js` de la raíz).
 - **Series de versión de este repo**: Virgilio `v30.NN`, Cervantes `v3.0.N`, botonera nueva de Cervantes (`cervantes-gp2/`) `v3.1.N`. Virgilio las compara con `_verNum`, que sólo
   acepta `vMAYOR.MENOR`: no agregar sufijos.
 

@@ -1,17 +1,11 @@
-/* Nombre del artículo (y marca) en las matrices de ENVASADO — tablet de GP2 y Cervantes (GP2 v3.0.1 / Cervantes v3.0.2).
+/* Nombre del artículo (y marca) en las matrices de ENVASADO — Cervantes (cervantes/, v3.0.2).
    Supabase está simulado; la RPC reg_prod_3_0_envasado_articulos devuelve lo mismo que devolvería la base:
      322 → 2 piezas: 394 LOEKE y 842 CHEF, las dos «Espátula Lisa Nylon 1 Pza» (sólo se distinguen por la marca)
      321 → 1 pieza, 10 → no es de envasado
 
    Regla [usuario 07/10/2026]: dentro de una matriz, si las piezas son el MISMO artículo (mismo nombre) se muestra sólo la
    MARCA; si los nombres son distintos, nombre y marca.
-   GP2
-     Marca en pantalla: LOEKE → LK, CHEF → CH (diminutivos), las demás tal cual.
-   1) 322 (mismo nombre, otra marca): las tarjetas llevan sólo la marca (LK / CH), sin nombre, y se distinguen
-     2) al elegir una, la línea colapsada dice sólo la marca
-     3) 389 (nombres distintos): las tarjetas llevan nombre y marca
-     4) una matriz de envasado con UNA pieza muestra nombre y marca en la card; una que no es de envasado no muestra nada
-     5) si la RPC falla, el selector queda como en la v1.245.2 («Art. 394» con el código del bundle) y sin errores
+   (La parte de la tablet de GP2, chequeos 1 a 5, se fue el 08/10/2026 con la carpeta gp2/ [Elías: «2 si»].)
    Cervantes
      6) 322 (mismo nombre): el aviso dice el nombre UNA vez y las dos marcas
      7) 389 (nombres distintos): «Artículos de esta matriz:» con nombre y marca de cada uno; con un solo artículo, «Artículo:»
@@ -102,68 +96,6 @@ const BUNDLE = {
     p.on("dialog", (d) => d.dismiss().catch(() => {}));
     return { ctx, p };
   }
-
-  // ======================= GP2 =======================
-  const sesionGP2 = `
-    localStorage.setItem("sb-hrxfctzncixxqmpfhskv-auth-token", JSON.stringify({ access_token: "x", refresh_token: "y", token_type: "bearer", expires_at: 4102444800, expires_in: 3600, user: { id: "u", email: "op@example.com" } }));
-    sessionStorage.setItem("gp_auth", "ok"); sessionStorage.setItem("gp_role", "admin"); sessionStorage.setItem("gp_email", "op@example.com");`;
-  async function abrirGP2(rpcArticulos) {
-    const c = await contexto(rpcArticulos, sesionGP2);
-    await c.p.goto(srv.url + "/gp2/Produccion/RegistroApp/Operarios_GP2.html", { waitUntil: "domcontentloaded" });
-    await c.p.waitForSelector("#legajoScreen", { state: "visible" });
-    await esperar(() => c.p.evaluate(() => typeof D !== "undefined" && !!(D.empleados && D.empleados["999"])));
-    if (rpcArticulos !== "falla") await esperar(() => c.p.evaluate(() => Object.keys(ENV_ARTS).length > 0));
-    else await pausa(600);
-    await c.p.fill("#legajoInput", "999");
-    await c.p.click("#btnContinuar");
-    await c.p.waitForSelector("#optionsScreen:not(.hidden)");
-    await c.p.click('.box[data-code="E"]');
-    return c;
-  }
-
-  { const { ctx, p } = await abrirGP2("ok");
-    await p.fill("#textInput", "322");
-    await p.waitForSelector("#piezaGrid .mz");
-    const cards = await p.locator("#piezaGrid .mz").allInnerTexts();
-    chequeo("1 el selector ofrece las 2 piezas de la 322", cards.length === 2);
-    chequeo("1 322 (mismo artículo): la tarjeta del 394 lleva sólo la marca LK", /\bLK\b/.test(cards[0]) && !/LOEKE/.test(cards[0]) && !/Espátula/.test(cards[0]) && !/Art\./.test(cards[0]));
-    chequeo("1 322 (mismo artículo): la tarjeta del 842 lleva sólo la marca CH", /\bCH\b/.test(cards[1]) && !/CHEF/.test(cards[1]) && !/Espátula/.test(cards[1]) && !/Art\./.test(cards[1]));
-    chequeo("1 las 2 tarjetas se distinguen", cards[0] !== cards[1]);
-    await p.click("#piezaGrid .mz >> nth=0");
-    await p.waitForSelector("#piezaGrid .pieza-cambiar");
-    const linea = await p.textContent("#piezaGrid .pieza-cambiar");
-    chequeo("2 la línea colapsada dice sólo la marca", /Fabricás 394/.test(linea) && /\(LK\)/.test(linea) && !/Espátula/.test(linea));
-
-    // 389: nombres distintos → nombre y marca
-    await p.fill("#textInput", "389");
-    await p.waitForSelector("#piezaGrid .mz >> nth=2");
-    const c389 = await p.locator("#piezaGrid .mz").allInnerTexts();
-    chequeo("3 389 (nombres distintos): el 207 lleva nombre y marca", c389.length === 3 && /Art\. 207 · Ñoquera Madera Mgo Redondo/.test(c389[0]) && /\bLK\b/.test(c389[0]));
-    chequeo("3 389: el 229 lleva nombre y marca LK", /Art\. 229 · Ñoquera Madera/.test(c389[1]) && /\bLK\b/.test(c389[1]));
-    chequeo("3 389: el 909 lleva nombre y marca CH", /Art\. 909 · Ñoquera Madera/.test(c389[2]) && /\bCH\b/.test(c389[2]));
-    await p.click("#piezaGrid .mz >> nth=2");
-    await p.waitForSelector("#piezaGrid .pieza-cambiar");
-    chequeo("3 389: la línea colapsada dice artículo, nombre y marca", /Art\. 909 · Ñoquera Madera \(CH\)/.test(await p.textContent("#piezaGrid .pieza-cambiar")));
-
-    await p.fill("#textInput", "321");
-    await pausa(300);
-    const card321 = await p.locator('#matrizGrid .mz[data-n="321"]').innerText();
-    chequeo("4 matriz de envasado con una pieza: la card muestra nombre y marca", /Art\. 321 · Espátula Calada Nylon/.test(card321) && /\bLK\b/.test(card321));
-    chequeo("4 y no hay selector de pieza", await p.locator("#piezaPicker").evaluate((el) => el.classList.contains("hidden")));
-
-    await p.fill("#textInput", "10");
-    await pausa(300);
-    const lineasArt10 = await p.locator('#matrizGrid .mz[data-n="10"] .mz-a, #matrizGrid .mz[data-n="10"] .mz-m').count();
-    chequeo("4 una matriz que no es de envasado no muestra artículo", lineasArt10 === 0);
-    await ctx.close(); }
-
-  { const { ctx, p } = await abrirGP2("falla");
-    await p.fill("#textInput", "322");
-    await p.waitForSelector("#piezaGrid .mz");
-    const cards = await p.locator("#piezaGrid .mz").allInnerTexts();
-    // sin la RPC queda lo de la v1.245.2: «Art. 394» con el código que trae el bundle, sin nombre ni marca
-    chequeo("5 con la RPC caída el selector sigue andando, con el código del bundle y sin nombre ni marca", cards.length === 2 && /Art\. 394/.test(cards[0]) && /Art\. 842/.test(cards[1]) && cards.every((t) => !/Espátula/.test(t) && !/LOEKE|CHEF/.test(t)));
-    await ctx.close(); }
 
   // ======================= Cervantes =======================
   async function abrirCervantes(rpcArticulos) {

@@ -25,11 +25,11 @@ const AUSENTES = [
   "virgilio/vendor/jspdf.umd.min.js", "virgilio/vendor/jspdf.plugin.autotable.min.js", "virgilio/vendor/chart.umd.min.js",
   "virgilio/vendor/leaflet.min.js", "virgilio/vendor/leaflet.min.css", "virgilio/vendor/xlsx.full.min.js",
   "virgilio/vendor/html2canvas.min.js", "virgilio/vendor/images",
-  "gp2/Produccion/RegistroApp/Registro_GP2.html",
+  "gp2",   // la copia vieja de la tablet de GP2 se borró el 08/10/2026 [Elías: «2 si»]
 ];
 const PRESENTES = [
   "virgilio/index.html", "virgilio/recepcion.js", "virgilio/planimetria.js", "virgilio/supabase-config.js", "virgilio/sw.js",
-  "virgilio/vendor/supabase.umd.js", "supabase.js", "cervantes/index.html", "gp2/Produccion/RegistroApp/Operarios_GP2.html",
+  "virgilio/vendor/supabase.umd.js", "supabase.js", "cervantes/index.html",
 ];
 const BOTONES = ["EP", "AP", "RT", "MG", "CC", "CR", "RR", "INS", "CP", "RC", "IR", "RKBM", "MOV", "PPP", "AT", "PB", "Limp", "Perm", "PC", "CT"];
 // Entradas de supervisor que NO pueden existir como función de la página.
