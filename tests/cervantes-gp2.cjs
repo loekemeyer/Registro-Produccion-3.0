@@ -205,7 +205,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.4" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.5" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -259,6 +259,14 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   // ============ 6b) pieza con etiqueta (como GP2 desde el 07/10) ============
   await ponerLegajo(p, "19");
   await p.click('.box[data-code="E"]');
+  // v3.1.5 [Elías, 08/10: «que si no escribo nada no aparezca nada; después de la 1.ª letra aparezcan cosas»]
+  chequeo("6b sin nada escrito la lista de matrices está vacía y sin rótulo", (await p.locator("#matrizGrid .mz").count()) === 0 && !(await p.isVisible("#matrizPicker .mp-label")));
+  await p.type("#textInput", "3");
+  await p.waitForSelector("#matrizGrid .mz");
+  chequeo("6b con la 1.ª letra o número aparecen las que coinciden", (await p.locator('#matrizGrid .mz[data-n="322"]').count()) === 1 && (await p.isVisible("#matrizPicker .mp-label")));
+  await p.fill("#textInput", "");
+  await p.dispatchEvent("#textInput", "input");
+  chequeo("6b al borrar lo escrito la lista vuelve a quedar vacía", (await p.locator("#matrizGrid .mz").count()) === 0);
   await p.fill("#textInput", "322");
   await p.waitForSelector("#piezaGrid .mz");
   const tarjetas = (await p.locator("#piezaGrid .mz").allInnerTexts()).map((t) => t.trim());

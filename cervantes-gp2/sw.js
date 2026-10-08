@@ -1,7 +1,7 @@
 // Registro Producción 3.0 · Cervantes (botonera de GP2) — service worker.
 // Patrón de Virgilio/Cervantes: NO cachea estáticos (el navegador siempre trae HTML/JS frescos) y no envía nada en segundo plano:
 // los toques se mandan desde la página con el pase firmado (reg_prod_3_0_registrar_evento), que no se puede usar desde acá.
-const SW_VERSION = "v3.1.4";
+const SW_VERSION = "v3.1.5";
 
 self.addEventListener("install", () => { self.skipWaiting(); });
 
