@@ -80,6 +80,27 @@ select grupo, tipo, objeto from dep order by grupo, tipo, objeto;   -- sin la ú
   el 07/10.** Sigue abierta una decisión: qué es «la armada» de Virgilio (hoy lo armado sale de triggers y vistas de Gestión Virgilio
   sobre la cruda).
 
+## Cervantes · la botonera de Registro Producción 2.0 (v3.1.9, 08/10/2026)
+
+[Elías, 08/10: «2.0», «todo lo del 10 debería ser como Reg Prod», «la 501 pone los kilos», «sacá el editar de momento», «que no se
+pueda eliminar el fin de jornada»]. Sobre la botonera de GP2 (que sigue para la E: picker, piezas por etiqueta, rollos) se trajo el
+comportamiento de 2.0 (`cervantes/app.js`):
+
+- **Qué botón ve cada uno**: `capsDe()` + `botonVisible()` de 2.0 con los permisos de `public."Empleados"` que trae el catálogo. Nunca un
+  legajo fijo: lo que era «de Eduardo» (CT, «¿quedó resto?») es del alimentador. Matricería ve sólo TRM/TL/CM/REM; piedra MOV P; `ve_mm` MM.
+- **Tiempos muertos**: con uno abierto sólo se puede tocar ése (los demás grises, como 2.0; antes se podía quedar trabado). PM es tiempo
+  muerto (abre con aviso «Paro Matriz»); CM abre con «matriz nueva + balancín» (`reg_prod_3_0_asignar_matriz_balancin`, con pase) y se
+  cierra con el 2.º toque; PCM al cerrarse pregunta si la matriz se rompió; TRM/TL/REM/MM/RD como 2.0.
+- **RM**: cantidad obligatoria → cierra el cajón → marca la rotura (WhatsApp) → Cambiar Matriz (si tiene permiso); en una matriz de
+  alimentador (tipo A) pregunta «Continuar / Cambiar Matriz», igual que al cerrar un cajón ahí. Si se recarga a mitad, se retoma.
+- **501 en kilos** (cualquier matriz con `tiempo_unidad` = kg): coma o punto, se guarda con coma; la base calcula el premio en kilos y
+  pasa los kilos a unidades de la pieza para el stock (kilos / `kg_x_uni`).
+- **Premio** (fase 2a): se descuentan los tiempos muertos que caen adentro del cajón (`reg_prod_3_0_recalcular_cajones`).
+- **Llegada tarde** con la hora de entrada de cada uno (Planify, si no Empleados, si no GP2; si no hay, 08:30) y en el historial.
+- **WhatsApp** como 2.0 (Matriz sin Tiempo / Paro Matriz / Rompio Matriz), **nunca con el legajo 0** (pruebas).
+- Legajo o matriz que no están: se vuelve a pedir el catálogo y se mira de nuevo. Sin «editar». El fin de jornada no se borra.
+- SQL: `sql/reg_prod_3_0_fase_2a_premio_con_tm.sql`, `sql/reg_prod_3_0_fase_2b_botonera.sql`. Prueba: `tests/cervantes-gp2.cjs` §10.
+
 ## Cervantes · botonera de GP2 (`cervantes-gp2/`, v3.1.6, 08/10/2026)
 
 Es la tablet de GP2 (`Produccion/RegistroApp/operarios_gp2.js` + `Operarios_GP2.html` de `loekemeyer/Gestion-Productiva-2.0`) portada al

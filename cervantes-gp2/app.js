@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.7)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.9)
    ESTE ARCHIVO ES LA FUENTE de la botonera de Cervantes desde el 08/10/2026 [Elías: «se va a dejar de modificar en GP2 y
    modificar en este, y GP2 sólo hacer copia y hacer modificaciones para testear»]: los cambios se hacen ACÁ, a mano.
    Nació de la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de loekemeyer/Gestion-Productiva-2.0, commit e110890,
@@ -16,14 +16,18 @@
        pase e internet. El catálogo (empleados, matrices, envasado, rollos) se guarda en el celular para poder abrir sin señal;
      · STOCK Y ROLLOS (Fase 1c): los mueve la base, en la misma transacción que el toque (reg_prod_3_0_registrar_evento →
        GP2.fabricar_stock) y con reg_prod_3_0_rollo_tomar / _rollo_cerrar, siempre con el pase. Mientras la base no lo tenga, el
-       catálogo no trae `rollos_activos` y el selector de rollo, «¿quedó resto?» y el botón CT de Eduardo quedan apagados.
+       catálogo no trae `rollos_activos` y el selector de rollo, «¿quedó resto?» y el botón CT del alimentador quedan apagados.
      · ANULAR (el 🗑 del historial) devuelve el stock que había movido ese toque (Fase 1d, lo hace la base). Los rollos llevan un
        id anti-duplicado: un reintento no descuenta otro rollo ni cierra el siguiente (como los toques, que ya lo tenían).
-   Eduardo Barrionuevo (legajo "19"): CT button + rollo en E/PR (sólo con rollos_activos).
+   QUÉ BOTONES VE CADA UNO, como Registro Producción 2.0 (v3.1.9, Elías 08/10: «pensé que ya se había integrado completo, y no sólo
+   para Eduardo»): capsDe() + botonVisible() con los permisos de public."Empleados" que trae el catálogo (es_matriceria, es_piedra,
+   es_alimentador, ve_cm, ve_trm, ve_tl, ve_rem, ve_mm). Nunca un legajo fijo: lo que antes era «de Eduardo» (CT y «¿quedó resto?»
+   del rollo) es del ALIMENTADOR. Y los botones se portan igual que en 2.0: CM (matriz nueva + balancín, tiempo muerto), PM tiempo
+   muerto, RM con su recorrido (cierra el cajón, marca la rotura, abre Cambiar Matriz), PCM (al cerrar pregunta si se rompió),
+   TRM/TL/REM de matricería, MM, RD; con un tiempo muerto abierto sólo se puede tocar ése (los demás quedan grises).
    ============================================================ */
 
-const APP_VERSION = "v3.1.8";
-const LEGAJO_EDUARDO = "19";
+const APP_VERSION = "v3.1.9";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -338,7 +342,7 @@ function armarBundle(d) {
   x.matricesMap = new Map((x.matrices || []).map(m => [String(m.n || "").trim(), m]));
   return x;
 }
-function repintarCatalogo() { if (selected && ["E", "CM"].includes(selected.code)) renderMatrizPicker(); }
+function repintarCatalogo() { if (selected && selected.code === "E") renderMatrizPicker(); }
 
 async function cargarBundle() {
   clearTimeout(_bundleTimer);
@@ -404,9 +408,11 @@ function apcEnvase(n, compSalidaId) {
    OPCIONES (botones)
    ============================================================ */
 const OPTIONS = [
-  // row 1
+  // row 1 (los botones de matricería también van arriba, como 2.0)
   { code: "E",  desc: "Empece Matriz",     row: 1, needsInput: true,  label: "Ingresa el número", validate: /^[0-9]+[A-Za-z]?$/ },
   { code: "C",  desc: "Cajon",             row: 1, needsInput: true,  label: "Ingresa los GOLPES del contador", validate: /^[0-9]+$/ },
+  { code: "TRM", desc: "Trabajando en Matriz", row: 1, needsInput: true, label: "Número de la matriz", validate: /^[0-9]+[A-Za-z]?$/ },
+  { code: "TL",  desc: "Taller",            row: 1, needsInput: false },
   // row 2
   { code: "PB",   desc: "Pare Bano",       row: 2, needsInput: false },
   { code: "BC",   desc: "Busque Cajon",    row: 2, needsInput: false },
@@ -414,22 +420,75 @@ const OPTIONS = [
   { code: "LIMP", desc: "Limpieza",        row: 2, needsInput: false },
   { code: "Perm", desc: "Permiso",         row: 2, needsInput: false },
   // row 3
-  { code: "AL",    desc: "Ayuda Logistica",     row: 3, needsInput: false },
-  { code: "PR",    desc: "Pare Carga Rollo",     row: 3, needsInput: false },
-  { code: "PC",    desc: "Pare Comida",          row: 3, needsInput: false },
-  { code: "MOV P", desc: "Movimiento Piedra",    row: 3, needsInput: false },
+  { code: "AL",    desc: "Ayuda Logistica",       row: 3, needsInput: false },
+  { code: "PR",    desc: "Pare Carga Rollo",      row: 3, needsInput: false },
+  { code: "PC",    desc: "Pare Comida",           row: 3, needsInput: false },
+  { code: "RD",    desc: "Rollo Fleje Doblado",   row: 3, needsInput: false },
+  { code: "MOV P", desc: "Movimiento Piedra",     row: 3, needsInput: false },
+  { code: "MM",    desc: "Movimiento Matriceria", row: 3, needsInput: false },
   // row 4
-  // Sacados 2026-08-29 (uso historico): RD (0 usos), CM (nada desde abril; con E
-  // alcanza para cambiar de matriz), REM (13 usos en la vida).
-  { code: "PM",  desc: "Pare Matriz",      row: 4, needsInput: false },
-  { code: "RM",  desc: "Rotura Matriz",    row: 4, needsInput: false },
+  { code: "CM",  desc: "Cambiar Matriz",       row: 4, needsInput: false },   // abre con el cartel matriz nueva + balancín
+  { code: "PM",  desc: "Pare Matriz",          row: 4, needsInput: false },
+  { code: "RM",  desc: "Rotura Matriz",        row: 4, needsInput: false },
+  { code: "REM", desc: "Reparando Matriz",     row: 4, needsInput: false },
+  { code: "PCM", desc: "Pare Consulta Matriz", row: 4, needsInput: false },
 ];
 
 const CT_OPTION = { code: "CT", desc: "Cajon Termine", row: 1, needsInput: false, isCT: true };
 
-const NON_DOWNTIME = new Set(["E", "C", "CT", "RM", "PM", "RD", "LT"]);
+// Como 2.0: E, C, RM, RD y LT son puntuales; todo lo demás (PM, CM, PCM, TRM, TL, REM, MM, PB…) es TIEMPO MUERTO: el 1.er toque lo
+// abre y el 2.º (el MISMO) lo cierra midiendo la duración. CT es el cajón de cierre del alimentador (puntual).
+const NON_DOWNTIME = new Set(["E", "C", "CT", "RM", "RD", "LT"]);
 const isDowntime = (op) => !NON_DOWNTIME.has(op);
 const sameDowntime = (a, b) => a && b && a.opcion === b.opcion && (a.texto || "") === (b.texto || "");
+
+/* ============================================================
+   QUIÉN VE QUÉ BOTÓN — capsDe() + botonVisible() de Registro Producción 2.0 (cervantes/app.js, v1.8.54), con los permisos de
+   public."Empleados" que trae el catálogo. El orden importa: matricería se pregunta primero (un matricero ve SÓLO sus botones).
+   ============================================================ */
+const NORMAL_BASE = new Set(["E", "C", "PB", "BC", "LIMP", "Perm", "AL", "PC", "PM", "RM", "PCM"]);
+function capsDe(legajo) {
+  const e = (D.empleados || {})[String(legajo || "").trim()] || {};
+  const alimentador = e.es_alimentador === true;
+  return {
+    matriceria: e.es_matriceria === true,
+    piedra: e.es_piedra === true,
+    alimentador,
+    cm: e.ve_cm === true || alimentador,   // el alimentador ya implica CM
+    pr_rd: alimentador,                     // PR + RD = rol alimentador
+    trm: e.ve_trm === true,
+    tl: e.ve_tl === true,
+    rem: e.ve_rem === true,
+    mm: e.ve_mm === true                    // Movimiento Matricería (piedra que también hace matricería)
+  };
+}
+function puedeCM(legajo) { return capsDe(legajo).cm; }
+function botonVisible(code, caps) {
+  if (caps.matriceria) {
+    if (code === "TRM") return caps.trm;
+    if (code === "TL") return caps.tl;
+    if (code === "CM") return caps.cm;
+    if (code === "REM") return caps.rem;
+    return false;                           // matricería no ve los botones normales
+  }
+  if (code === "CT") return caps.alimentador && rollosActivos();   // cierre de cajón con rollo: del alimentador
+  if (code === "MOV") return !caps.piedra;
+  if (code === "MOV P") return caps.piedra;
+  if (code === "MM") return caps.mm;
+  if (code === "CM") return caps.cm;
+  if (code === "PR" || code === "RD") return caps.pr_rd;
+  if (code === "TRM" || code === "TL" || code === "REM") return false;
+  return NORMAL_BASE.has(code);
+}
+// Matriz de alimentador (GP2.matriz.tipo = 'A', el Tipo_Matriz de 2.0): al cerrar un cajón pregunta «Continuar / Cambiar Matriz».
+function esMatrizAlimentador(n) { return String(D.matricesMap?.get(String(n || "").trim())?.tipo || "").trim().toUpperCase() === "A"; }
+// 501: el operario no carga golpes sino los KILOS que hizo, con coma o punto; se guarda con coma (como 2.0) y viaja como uni.
+function es501(n) {
+  const k = String(n || "").trim();
+  return k === "501" || String(D.matricesMap?.get(k)?.tu || "").trim().toLowerCase() === "kg";
+}
+function normalizarComa(v) { return String(v || "").trim().replace(/\./g, ","); }
+function kilos501(v) { return Number(String(v || "").trim().replace(",", ".")) || 0; }
 
 /* ============================================================
    TIEMPO / ZONA AR
@@ -535,8 +594,8 @@ function updateStateAfterSend(legajo, payload) {
     s.last2.push({ ...payload, status: "queued" });
     writeState(legajo, s); return;
   }
-  if (["RM", "PM", "RD"].includes(op)) {
-    s.lastDowntime = null;
+  if (["RM", "RD", "LT"].includes(op)) {        // puntuales (PM es tiempo muerto desde la v3.1.9, como 2.0)
+    if (op !== "LT") s.lastDowntime = null;
     s.last2.push({ ...payload, status: "queued" });
     writeState(legajo, s); return;
   }
@@ -602,7 +661,8 @@ function horaAR(iso) {
 function toRpcPayload(p) {
   const op = String(p.opcion || "").toUpperCase();
   let matriz;
-  if (["E", "CM"].includes(op)) matriz = p.texto || "";
+  if (op === "E") matriz = p.texto || "";
+  else if (op === "CM" || op === "TRM") matriz = op;     // como 2.0: la matriz que se cambia / se repara va en el texto
   else if (p.matriz) matriz = p.matriz;
   else matriz = op;
 
@@ -616,9 +676,13 @@ function toRpcPayload(p) {
   if (p.hs_inicio) rpc.hora_inicio = horaAR(p.hs_inicio);
   if (p.comp_salida_id) rpc.comp_salida_id = p.comp_salida_id;
 
+  if (p.balancin) rpc.balancin = p.balancin;            // CM: en qué balancín quedó la matriz (va a la cruda)
   if (["C", "CT"].includes(op)) {
     const env = envasadoDe(matriz);
-    if (env) {
+    if (es501(matriz)) {
+      // 501: KILOS (con coma, como 2.0). La base calcula el premio en kilos y pasa los kilos a unidades para el stock.
+      rpc.uni = kilos501(p.texto);
+    } else if (env) {
       // ENVASADO: el operario carga CAJAS; unidades = cajas x articulos_por_caja. Se manda uni
       // directo (no golpes) para que fabricar_stock descuente el BOM de esas unidades.
       const apc = apcEnvase(matriz, p.comp_salida_id) || 1;
@@ -632,7 +696,10 @@ function toRpcPayload(p) {
     rpc.nombre_matriz = nombreMatriz(matriz) || undefined;
   } else {
     rpc.uni = 0;
-    rpc.nombre_matriz = ["E", "CM"].includes(op) ? (nombreMatriz(matriz) || undefined) : p.descripcion;
+    rpc.nombre_matriz = op === "E" ? (nombreMatriz(matriz) || undefined)
+      : op === "CM" ? `Cambiar Matriz a ${p.texto || ""}`.trim()
+      : op === "TRM" ? `Trabajando en Matriz ${p.texto || ""}`.trim()
+      : p.descripcion;
   }
 
   const segs = (p.hs_inicio && p.ts_event)
@@ -666,7 +733,7 @@ async function flushQueue() {
   flushing = true;
   try {
     const q = readQueue();
-    if (!q.length && !readRolloQueue().length && !readAnularQueue().length) return;
+    if (!q.length && !readRolloQueue().length && !readAnularQueue().length && !readBalancinQueue().length) return;
     if (!paseVigente()) { verificarEntrada(); return; }       // sin pase no se manda: queda en la cola y se pide el código
     const enviados = new Set();
     for (const payload of q) {
@@ -696,31 +763,49 @@ async function flushQueue() {
       if (error && !esRechazoDefinitivo(error)) break;
       rq = readRolloQueue(); rq.shift(); writeRolloQueue(rq);
     }
+    // Balancines (CM: en qué balancín quedó la matriz), FIFO igual que los rollos.
+    let bq = readBalancinQueue();
+    while (bq.length && paseVigente()) {
+      const { error } = await rpc("reg_prod_3_0_asignar_matriz_balancin", bq[0]);
+      if (error && error.code === "28000") { pasePerdido(); break; }
+      if (error && !esRechazoDefinitivo(error)) break;
+      bq = readBalancinQueue(); bq.shift(); writeBalancinQueue(bq);
+    }
   } finally { flushing = false; }
 }
 
 /* ============================================================
    LLEGADA TARDE
    ============================================================ */
+// La hora de entrada DE CADA OPERARIO (catálogo: Planify, si no Empleados, si no GP2) [Elías, 08/10: «tiene que ser la llegada tarde
+// del operario de verdad»]. Sin hora en ningún lado, 08:30 como antes.
+function horaEntradaDe(legajo) {
+  const h = String(((D.empleados || {})[String(legajo || "").trim()] || {}).hora_entrada || "").trim();
+  const m = h.match(/^(\d{1,2}):(\d{2})/);
+  if (!m) return { min: 8 * 60 + 30, hhmm: "08:30" };
+  return { min: Number(m[1]) * 60 + Number(m[2]), hhmm: m[1].padStart(2, "0") + ":" + m[2] };
+}
 function maybeSendLateArrival(legajo) {
   const s = readState(legajo);
   const isFirst = !s.last2.length && !s.lastMatrix && !s.lastCajon && !s.lastDowntime;
   if (!isFirst || s.lateArrivalSent || s.lateArrivalDiscarded) return;
 
-  if (nowMinutesAR() <= 8 * 60 + 30) {
+  const entrada = horaEntradaDe(legajo);
+  if (nowMinutesAR() <= entrada.min) {
     s.lateArrivalDiscarded = true; writeState(legajo, s); return;
   }
   const day = dayKeyAR();
   const payload = {
     id: uuidv4(), legajo, opcion: "LT", descripcion: "Llegada Tarde",
-    texto: "", ts_event: isoNow(), hs_inicio: `${day}T08:30:00-03:00`, matriz: ""
+    texto: "", ts_event: isoNow(), hs_inicio: `${day}T${entrada.hhmm}:00-03:00`, matriz: ""
   };
   s.lateArrivalSent = true; writeState(legajo, s);
+  updateStateAfterSend(legajo, payload);   // queda en el historial (como 2.0)
   enqueue(payload);
 }
 
 /* ============================================================
-   ROLLOS (Eduardo)
+   ROLLOS (todos eligen en E; el alimentador cierra con CT o PR)
    ============================================================ */
 /* El fleje NO depende solo de la matriz: hay matrices que cortan de dos flejes distintos
    segun la pieza. La 28 saca A15 del Fleje N° 94 (inox) y J2/J5 del Fleje N° 13; la 37
@@ -806,7 +891,7 @@ let selected = null;
 function esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
 function legajoKey() { return String($("legajoInput").value || "").trim(); }
-function isEduardo()  { return legajoKey() === LEGAJO_EDUARDO; }
+function esAlimentadorLeg() { return capsDe(legajoKey()).alimentador; }   // lo que antes era «de Eduardo» (legajo fijo)
 
 function computeHsInicio(state) {
   if (state.lastCajon?.ts) return state.lastCajon.ts;
@@ -840,7 +925,7 @@ function renderSummary() {
           <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
             <span style="font-weight:900;font-size:34px;">${it.opcion}${it.texto ? `: ${it.texto}` : ""}</span>
             ${badge(it.status)}
-            <span class="hist-btn hist-del" data-idx="${idx}" title="Eliminar">🗑</span>
+            ${String(it.opcion || "").toUpperCase() === "FJ" ? "" : `<span class="hist-btn hist-del" data-idx="${idx}" title="Eliminar">🗑</span>`}
           </div>
           ${it.ts_event ? `<div style="color:#555;">${formatDateTimeAR(it.ts_event)}</div>` : ""}
           ${it.lastError ? `<div style="color:#9b1c1c;font-size:12px;">${esc(it.lastError)}</div>` : ""}
@@ -868,7 +953,7 @@ function renderSyncBadge() {
 
 function renderMatrizInfo() {
   const el = $("matrizInfo");
-  if (!selected || !["C", "CT", "RM", "PM", "RD", "CM"].includes(selected.code)) {
+  if (!selected || !["C", "CT", "RM", "PM", "RD", "PCM"].includes(selected.code)) {
     el.classList.add("hidden"); return;
   }
   const s = readState(legajoKey());
@@ -976,7 +1061,7 @@ function etiquetaDeSalida(n, compId) {
 function renderPiezaPicker(n) {
   const wrap = $("piezaPicker"), grid = $("piezaGrid");
   if (!wrap || !grid) return;
-  const salidas = (selected && ["E", "CM"].includes(selected.code)) ? salidasDeMatriz(n) : [];
+  const salidas = (selected && selected.code === "E") ? salidasDeMatriz(n) : [];
   if (salidas.length < 2) {
     piezaSel = null; wrap.classList.add("hidden"); grid.innerHTML = "";
     $("btnEnviar").disabled = false;
@@ -1040,22 +1125,51 @@ function renderPiezaPicker(n) {
    RENDERIZAR BOTONES
    ============================================================ */
 function renderOptions() {
-  const isEd = isEduardo();
+  const leg = legajoKey();
+  const st = leg ? readState(leg) : null;
+  const pendiente = st?.lastDowntime || null;
+  const caps = capsDe(leg);
   [1, 2, 3, 4].forEach(r => { $(`row${r}`).innerHTML = ""; });
 
-  const all = (isEd && rollosActivos()) ? [...OPTIONS, CT_OPTION] : OPTIONS;
-  all.forEach(opt => {
+  [...OPTIONS, CT_OPTION].forEach(opt => {
+    if (!botonVisible(opt.code, caps)) return;            // cada uno ve los de SU rol (como 2.0)
     const el = document.createElement("div");
     el.className = "box" + (opt.isCT ? " ct-btn" : "");
     el.dataset.code = opt.code;
     el.innerHTML = `<div style="font-size:18px;font-weight:900;">${opt.code}</div><div style="font-size:11px;font-weight:600;color:inherit;margin-top:3px;">${opt.desc}</div>`;
-    el.addEventListener("click", () => selectOption(opt));
+    // Como 2.0: con un tiempo muerto abierto sólo se puede tocar ÉSE (los demás quedan grises: así nadie queda trabado);
+    // E gris mientras falte el cajón de la matriz en curso; C / CT grises sin matriz.
+    const permitido = (!pendiente || opt.code === pendiente.opcion)
+      && (opt.code !== "E" || !st?.matrixNeedsC)
+      && (!["C", "CT"].includes(opt.code) || !!st?.lastMatrix);
+    if (!permitido) {
+      el.classList.add("bloq");
+      el.setAttribute("aria-disabled", "true");
+    } else {
+      el.addEventListener("click", () => {
+        const s2 = readState(legajoKey());
+        // CM: el 1.er toque abre el cartel «matriz nueva + balancín»; el 2.º (con el CM abierto) lo cierra por el camino normal.
+        if (opt.code === "CM" && !(s2.lastDowntime && s2.lastDowntime.opcion === "CM")) { abrirCambiarMatriz(); return; }
+        selectOption(opt);
+      });
+    }
     $(`row${opt.row}`).appendChild(el);
   });
+
+  const av = $("avisoBotones");
+  if (av) {
+    av.textContent = pendiente
+      ? `Hay un tiempo muerto abierto (${pendiente.opcion}): tocalo para cerrarlo.`
+      : (st?.matrixNeedsC ? "Para iniciar una nueva matriz (E), primero terminá la cantidad de la matriz en curso (C)." : "");
+  }
+  mostrarBotones(true);
 }
 
 function mostrarBotones(mostrar) {
-  [1, 2, 3, 4].forEach(r => $(`row${r}`).classList.toggle("hidden", !mostrar));
+  // Las filas sin botones (por el rol) no se muestran: sin huecos.
+  [1, 2, 3, 4].forEach(r => { const row = $(`row${r}`); row.classList.toggle("hidden", !mostrar || !row.childElementCount); });
+  const av = $("avisoBotones");
+  if (av) av.classList.toggle("hidden", !mostrar || !av.textContent);
 }
 
 function selectOption(opt) {
@@ -1069,22 +1183,28 @@ function selectOption(opt) {
   $("selectedDesc").innerText = opt.desc;
   $("selectedArea").classList.remove("hidden");
 
+  const st = readState(legajoKey());
+  // CM / TRM: el 2.º toque cierra el tiempo muerto con el MISMO texto (la matriz) y no pide nada (como 2.0).
+  const cerrando = ["CM", "TRM"].includes(opt.code) && st.lastDowntime?.opcion === opt.code;
+  const c501 = opt.code === "C" && es501(st.lastMatrix?.texto);
+
   const inputArea = $("inputArea");
   const textInput = $("textInput");
-  if (opt.needsInput) {
-    $("inputLabel").innerText = opt.label || "Ingresa valor";
+  textInput.inputMode = c501 ? "decimal" : "numeric";
+  if (opt.needsInput && !cerrando) {
+    $("inputLabel").innerText = c501 ? "Ingresá los KILOS que hiciste" : (opt.label || "Ingresa valor");
     textInput.value = "";
     inputArea.classList.remove("hidden");
     setTimeout(() => textInput.focus(), 50);
   } else {
     inputArea.classList.add("hidden");
-    textInput.value = "";
+    textInput.value = cerrando ? (st.lastDowntime.texto || "") : "";
   }
 
-  // Listado de matrices para E / CM
+  // Listado de matrices para E
   const matrizPicker = $("matrizPicker");
   piezaSel = null;
-  if (["E", "CM"].includes(opt.code)) {
+  if (opt.code === "E") {
     matrizPicker.classList.remove("hidden");
     renderMatrizPicker("");
     renderPiezaPicker("");
@@ -1107,24 +1227,22 @@ function selectOption(opt) {
     actualizarRolloPicker("");
   } else {
     rolloPicker.classList.add("hidden");
-    textInput.oninput = opt.code === "CM"
-      ? () => {
-          renderMatrizPicker();
-          renderPiezaPicker(textInput.value.trim());
-        }
-      : null;
+    textInput.oninput = null;
   }
 
-  // Cajon: se anotan GOLPES (o CAJAS si la matriz es de envasado) y se muestra en vivo cuantas
-  // unidades salen.
+  // Cajon: se anotan GOLPES (o CAJAS si la matriz es de envasado, o KILOS en la 501) y se muestra en vivo cuantas unidades salen.
   const gh = $("golpeHint");
   if (gh) {
-    const nMatC = opt.code === "C" ? String(readState(legajoKey()).lastMatrix?.texto || "").trim() : "";
+    const nMatC = opt.code === "C" ? String(st.lastMatrix?.texto || "").trim() : "";
     const envC = opt.code === "C" ? envasadoDe(nMatC) : null;
-    if (opt.code === "C" && envC) {
+    if (c501) {
+      gh.className = "golpe-hint";
+      gh.innerText = `Matriz ${nMatC}: se cargan los KILOS hechos, con coma o punto (ej: 5,6).`;
+      gh.classList.remove("hidden");
+    } else if (opt.code === "C" && envC) {
       // Matriz de envasado: el operario carga CAJAS.
       $("inputLabel").innerText = "¿Cuántas CAJAS armaste?";
-      const apc = apcEnvase(nMatC, readState(legajoKey()).lastMatrix?.comp_salida_id) || 1;
+      const apc = apcEnvase(nMatC, st.lastMatrix?.comp_salida_id) || 1;
       const pintarC = () => {
         const c = Number(textInput.value.trim()) || 0;
         gh.className = "golpe-hint";
@@ -1154,9 +1272,9 @@ function selectOption(opt) {
     }
   }
 
-  // Eduardo: quedoResto para PR
+  // Alimentador: «¿quedó resto?» en PR (antes era sólo el legajo 19)
   const quedoRestoWrap = $("quedoRestoWrap");
-  if (rollosActivos() && isEduardo() && opt.code === "PR") {
+  if (rollosActivos() && esAlimentadorLeg() && opt.code === "PR") {
     quedoRestoWrap.classList.remove("hidden");
     $("quedoRestoChk").checked = false;
   } else {
@@ -1209,7 +1327,8 @@ function actualizarRolloPicker(n_matriz) {
 
 function resetSelection() {
   const s = readState(legajoKey());
-  if (s?.lastDowntime && selected) return; // downtime abierto: hay que enviar el mismo, no se sale
+  // Elegido el tiempo muerto que está abierto: hay que enviarlo para cerrarlo (como 2.0). Cualquier otra cosa se puede soltar.
+  if (s?.lastDowntime && selected && selected.code === s.lastDowntime.opcion) return;
   selected = null;
   mostrarBotones(true);
   $("selectedArea").classList.add("hidden");
@@ -1224,6 +1343,339 @@ function resetSelection() {
   document.querySelectorAll(".box.selected").forEach(x => x.classList.remove("selected"));
 }
 
+// Después de enviar (o de un cartel de 2.0): vuelve a la pantalla del legajo, como siempre.
+function volverAInicio() {
+  selected = null;
+  $("selectedArea").classList.add("hidden");
+  $("optionsScreen").classList.add("hidden");
+  $("legajoScreen").classList.remove("hidden");
+  $("matrizInfo").classList.add("hidden");
+  $("error").innerText = "";
+  $("btnEnviar").disabled = false;
+  $("btnEnviar").innerText = "Enviar";
+  document.querySelectorAll(".box.selected").forEach(x => x.classList.remove("selected"));
+  renderSummary();
+}
+async function despacharCola() {
+  try { await flushQueue(); } catch { /* queda en la cola */ }
+  renderSyncBadge(); renderSummary();
+}
+
+/* ============================================================
+   CATÁLOGO AL DÍA CUANDO FALTA ALGO [Elías, 08/10: «si no encuentra el legajo o la matriz, que actualice»]
+   Además del refresco cada 30 min: si el legajo o la matriz no están, se vuelve a pedir el catálogo UNA vez (como mucho cada
+   20 s) y se mira de nuevo. Sin pase o sin señal no hay a quién preguntar: se queda con lo guardado.
+   ============================================================ */
+let _refrescoPorFaltaAt = 0;
+async function refrescarCatalogoSiFalta() {
+  if (!paseVigente() || navigator.onLine === false) return false;
+  if (Date.now() - _refrescoPorFaltaAt < 20000) return false;
+  _refrescoPorFaltaAt = Date.now();
+  const antes = _catalogoAt;
+  try { await cargarBundle(); } catch { /* sin catálogo nuevo */ }
+  return _catalogoAt !== antes;
+}
+async function matrizConocida(n) {
+  if (D.matricesMap?.has(n)) return true;
+  if (await refrescarCatalogoSiFalta()) return !!D.matricesMap?.has(n);
+  return false;
+}
+
+/* ============================================================
+   AVISOS POR WHATSAPP, como 2.0 (Edge Function send-whatsapp): «Matriz sin Tiempo» al empezar una matriz sin tiempo
+   histórico, «Paro Matriz» al abrir un PM y «Rompio Matriz» en la rotura. El legajo 0 (pruebas) no avisa a nadie
+   [Elías, 08/10: «con la exclusión de no mandar si se está usando el legajo 0 (testeo)»].
+   ============================================================ */
+const EDGE_WA = SUPABASE_URL + "/functions/v1/send-whatsapp";
+function avisarWA(legajo, problema, matriz) {
+  const leg = String(legajo || "").trim();
+  if (!leg || leg === "0") return;
+  let plantilla = "problemas_en_matriz_reducido";
+  try { plantilla = localStorage.getItem("wa_plantilla_activa") || plantilla; } catch { /* sin storage */ }
+  const emp = (D.empleados || {})[leg];
+  const operario = (emp && emp.nombre) || ("Legajo " + leg);
+  const hora = new Date().toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" });
+  const desc = nombreMatriz(matriz) || "";
+  const parametros = plantilla === "problema_en_matriz_completo"
+    ? [problema, String(matriz || "?"), desc, operario, hora]
+    : [problema, String(matriz || "?"), desc, hora];
+  fetch(EDGE_WA, {
+    method: "POST",
+    headers: { "Authorization": "Bearer " + SUPABASE_KEY, "apikey": SUPABASE_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ parametros, plantilla, idioma: "es_AR" })
+  }).catch((e) => console.warn("Aviso WhatsApp:", e));
+}
+function avisarSiMatrizSinTiempo(legajo, n) {
+  const m = D.matricesMap?.get(String(n || "").trim());
+  if (m && "th" in m && !(Number(m.th) > 0)) avisarWA(legajo, "Matriz sin Tiempo", n);
+}
+
+/* ============================================================
+   CARTELES DE 2.0 (elegir, cantidad del cajón, matriz nueva + balancín)
+   ============================================================ */
+function elegirOpcion(pregunta, opciones, sinCancelar) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "rp-modal";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:350;display:flex;align-items:center;justify-content:center;padding:16px;";
+    const modal = document.createElement("div");
+    modal.style.cssText = "background:#fff;border-radius:16px;padding:24px 20px;max-width:440px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3);";
+    const t = document.createElement("p");
+    t.style.cssText = "font-size:24px;font-weight:800;margin:0 0 18px;line-height:1.25;";
+    t.textContent = pregunta;
+    modal.appendChild(t);
+    opciones.forEach((op) => {
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "rp-op"; btn.dataset.val = op.val; btn.textContent = op.label;
+      btn.style.cssText = "display:block;width:100%;padding:20px;margin-bottom:12px;border:1px solid #c9d1d9;border-radius:14px;font-size:22px;font-weight:800;background:#f8f9fa;";
+      btn.onclick = () => { overlay.remove(); resolve(op); };
+      modal.appendChild(btn);
+    });
+    if (!sinCancelar) {
+      const no = document.createElement("button");
+      no.type = "button"; no.className = "rp-cancelar"; no.textContent = "Cancelar";
+      no.style.cssText = "display:block;width:100%;padding:12px;border:none;background:transparent;color:#64748b;font-size:17px;";
+      no.onclick = () => { overlay.remove(); resolve(null); };
+      modal.appendChild(no);
+    }
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+  });
+}
+
+// Cantidad para cerrar el cajón en la rotura: OBLIGATORIA (sin cancelar), en la unidad de esa matriz (golpes, cajas o kilos).
+function pedirCantidadCajon(matriz) {
+  const kilos = es501(matriz);
+  const env = !kilos && envasadoDe(matriz);
+  const titulo = kilos ? "KILOS hechos para cerrar el cajón"
+    : env ? "CAJAS armadas para cerrar el cajón"
+    : (pideGolpes() ? "GOLPES del contador para cerrar el cajón" : "Unidades hechas para cerrar el cajón");
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.id = "cantidadCajonModal";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:350;display:flex;align-items:center;justify-content:center;padding:16px;";
+    const modal = document.createElement("div");
+    modal.style.cssText = "background:#fff;border-radius:16px;padding:24px 20px;max-width:440px;width:100%;text-align:center;";
+    const t = document.createElement("p");
+    t.style.cssText = "font-size:24px;font-weight:800;margin:0 0 16px;line-height:1.25;";
+    t.textContent = titulo;
+    const inp = document.createElement("input");
+    inp.id = "cantidadCajonInput";
+    inp.type = "text"; inp.inputMode = kilos ? "decimal" : "numeric";
+    inp.placeholder = kilos ? "Ej: 5,6" : "Ej: 1500";
+    inp.style.cssText = "width:100%;box-sizing:border-box;padding:16px;font-size:28px;text-align:center;border:2px solid #c9d1d9;border-radius:14px;margin-bottom:8px;";
+    const err = document.createElement("div");
+    err.style.cssText = "color:#dc2626;font-size:16px;min-height:20px;margin-bottom:12px;";
+    const ok = document.createElement("button");
+    ok.id = "cantidadCajonOk"; ok.type = "button"; ok.textContent = "Confirmar y cerrar cajón";
+    ok.style.cssText = "display:block;width:100%;padding:20px;border:1px solid #1aa34a;border-radius:14px;font-size:22px;font-weight:800;background:#eafff1;color:#0b6b2c;";
+    const re = kilos ? /^\d+(?:[.,]\d+)?$/ : /^\d+$/;
+    const confirmar = () => {
+      const v = String(inp.value || "").trim();
+      if (!re.test(v)) { err.textContent = kilos ? "Número válido (coma o punto)" : "Sólo números enteros"; return; }
+      overlay.remove(); resolve(v);
+    };
+    ok.onclick = confirmar;
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmar(); });
+    modal.append(t, inp, err, ok);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    setTimeout(() => { try { inp.focus(); } catch { /* sin foco */ } }, 50);
+  });
+}
+
+// Cambiar Matriz: el número de la matriz nueva Y el balancín donde se coloca (los activos del catálogo). -> {matriz, balancin} | null
+function pedirMatrizYBalancin() {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.id = "cmModal";
+    overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:350;display:flex;align-items:center;justify-content:center;padding:16px;";
+    const modal = document.createElement("div");
+    modal.style.cssText = "background:#fff;border-radius:16px;padding:24px 20px;max-width:440px;width:100%;text-align:center;";
+    const t = document.createElement("p");
+    t.style.cssText = "font-size:24px;font-weight:800;margin:0 0 16px;";
+    t.textContent = "Cambiar Matriz";
+    const lm = document.createElement("div");
+    lm.style.cssText = "font-size:18px;font-weight:700;color:#334155;text-align:left;margin-bottom:6px;";
+    lm.textContent = "Matriz nueva";
+    const inp = document.createElement("input");
+    inp.id = "cmMatriz"; inp.type = "text"; inp.inputMode = "numeric"; inp.placeholder = "Ej: 110";
+    inp.style.cssText = "width:100%;box-sizing:border-box;padding:16px;font-size:26px;text-align:center;border:2px solid #c9d1d9;border-radius:14px;margin-bottom:12px;";
+    const lb = document.createElement("div");
+    lb.style.cssText = lm.style.cssText;
+    lb.textContent = "En qué balancín";
+    const sel = document.createElement("select");
+    sel.id = "cmBalancin";
+    sel.style.cssText = "width:100%;box-sizing:border-box;padding:14px;font-size:20px;border:2px solid #c9d1d9;border-radius:14px;margin-bottom:8px;background:#fff;";
+    const bals = D.balancines || [];
+    const ph = document.createElement("option");
+    ph.value = ""; ph.textContent = bals.length ? "Elegí un balancín…" : "(no hay balancines cargados)";
+    sel.appendChild(ph);
+    bals.forEach((b) => {
+      const o = document.createElement("option");
+      o.value = String(b.num);
+      o.textContent = (String(b.tipo || "") === String(b.num)) ? String(b.num) : ((b.tipo || "Balancín") + " " + b.num);
+      sel.appendChild(o);
+    });
+    const err = document.createElement("div");
+    err.id = "cmError";
+    err.style.cssText = "color:#dc2626;font-size:16px;min-height:20px;margin-bottom:12px;";
+    const ok = document.createElement("button");
+    ok.id = "cmOk"; ok.type = "button"; ok.textContent = "Enviar";
+    ok.style.cssText = "display:block;width:100%;padding:20px;margin-bottom:8px;border:1px solid #1d4ed8;border-radius:14px;font-size:22px;font-weight:800;background:#eff6ff;color:#1e3a8a;";
+    const no = document.createElement("button");
+    no.id = "cmCancelar"; no.type = "button"; no.textContent = "Cancelar";
+    no.style.cssText = "display:block;width:100%;padding:12px;border:none;background:transparent;color:#64748b;font-size:17px;";
+    const confirmar = async () => {
+      const m = String(inp.value || "").trim();
+      if (!/^[0-9]+[A-Za-z]?$/.test(m)) { err.textContent = "Matriz: sólo números"; return; }
+      if (!(await matrizConocida(m))) { err.textContent = "La matriz " + m + " no existe"; return; }
+      if (!matrizActiva(m)) { err.textContent = "La matriz " + m + " está dada de baja"; return; }
+      const b = String(sel.value || "").trim();
+      if (!b) { err.textContent = "Elegí el balancín"; return; }
+      overlay.remove(); resolve({ matriz: m, balancin: b });
+    };
+    ok.onclick = confirmar;
+    no.onclick = () => { overlay.remove(); resolve(null); };
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") confirmar(); });
+    modal.append(t, lm, inp, lb, sel, err, ok, no);
+    overlay.appendChild(modal);
+    document.body.appendChild(overlay);
+    setTimeout(() => { try { inp.focus(); } catch { /* sin foco */ } }, 50);
+  });
+}
+
+/* Balancín: misma lógica que 2.0 (public.asignar_matriz_balancin: libera la matriz de otro balancín y la pone en éste), con el pase.
+   Sin señal o sin pase espera en su cola y sale en flushQueue. */
+const LS_BQUEUE = "rp3c_balq";
+function readBalancinQueue()  { try { return JSON.parse(localStorage.getItem(LS_BQUEUE) || "[]"); } catch { return []; } }
+function writeBalancinQueue(q) { try { localStorage.setItem(LS_BQUEUE, JSON.stringify(q || [])); } catch { /* storage lleno */ } }
+function asignarMatrizBalancin(balancin, matriz) {
+  const q = readBalancinQueue();
+  q.push({ p_balancin: String(balancin), p_matriz: String(matriz) });
+  writeBalancinQueue(q);
+}
+
+/* ============================================================
+   RECORRIDOS DE 2.0: Cambiar Matriz, Rotura Matriz, Pare Consulta Matriz, cajón de alimentador
+   ============================================================ */
+// CM (apertura): cartel matriz nueva + balancín → balancín asignado → CM abierto (tiempo muerto; se cierra tocando CM otra vez).
+async function abrirCambiarMatriz() {
+  const legajo = legajoKey();
+  const res = await pedirMatrizYBalancin();
+  if (!res) {
+    const s = readState(legajo);
+    if (s.pendingRM) { s.pendingRM = null; writeState(legajo, s); }   // canceló: termina el recorrido de rotura
+    volverAInicio();
+    return;
+  }
+  maybeSendLateArrival(legajo);
+  asignarMatrizBalancin(res.balancin, res.matriz);
+  const p = {
+    id: uuidv4(), legajo, opcion: "CM", descripcion: "Cambiar Matriz",
+    texto: res.matriz, ts_event: isoNow(), hs_inicio: "", matriz: "", balancin: res.balancin
+  };
+  updateStateAfterSend(legajo, p);
+  enqueue(p);
+  const s2 = readState(legajo);
+  if (s2.pendingRM) { s2.pendingRM = null; writeState(legajo, s2); }
+  volverAInicio();
+  await despacharCola();
+}
+
+// Matriz de alimentador (tipo 'A'), al cerrar un cajón o en la rotura: «Continuar Produciendo» o «Cambiar Matriz».
+async function popupAlimentadorCajon(legajo, opts) {
+  const desdeRotura = !!(opts && opts.desdeRotura);
+  const el = await elegirOpcion(desdeRotura ? "Rotura registrada. ¿Qué querés hacer?" : "Cajón cerrado. ¿Qué querés hacer?", [
+    { label: desdeRotura ? "No cambiar matriz" : "Continuar Produciendo", val: "SEGUIR" },
+    { label: "Cambiar Matriz", val: "CM" }
+  ], true);
+  if (el && el.val === "CM") { await abrirCambiarMatriz(); return; }
+  if (desdeRotura) {
+    const s = readState(legajo);
+    if (s.pendingRM) { s.pendingRM = null; writeState(legajo, s); }
+  }
+  volverAInicio();
+}
+
+// RM: no es tiempo muerto. Pide la cantidad (obligatoria) → cierra el cajón → marca la rotura (+ WhatsApp) → Cambiar Matriz (si
+// tiene permiso). Si se recarga a mitad, se retoma (state.pendingRM), como 2.0.
+async function ejecutarFlujoRM(legajo) {
+  const s0 = readState(legajo);
+  const matriz = s0.lastMatrix?.texto || "";
+  if (!matriz) { alert('Primero enviá "E (Empecé Matriz)" para registrar una matriz.'); return; }
+  s0.pendingRM = { matriz, cajonHecho: false };
+  writeState(legajo, s0);
+  await pasoCantidadYCajonRM(legajo);
+}
+async function pasoCantidadYCajonRM(legajo) {
+  const s = readState(legajo);
+  const matriz = s.lastMatrix?.texto || s.pendingRM?.matriz || "";
+  if (!matriz) { volverAInicio(); return; }
+  const cant = await pedirCantidadCajon(matriz);
+  maybeSendLateArrival(legajo);
+  const cajon = {
+    id: uuidv4(), legajo, opcion: "C", descripcion: "Cajon",
+    texto: es501(matriz) ? normalizarComa(cant) : cant, ts_event: isoNow(),
+    hs_inicio: computeHsInicio(s) || (s.last2[0]?.ts_event || ""), matriz
+  };
+  if (s.lastMatrix?.comp_salida_id) { cajon.comp_salida_id = s.lastMatrix.comp_salida_id; cajon.pieza = s.lastMatrix.pieza || ""; }
+  updateStateAfterSend(legajo, cajon);
+  enqueue(cajon);
+  const ts = isoNow();
+  const rm = { id: uuidv4(), legajo, opcion: "RM", descripcion: "Rotura Matriz", texto: "", ts_event: ts, hs_inicio: ts, matriz };
+  updateStateAfterSend(legajo, rm);
+  enqueue(rm);
+  avisarWA(legajo, "Rompio Matriz", matriz);
+  const s2 = readState(legajo);
+  if (s2.pendingRM) { s2.pendingRM.cajonHecho = true; writeState(legajo, s2); }
+  renderSummary();
+  despacharCola();
+  await finalizarFlujoRM(legajo);
+}
+async function finalizarFlujoRM(legajo) {
+  if (puedeCM(legajo)) {
+    const s0 = readState(legajo);
+    const rota = s0.pendingRM?.matriz || s0.lastMatrix?.texto || "";
+    if (esMatrizAlimentador(rota)) { await popupAlimentadorCajon(legajo, { desdeRotura: true }); return; }
+    await abrirCambiarMatriz();
+    return;
+  }
+  const s = readState(legajo);
+  if (s.pendingRM) { s.pendingRM = null; writeState(legajo, s); }
+  volverAInicio();
+}
+async function resumirFlujoRMSiHace(legajo) {
+  const s = readState(legajo);
+  if (!s.pendingRM) return false;
+  if (!s.pendingRM.cajonHecho) await pasoCantidadYCajonRM(legajo);
+  else await finalizarFlujoRM(legajo);
+  return true;
+}
+
+// PCM: al cerrarla (2.º toque) pregunta si la matriz se rompió. Rota → cierra la PCM y sigue con la rotura; no rota → sólo la cierra.
+function cerrarPCM(legajo) {
+  const s = readState(legajo);
+  const dt = s.lastDowntime;
+  const cierre = {
+    id: uuidv4(), legajo, opcion: "PCM", descripcion: "Pare Consulta Matriz",
+    texto: "", ts_event: isoNow(), hs_inicio: (dt && dt.opcion === "PCM") ? (dt.ts || "") : "", matriz: ""
+  };
+  updateStateAfterSend(legajo, cierre);
+  enqueue(cierre);
+  renderSummary();
+}
+async function manejarCierrePCM(legajo) {
+  const el = await elegirOpcion("¿La matriz se rompió?", [
+    { label: "Matriz Rota (RM)", val: "RM" },
+    { label: "Matriz no Rota (continúa)", val: "NO" }
+  ]);
+  if (!el) return;                       // canceló: la PCM sigue abierta
+  cerrarPCM(legajo);
+  if (el.val !== "RM") { volverAInicio(); await despacharCola(); return; }
+  await ejecutarFlujoRM(legajo);
+}
+
 /* ============================================================
    ENVIAR
    ============================================================ */
@@ -1234,40 +1686,43 @@ async function sendFast() {
 
   maybeSendLateArrival(legajo);
 
-  const texto = String($("textInput").value || "").trim();
+  let texto = String($("textInput").value || "").trim();
   const s = readState(legajo);
 
+  // RM no es un envío normal ni un tiempo muerto: su recorrido (como 2.0).
+  if (selected.code === "RM") { await ejecutarFlujoRM(legajo); return; }
+  // PCM: el 2.º toque pregunta si la matriz se rompió.
+  if (selected.code === "PCM" && s.lastDowntime?.opcion === "PCM") { await manejarCierrePCM(legajo); return; }
+
+  const cerrando = !!(s.lastDowntime && s.lastDowntime.opcion === selected.code);
+  if (cerrando && ["CM", "TRM"].includes(selected.code)) texto = s.lastDowntime.texto || "";
+  const c501 = selected.code === "C" && es501(s.lastMatrix?.texto);
+
   // Validaciones
-  if (selected.needsInput) {
-    if (!selected.validate?.test(texto)) {
-      $("error").innerText = "Solo se permiten números"; return;
-    }
+  if (selected.needsInput && !cerrando) {
+    const ok = c501 ? /^\d+(?:[.,]\d+)?$/.test(texto) : !!selected.validate?.test(texto);
+    if (!ok) { $("error").innerText = c501 ? "Matriz 501: kilos con coma o punto (ej: 5,6)" : "Solo se permiten números"; return; }
   }
 
   if (selected.code === "E") {
     if (s.matrixNeedsC) {
       alert('Antes de iniciar una nueva matriz (E), enviá al menos 1 Cajón (C).'); return;
     }
-    if (!D.matricesMap?.has(texto)) {
+    if (!(await matrizConocida(texto))) {
       alert(`La matriz ${texto} no existe. Verifica el número.`); return;
     }
     if (!matrizActiva(texto)) {
       alert(`La matriz ${texto} está dada de baja, no se usa más.`); return;
     }
   }
-  if (selected.code === "CM") {
-    if (!D.matricesMap?.has(texto)) {
-      alert(`La matriz ${texto} no existe.`); return;
-    }
-    if (!matrizActiva(texto)) {
-      alert(`La matriz ${texto} está dada de baja, no se usa más.`); return;
-    }
+  if (selected.code === "TRM" && !cerrando && !(await matrizConocida(texto))) {
+    alert(`La matriz ${texto} no existe.`); return;
   }
-  if (["E", "CM"].includes(selected.code) && salidasDeMatriz(texto).length > 1 && !piezaSel) {
+  if (selected.code === "E" && salidasDeMatriz(texto).length > 1 && !piezaSel) {
     $("error").innerText = "Esta matriz hace varias piezas. Elegí cuál vas a fabricar.";
     return;
   }
-  if (["C", "CT", "RM", "PM", "RD"].includes(selected.code)) {
+  if (["C", "CT", "PM", "RD", "PCM"].includes(selected.code)) {
     if (!s.lastMatrix?.texto) {
       alert('Primero enviá "E (Empecé Matriz)" para registrar una matriz.'); return;
     }
@@ -1286,17 +1741,17 @@ async function sendFast() {
   const tsEvent = isoNow();
   const payload = {
     id: uuidv4(), legajo, opcion: selected.code, descripcion: selected.desc,
-    texto, ts_event: tsEvent, hs_inicio: "", matriz: ""
+    texto: c501 ? normalizarComa(texto) : texto, ts_event: tsEvent, hs_inicio: "", matriz: ""
   };
 
-  if (["E", "CM"].includes(payload.opcion) && piezaSel) {
+  if (payload.opcion === "E" && piezaSel) {
     payload.comp_salida_id = piezaSel.comp_id;
     payload.pieza = piezaSel.codigo || "";
   }
   if (payload.opcion === "E" && rolloInfo) {
     payload.rollo = rolloInfo;   // {comp_id, codigo, kg_por_rollo} -> queda en el estado
   }
-  if (["C", "CT", "RM", "PM", "RD"].includes(payload.opcion)) {
+  if (["C", "CT", "PM", "RD"].includes(payload.opcion)) {
     payload.matriz = s.lastMatrix?.texto || "";
     if (["C", "CT"].includes(payload.opcion) && s.lastMatrix?.comp_salida_id) {
       payload.comp_salida_id = s.lastMatrix.comp_salida_id;
@@ -1304,14 +1759,13 @@ async function sendFast() {
     }
   }
   if (payload.opcion === "C" || payload.opcion === "CT") {
-    payload.hs_inicio = computeHsInicio(s);
+    payload.hs_inicio = computeHsInicio(s) || (s.last2[0]?.ts_event || "");
   }
-  if (["RM", "PM", "RD"].includes(payload.opcion)) {
-    payload.hs_inicio = tsEvent;
-  }
-  if (s.lastDowntime && sameDowntime(s.lastDowntime, payload)) {
-    payload.hs_inicio = s.lastDowntime.ts || "";
-  }
+  if (payload.opcion === "RD") payload.hs_inicio = tsEvent;          // puntual
+  if (cerrando) payload.hs_inicio = s.lastDowntime.ts || "";          // cierre de tiempo muerto: se mide desde que se abrió
+
+  if (payload.opcion === "E") avisarSiMatrizSinTiempo(legajo, texto);
+  if (payload.opcion === "PM" && !cerrando) avisarWA(legajo, "Paro Matriz", payload.matriz);
 
   $("btnEnviar").disabled = true;
   $("btnEnviar").innerText = "Enviando...";
@@ -1320,8 +1774,8 @@ async function sendFast() {
   if (selected.code === "E" && rolloInfo) {
     await tomarRollo(legajo, rolloInfo.comp_id, rolloInfo.kg_por_rollo, texto);
   }
-  // Cerrar rollo: los eventos especiales de Eduardo (CT / PR con quedo-resto)
-  if (isEduardo()) {
+  // Cerrar rollo: el alimentador, con CT o con PR «¿quedó resto?» (antes era sólo el legajo 19)
+  if (esAlimentadorLeg() && rollosActivos()) {
     if (selected.code === "CT") {
       await cerrarRollo(legajo, false);
     }
@@ -1335,18 +1789,19 @@ async function sendFast() {
   enqueue(payload);
   renderSummary();
 
-  selected = null;
-  $("selectedArea").classList.add("hidden");
-  $("optionsScreen").classList.add("hidden");
-  $("legajoScreen").classList.remove("hidden");
-  $("matrizInfo").classList.add("hidden");
-  $("error").innerText = "";
-  document.querySelectorAll(".box.selected").forEach(x => x.classList.remove("selected"));
+  // Matriz de alimentador (tipo 'A'): al cerrar un cajón pregunta «Continuar Produciendo / Cambiar Matriz» (como 2.0).
+  if (payload.opcion === "C" && esMatrizAlimentador(payload.matriz) && puedeCM(legajo)) {
+    volverAInicio();
+    despacharCola();
+    await popupAlimentadorCajon(legajo, { desdeRotura: false });
+    return;
+  }
 
+  volverAInicio();
+  $("btnEnviar").disabled = true;
+  $("btnEnviar").innerText = "Enviando...";
   try {
-    await flushQueue();
-    renderSyncBadge();
-    renderSummary();
+    await despacharCola();
   } finally {
     $("btnEnviar").disabled = false;
     $("btnEnviar").innerText = "Enviar";
@@ -1362,6 +1817,7 @@ async function deleteHistItem(legajo, idx) {
   const item = s.last2[idx];
   if (!item) return;
   const op = String(item.opcion || "").toUpperCase();
+  if (op === "FJ") return;   // el fin de jornada no se borra (se pisa con uno nuevo)
 
   // Baja logica en la base (si ya se habia enviado). Va por RPC: con RLS activo
   // la clave anon ya no puede tocar la tabla produccion directo.
@@ -1487,9 +1943,12 @@ function openHistDias() {
 /* ============================================================
    NAVEGACION
    ============================================================ */
-function goToOptions() {
+async function goToOptions() {
   const legajo = legajoKey();
   if (!legajo) { alert("Ingresa el número de legajo"); return; }
+  if (!D.empleados?.[legajo] && await refrescarCatalogoSiFalta() && !D.empleados?.[legajo]) {
+    alert(`El legajo ${legajo} no existe en el sistema.`); return;
+  }
   if (!D.empleados?.[legajo]) {
     alert(`El legajo ${legajo} no existe en el sistema.`); return;
   }
@@ -1499,13 +1958,18 @@ function goToOptions() {
   registrarLegajoEnEquipo(legajo, nombre);
   $("legajoScreen").classList.add("hidden");
   $("optionsScreen").classList.remove("hidden");
+  selected = null;
   renderOptions();
   resetSelection();
+  resumirFlujoRMSiHace(legajo);   // una rotura que quedó a medias (se recargó la página): se retoma
 }
 
 function goToLegajo() {
+  selected = null;                // como 2.0: al volver al legajo se suelta lo elegido (no queda nada trabado)
+  $("selectedArea").classList.add("hidden");
   $("optionsScreen").classList.add("hidden");
   $("legajoScreen").classList.remove("hidden");
+  renderSummary();
 }
 
 /* ============================================================
@@ -1609,8 +2073,6 @@ document.addEventListener("DOMContentLoaded", () => {
   $("btnTerminarDia").addEventListener("click", openTerminarDia);
   $("btnCancelTD").addEventListener("click", () => $("terminarDiaModal").classList.add("hidden"));
   $("btnConfirmTD").addEventListener("click", confirmarTerminarDia);
-
-  $("editCancel").addEventListener("click", () => $("editModal").classList.add("hidden"));
 
   renderSummary();
   renderSyncBadge();
