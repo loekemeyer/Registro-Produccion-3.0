@@ -160,7 +160,15 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
   concatenación necesita que el prefijo aparezca como `"prefijo-" + x` o `` `prefijo-${x}` `` (así lo reconoció la poda).
 - **`cervantes-gp2/` ES LA FUENTE de la botonera de Cervantes** `[Elías, 08/10/2026: «se va a dejar de modificar en GP2 y modificar en
   este, y GP2 sólo hacer copia y hacer modificaciones para testear»]`: los cambios del operario de Cervantes se hacen ACÁ, a mano
-  (`cervantes-gp2/app.js` + `index.html`, con el bump de `v3.1.N`). La tablet de GP2 (`Produccion/RegistroApp/`) deja de ser el origen:
-  GP2 copia de acá y prueba cambios en su copia; **no se trae nada de GP2 hacia acá**. Nació de GP2 `e110890` (v1.251.1) con
+  (`cervantes-gp2/app.js` + `index.html`, con el bump de `v3.1.N`). La tablet de GP2 (`Produccion/RegistroApp/`) es una COPIA exacta para
+  probar (código de la TV, pase, `reg_prod_3_0`; la hace `tools/copiar_botonera_de_3_0.py` de GP2). Nació de GP2 `e110890` (v1.251.1) con
   `tools/portar_botonera_gp2.py`, que se retiró el 08/10 (está en el historial de git).
+- **«Implementá lo nuevo de GP2 a Reg Prod 3.0 en Cervantes»** `[Elías, 08/10/2026: «para en el futuro hacer cambios en GP2 y cuando
+  están terminados decirle a la IA "implementá lo nuevo de GP2 a Reg Prod 3.0 en Cervantes", y que no cometa errores»]`: cuando Elías
+  lo pide, y SÓLO entonces, se corre `python3 tools/traer_de_gp2.py --gp2 <clon de Gestion-Productiva-2.0> --version 3.1.N`. Deshace
+  las 6 diferencias de la copia, comprueba que la vuelta sea exacta (volver a copiar tiene que dar byte por byte lo de GP2), une con
+  `git merge-file` si 3.0 cambió desde la copia, y frena con un mensaje si algo no cierra (no adivina). Trae también la prueba
+  (`tests/ui/test_op_e2e.js` → `tests/cervantes-gp2.cjs`). Después: `node tests/cervantes-gp2.cjs`, revisar `git diff`, commit, y en
+  GP2 volver a copiar con un token nuevo para que la copia diga la versión nueva. **Nunca portar a mano** lo de GP2: si el script frena,
+  se le cuenta a Elías qué chocó.
 - **Cambios en `main`** `[usuario, 06/10/2026]`: se hacen directo en `main`, sin pull request, salvo que se pida otra cosa.

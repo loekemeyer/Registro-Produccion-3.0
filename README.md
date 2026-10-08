@@ -91,7 +91,13 @@ celular del operario [Elías: «tendría que ser el de GP2, como está funcionan
   modificaciones para testear»]: los cambios se hacen a mano en `cervantes-gp2/app.js` e `index.html` (con el bump `v3.1.N` en `APP_VERSION`,
   `SW_VERSION`, `?v=` y `MI_V`). GP2 copia de acá y prueba en su copia; nada viene de GP2 hacia acá. Hasta la v3.1.6 se **generaba** desde la
   tablet de GP2 con `tools/portar_botonera_gp2.py` (la última, desde GP2 `e110890`, v1.251.1: arreglos de 3.0, chip de la pieza adentro de
-  la tarjeta y lista de matrices vacía hasta escribir); el script se borró el 08/10 y queda en el historial de git. v3.1.7: los rollos van
+  la tarjeta y lista de matrices vacía hasta escribir); el script se borró el 08/10 y queda en el historial de git.
+- **Ida y vuelta con GP2** (08/10) [Elías: «hacé que GP2 use el código de la TV»; «cambios en GP2 y cuando están terminados… implementá
+  lo nuevo de GP2 a Reg Prod 3.0 en Cervantes, y que no cometa errores»]: la tablet de GP2 es una COPIA exacta de esta (graba igual, en
+  `reg_prod_3_0`; lo cargado desde GP2 lleva `app_version` `gp2-…` y `p_app` `gp2`). Ida (3.0 → GP2): `tools/copiar_botonera_de_3_0.py`
+  de GP2. Vuelta (lo terminado en GP2 → acá): `tools/traer_de_gp2.py`, con control de vuelta exacta y unión con `git merge-file` si los
+  dos lados cambiaron (probado: sin cambios no escribe; cambio simple → v3.1.N y 69/69; punto de la copia tocado → frena; 3.0 cambió
+  otra línea → une; misma línea → frena). v3.1.7: los rollos van
   siempre con id anti-duplicado (`reg_prod_3_0_rollo_tomar` / `_rollo_cerrar`).
 - **Entrada**: pantalla del código de la TV de Cervantes (misma que `cervantes/`), antes de entrar. La base devuelve un **pase firmado**
   (`reg_prod_3_0_cerv_ingresar` → `{ok, pase, vence}`) que se guarda en el celular (`rp3c_pase`) y vale hasta las 17:45 (3 h si se entra
