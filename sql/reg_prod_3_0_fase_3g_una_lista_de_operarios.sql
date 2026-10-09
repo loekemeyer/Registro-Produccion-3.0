@@ -1,4 +1,7 @@
--- ESTADO: PROPUESTO (09/10/2026), sin aplicar. Espera el «sí» de Elías.
+-- ESTADO: APLICADO el 09/10/2026 (MCP execute_sql), con el «sí» de Elías («Activa 3»). Verificado: Virgilio con el código bueno trae 18
+-- operarios y con uno malo {ok:false}; operarios_lista y problemas_matrices_bundle rechazan a anon y a una cuenta no habilitada (42501);
+-- reg_prod_3_0.operario sigue sin SELECT para anon. OJO: problemas_matrices_bundle era LANGUAGE sql (sin begin): se aplicó como plpgsql
+-- con «perform _exigir_autorizado(); return (<la misma consulta>);» (el paso 3 de abajo, tal cual, no corre sobre una función sql).
 -- Registro Producción 3.0 — FASE 3g · una sola lista de operarios para Cervantes 3.0, Virgilio 3.0 y el admin de GP2
 -- [Elías, 09/10: «GP2 y 3.0 Cervantes tienen que tomar del mismo lugar» · «y el de Virgilio también» ·
 --  «no es anon, tiene que ser al enviar con el token que se obtiene de la pantalla»].

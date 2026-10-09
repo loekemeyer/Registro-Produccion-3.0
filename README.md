@@ -139,6 +139,11 @@ comportamiento de 2.0 (`cervantes/app.js`):
   un cajón o un tiempo muerto abierto (Cervantes) ni con algo abierto (Virgilio). Las dos apps comparten el localStorage (mismo sitio):
   el cambio en curso es `rp3_cambio_sede`; el legajo se compara por el número (Virgilio todavía graba 104, Cervantes c104). La copia de
   la tablet de GP2 no muestra el botón ni toma un cambio en curso (sólo dentro de `/cervantes-gp2/`; v3.1.15). `tests/cambio-sede.cjs`.
+- **v30.16 (Virgilio) — la misma lista de operarios** [Elías, 09/10: «GP2 y 3.0 Cervantes tienen que tomar del mismo lugar … y el de
+  Virgilio también» · «no es anon, tiene que ser al enviar con el token que se obtiene de la pantalla»]: el código de la TV llama a
+  `reg_prod_3_0_virgilio_operarios` (schema `reg_prod_3_0`), que devuelve los operarios de `reg_prod_3_0.operario` (los 18 de planta,
+  de las dos sedes) en vez de la lista de Gestión Virgilio (los que trabajaron en Virgilio en 15 días, con apodos). Virgilio sigue
+  grabando el número (104); viaja también `legajo_verdadero`. Fase 3g: `sql/reg_prod_3_0_fase_3g_una_lista_de_operarios.sql`.
 - SQL: `sql/reg_prod_3_0_fase_2a_premio_con_tm.sql`, `sql/reg_prod_3_0_fase_2b_botonera.sql`, `sql/reg_prod_3_0_fase_2c_fin_de_jornada_y_cajon.sql`.
   Prueba: `tests/cervantes-gp2.cjs` §10 y §11.
 

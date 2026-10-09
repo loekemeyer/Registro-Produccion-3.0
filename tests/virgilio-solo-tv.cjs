@@ -1,5 +1,5 @@
 /* Virgilio — el operario entra SÓLO con el código de la TV (v30.02, SOLO_TV = true).
-   Supabase está simulado (gv_tv_clave_validar acepta "1234"); lo demás se aborta como en las otras pruebas.
+   Supabase está simulado (reg_prod_3_0_virgilio_operarios, con Content-Profile reg_prod_3_0, acepta "1234"); lo demás se aborta como en las otras pruebas.
 
    1) la pantalla no muestra Google ni «Entrar con mi legajo»; sí el código de la TV y el aviso correcto
    2) signInWithGoogle() no sale a Google aunque se llame a mano
@@ -41,7 +41,8 @@ const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
       if (req.method() === "OPTIONS") return route.fulfill({ status: 204, headers: CORS });
       const json = (body) => route.fulfill({ status: 200, headers: { ...CORS, "content-type": "application/json" }, body: JSON.stringify(body) });
       if (url.includes("/auth/v1/authorize")) { est.google++; return route.abort(); }
-      if (url.includes("/rpc/gv_tv_clave_validar")) {
+      if (url.includes("/rpc/reg_prod_3_0_virgilio_operarios")) {
+        if (req.headers()["content-profile"] !== "reg_prod_3_0") return route.fulfill({ status: 404, headers: CORS, body: "{}" });   // v30.16: schema propio
         est.validar++;
         let clave = ""; try { clave = String(JSON.parse(req.postData() || "{}").p_clave || ""); } catch {}
         return json(clave === "1234" ? { ok: true, operarios: [{ legajo: "999", nombre: "Prueba TV" }] } : { ok: false });

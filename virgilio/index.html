@@ -5230,7 +5230,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.15";
+const APP_VERSION = "v30.16";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17630,8 +17630,11 @@ window.loginConClaveTv = async function () {
   if (clave.length !== 4) { if (errEl) errEl.textContent = "Poné los 4 números de la TV."; return; }
   let j = null;
   try {
-    const r = await fetch(SB_URL + "/rest/v1/rpc/gv_tv_clave_validar", { method: "POST",
-      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json" },
+    /* v30.16 (Elías, 09/10: «GP2 y 3.0 Cervantes tienen que tomar del mismo lugar … y el de Virgilio también» · «no es anon, tiene que
+       ser al enviar con el token que se obtiene de la pantalla»): el código de la TV devuelve los operarios de reg_prod_3_0.operario
+       (la misma lista que Cervantes y el admin de GP2), no la de Gestión Virgilio. «legajo» es el número (lo que Virgilio graba hoy). */
+    const r = await fetch(SB_URL + "/rest/v1/rpc/reg_prod_3_0_virgilio_operarios", { method: "POST",
+      headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json", "Content-Profile": "reg_prod_3_0" },
       body: JSON.stringify({ p_clave: clave }) });
     j = r.ok ? await r.json() : null;
   } catch (_e) { j = null; }

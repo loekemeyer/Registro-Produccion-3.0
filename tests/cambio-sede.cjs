@@ -62,7 +62,7 @@ const BUNDLE = {
       }
       if (fn === "reg_prod_3_0_registrar_ingreso") return json(200, 1);
       // Virgilio
-      if (fn === "gv_tv_clave_validar") {
+      if (fn === "reg_prod_3_0_virgilio_operarios") {
         return json(200, cuerpo.p_clave === CODIGO_VIR ? { ok: true, operarios: [{ legajo: "104", nombre: "Moncayo Jhonny" }] } : { ok: false });
       }
       if (/\/rest\/v1\/Registros_Produccion_Virgilio/.test(url) && m === "POST") {
