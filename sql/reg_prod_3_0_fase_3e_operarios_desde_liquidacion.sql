@@ -51,3 +51,63 @@ end $$;
 revoke all on function reg_prod_3_0.reg_prod_3_0_operario_sync() from public, anon, authenticated;
 create trigger reg_prod_3_0_operario_sync after insert or update or delete on planify.empleados_liquidacion
   for each row execute function reg_prod_3_0.reg_prod_3_0_operario_sync();
+
+-- ============================================================================================================================
+-- C) 09/10, el mismo día [Elías: «que el trigger busque bien y no pase lo de Kevin»]. APLICADO. Probado en transacción deshecha:
+--    Kevin (504, Agencia, sin vínculo a planify.employees) baja en liquidación → sale, alta → vuelve · Eduardo (c19) baja SÓLO en
+--    la ficha de Planify → sale, alta → vuelve · resync completo → 0 cambios (la tabla ya coincidía).
+--    «Lo de Kevin» fue buscar en planify.employees y no en la liquidación. La regla única, en UNA función:
+--      vale = activo y de planta en planify.empleados_liquidacion (legajo en minúscula, sin espacios)
+--             y, si la fila está vinculada a planify.employees, ese empleado también activo.
+--    Los 2 triggers (liquidación y employees) y un cron nocturno de red de seguridad llaman a la misma función.
+--    ⚠ La baja borra también los permisos (decisión de Elías): una baja por error en Planify hace perder los botones.
+-- ============================================================================================================================
+create or replace function reg_prod_3_0.reg_prod_3_0_operario_resync(p_legajo text default null)
+returns table(accion text, op_legajo text, op_nombre text) language plpgsql security definer set search_path to '' as $$
+begin
+  return query
+  with fuente as (
+    select distinct on (lower(btrim(l.legajo))) lower(btrim(l.legajo)) as leg, btrim(l.nombre) as nom
+      from planify.empleados_liquidacion l
+      left join planify.employees e on e.id = l.employee_id
+     where l.activo and l.tipo_empleado = 'planta' and coalesce(btrim(l.legajo), '') <> ''
+       and (l.employee_id is null or coalesce(e.activo, false))
+       and (p_legajo is null or lower(btrim(l.legajo)) = lower(btrim(p_legajo)))
+     order by lower(btrim(l.legajo)), l.updated_at desc nulls last
+  ), borrados as (
+    delete from reg_prod_3_0.operario o
+     where o.legajo <> '0' and (p_legajo is null or o.legajo = lower(btrim(p_legajo)))
+       and not exists (select 1 from fuente f where f.leg = o.legajo)
+    returning 'baja'::text, o.legajo, o.nombre
+  ), puestos as (
+    insert into reg_prod_3_0.operario as o (legajo, nombre)
+    select f.leg, f.nom from fuente f
+     where not exists (select 1 from reg_prod_3_0.operario x where x.legajo = f.leg and x.nombre = f.nom)
+    on conflict on constraint operario_pkey do update set nombre = excluded.nombre
+    returning 'alta o nombre'::text, o.legajo, o.nombre
+  )
+  select * from borrados union all select * from puestos;
+end $$;
+revoke all on function reg_prod_3_0.reg_prod_3_0_operario_resync(text) from public, anon, authenticated;
+
+create or replace function reg_prod_3_0.reg_prod_3_0_operario_sync() returns trigger language plpgsql security definer set search_path to '' as $$
+begin
+  if tg_op in ('UPDATE','DELETE') and coalesce(btrim(old.legajo), '') <> '' then perform reg_prod_3_0.reg_prod_3_0_operario_resync(old.legajo); end if;
+  if tg_op in ('INSERT','UPDATE') and coalesce(btrim(new.legajo), '') <> '' then perform reg_prod_3_0.reg_prod_3_0_operario_resync(new.legajo); end if;
+  return null;
+end $$;
+
+create or replace function reg_prod_3_0.reg_prod_3_0_operario_sync_emp() returns trigger language plpgsql security definer set search_path to '' as $$
+declare r record;
+begin
+  for r in select l.legajo from planify.empleados_liquidacion l
+            where l.employee_id = (case when tg_op = 'DELETE' then old.id else new.id end) and coalesce(btrim(l.legajo), '') <> '' loop
+    perform reg_prod_3_0.reg_prod_3_0_operario_resync(r.legajo);
+  end loop;
+  return null;
+end $$;
+revoke all on function reg_prod_3_0.reg_prod_3_0_operario_sync_emp() from public, anon, authenticated;
+create trigger reg_prod_3_0_operario_sync_emp after update of activo or delete on planify.employees
+  for each row execute function reg_prod_3_0.reg_prod_3_0_operario_sync_emp();
+
+select cron.schedule('reg-prod-3-0-operarios-resync', '10 6 * * *', 'select reg_prod_3_0.reg_prod_3_0_operario_resync(null)');
