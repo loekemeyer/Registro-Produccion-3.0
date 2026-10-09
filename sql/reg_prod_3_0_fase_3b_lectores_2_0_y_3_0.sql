@@ -1,5 +1,5 @@
--- ESTADO: PROPUESTO (09/10/2026), sin aplicar. Probado por partes en transacciones deshechas: costos 226 matrices 0,2 s · planify 12 legajos
--- 0,1 s · mensajes 0,0 s · ingresos 0,0 s · alerta 0,0 s · horas 0,1 s (igual que antes) · racha completa 0,9 s · cron 0,0 s.
+-- ESTADO: PROPUESTO (09/10/2026), sin aplicar. Probado por partes en transacciones deshechas: planify 12 legajos
+-- 0,1 s · mensajes 0,0 s · ingresos 0,0 s · alerta 0,0 s · horas 0,1 s (igual que antes) · cron 0,0 s.
 -- Registro Producción 3.0 — FASE 3b · lo que hoy lee sólo Registro Producción 2.0 pasa a leer 2.0 + 3.0
 -- [Elías, 09/10: «si tienen que leer que de momento lean todas» — los operarios de Cervantes pasan a 3.0 el martes 13/10].
 --
@@ -11,9 +11,11 @@
 -- Las vistas NO se exponen a anon/authenticated (datos nominales): sólo postgres y service_role.
 --
 -- Lectores que se cambian (cirugía sobre la definición viva: frena si el texto a reemplazar no aparece exactamente 1 vez):
---   costos_sync_produccion · gp2_matriz_racha_sync · planify_produccion_dia · planify_operario_mensajes_dia ·
+--   planify_produccion_dia · planify_operario_mensajes_dia ·
 --   gv_monitor_ingresos · gv_monitor_horas_operario_dia · gv_alerta_inactivo_servidor(boolean, timestamptz) · toggle_anular_tiempo (id < 0 = 3.0)
--- + trigger de racha sobre procesado_cervantes (el de 2.0 está sobre el espejo) + el conteo del cron del reporte de las 18 h.
+-- + el conteo del cron del reporte de las 18 h.
+-- [Elías, 09/10: «3.0 de Cervantes tiene que hacer lo mismo que Reg Prod 2.0 — no estamos hablando de Gestión Productiva»]:
+-- costos_sync_produccion y la racha de matrices (gp2_matriz_racha_*) son de GP2 y quedan afuera.
 -- La Edge Function reporte-diario-rendimiento se cambia aparte (lee el espejo con supabase-js): sb.schema('reg_prod_3_0').from('espejo_todas').
 
 begin;
@@ -54,10 +56,6 @@ begin
   execute replace(d, p_viejo, p_nuevo);
 end $c$;
 
-select pg_temp.cambiar('public.costos_sync_produccion()',
-  'from public.db_n8n_espejo e', 'from reg_prod_3_0.espejo_todas e');
-select pg_temp.cambiar('public.gp2_matriz_racha_sync(text)',
-  'from public.db_n8n_espejo e', 'from reg_prod_3_0.espejo_todas e');
 select pg_temp.cambiar('public.planify_produccion_dia(date)',
   'from public.db_n8n_espejo', 'from reg_prod_3_0.espejo_todas');
 select pg_temp.cambiar('public.planify_produccion_dia(date)',
@@ -97,31 +95,6 @@ begin
   return not current_val;
 end;
 $function$;
-
--- 3) racha: el trigger que 2.0 tiene sobre el espejo, ahora también sobre lo procesado de 3.0 -----------------------------------------
-create or replace function reg_prod_3_0.reg_prod_3_0_racha_trg()
-returns trigger
-language plpgsql
-security definer
-set search_path to ''
-as $function$
-declare v_m text;
-begin
-  v_m := btrim(coalesce(case when tg_op = 'DELETE' then old.matriz else new.matriz end, ''));
-  -- igual que public.gp2_matriz_racha_trg_espejo: un tiempo muerto sin número recalcula todo
-  if v_m = '' or v_m !~ '^[0-9]+$' then
-    perform public.gp2_matriz_racha_sync(null);
-  else
-    perform public.gp2_matriz_racha_sync(v_m);
-  end if;
-  return null;
-end $function$;
-
-revoke all on function reg_prod_3_0.reg_prod_3_0_racha_trg() from public, anon, authenticated;
-
-drop trigger if exists reg_prod_3_0_racha on reg_prod_3_0.procesado_cervantes;
-create trigger reg_prod_3_0_racha after insert or update of matriz, uni, eliminar or delete on reg_prod_3_0.procesado_cervantes
-  for each row execute function reg_prod_3_0.reg_prod_3_0_racha_trg();
 
 -- 4) cron del reporte de las 18 h: cuenta 2.0 + 3.0 ----------------------------------------------------------------------------------
 select cron.alter_job(j.jobid, command := replace(j.command, 'FROM public.db_n8n_espejo', 'FROM reg_prod_3_0.espejo_todas'))
