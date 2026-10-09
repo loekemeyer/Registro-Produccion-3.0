@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.10)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.11)
    ESTE ARCHIVO ES LA FUENTE de la botonera de Cervantes desde el 08/10/2026 [Elías: «se va a dejar de modificar en GP2 y
    modificar en este, y GP2 sólo hacer copia y hacer modificaciones para testear»]: los cambios se hacen ACÁ, a mano.
    Nació de la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de loekemeyer/Gestion-Productiva-2.0, commit e110890,
@@ -30,7 +30,7 @@
    de ayer), los errores de envío a la auditoría, reintento cada 3 s y envío en segundo plano por el service worker.
    ============================================================ */
 
-const APP_VERSION = "v3.1.10";
+const APP_VERSION = "v3.1.11";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -1626,6 +1626,10 @@ async function refrescarCatalogoSiFalta() {
   try { await cargarBundle(); } catch { /* sin catálogo nuevo */ }
   return _catalogoAt !== antes;
 }
+// Sin catálogo (celular nuevo o caché borrado, con la base caída o sin señal) no se puede decir que un legajo o una matriz
+// «no existe»: hay que decir que no hay conexión [auditoría 30/09, «Legajo no encontrado» con la base caída en 2.0; Elías 09/10: «1 si»].
+const AVISO_SIN_CATALOGO = "Sin conexión: todavía no se pudo bajar la lista de legajos y matrices. Probá de nuevo en unos segundos.";
+function hayCatalogo() { return !!(D.empleados && Object.keys(D.empleados).length && D.matricesMap && D.matricesMap.size); }
 async function matrizConocida(n) {
   if (D.matricesMap?.has(n)) return true;
   if (await refrescarCatalogoSiFalta()) return !!D.matricesMap?.has(n);
@@ -1780,7 +1784,7 @@ function pedirMatrizYBalancin() {
     const confirmar = async () => {
       const m = String(inp.value || "").trim();
       if (!/^[0-9]+[A-Za-z]?$/.test(m)) { err.textContent = "Matriz: sólo números"; return; }
-      if (!(await matrizConocida(m))) { err.textContent = "La matriz " + m + " no existe"; return; }
+      if (!(await matrizConocida(m))) { err.textContent = hayCatalogo() ? "La matriz " + m + " no existe" : AVISO_SIN_CATALOGO; return; }
       if (!matrizActiva(m)) { err.textContent = "La matriz " + m + " está dada de baja"; return; }
       const b = String(sel.value || "").trim();
       if (!b) { err.textContent = "Elegí el balancín"; return; }
@@ -1962,14 +1966,14 @@ async function sendFast() {
       alert('Antes de iniciar una nueva matriz (E), enviá al menos 1 Cajón (C).'); return;
     }
     if (!(await matrizConocida(texto))) {
-      alert(`La matriz ${texto} no existe. Verifica el número.`); return;
+      alert(hayCatalogo() ? `La matriz ${texto} no existe. Verifica el número.` : AVISO_SIN_CATALOGO); return;
     }
     if (!matrizActiva(texto)) {
       alert(`La matriz ${texto} está dada de baja, no se usa más.`); return;
     }
   }
   if (selected.code === "TRM" && !cerrando && !(await matrizConocida(texto))) {
-    alert(`La matriz ${texto} no existe.`); return;
+    alert(hayCatalogo() ? `La matriz ${texto} no existe.` : AVISO_SIN_CATALOGO); return;
   }
   if (selected.code === "E" && salidasDeMatriz(texto).length > 1 && !piezaSel) {
     $("error").innerText = "Esta matriz hace varias piezas. Elegí cuál vas a fabricar.";
@@ -2454,10 +2458,9 @@ function openHistDias() {
 async function goToOptions() {
   const legajo = legajoKey();
   if (!legajo) { alert("Ingresa el número de legajo"); return; }
-  if (!D.empleados?.[legajo] && await refrescarCatalogoSiFalta() && !D.empleados?.[legajo]) {
-    alert(`El legajo ${legajo} no existe en el sistema.`); return;
-  }
+  if (!D.empleados?.[legajo]) await refrescarCatalogoSiFalta();
   if (!D.empleados?.[legajo]) {
+    if (!hayCatalogo()) { cargarBundle().catch(() => {}); alert(AVISO_SIN_CATALOGO); return; }
     alert(`El legajo ${legajo} no existe en el sistema.`); return;
   }
   const emp = D.empleados[legajo];

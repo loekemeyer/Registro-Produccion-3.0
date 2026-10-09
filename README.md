@@ -115,6 +115,10 @@ comportamiento de 2.0 (`cervantes/app.js`):
 - **v3.1.10 — errores y envío** [«15 tiene que estar» · «16 como en 2.0»]: cada envío fallido va a `reg_prod_3_0.auditoria`
   (`reg_prod_3_0_registrar_error_envio`, al 1.er intento y cada 5); con algo en la cola se reintenta cada 3 s; y la cola se copia al
   IndexedDB (`rp3c-envio`) para que el service worker la mande con la app cerrada (background sync, con el pase), como 2.0.
+- **v3.1.11 — «Sin conexión» en vez de «el legajo no existe»** [Elías, 09/10: «1 si»; auditoría 30/09, el mismo error en 2.0 con la base caída]:
+  si el celular todavía no tiene catálogo (celular nuevo o caché borrado, sin señal o con la base caída), el legajo y la matriz no se
+  rechazan como inexistentes: avisa «Sin conexión…» y vuelve a pedir el catálogo. Con catálogo, un legajo que no está sigue diciendo
+  «no existe». `tests/cervantes-gp2.cjs` §12 (falla con v3.1.10).
 - SQL: `sql/reg_prod_3_0_fase_2a_premio_con_tm.sql`, `sql/reg_prod_3_0_fase_2b_botonera.sql`, `sql/reg_prod_3_0_fase_2c_fin_de_jornada_y_cajon.sql`.
   Prueba: `tests/cervantes-gp2.cjs` §10 y §11.
 

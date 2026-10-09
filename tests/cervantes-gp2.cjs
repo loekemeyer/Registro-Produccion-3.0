@@ -114,6 +114,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
       contador: {},                  // contador de cajón por pieza (como reg_prod_3_0.contador_cajon)
       fjPisados: 0,                  // fines de jornada que pisaron a uno anterior (mismo id)
       falla500: false,               // true = registrar_evento contesta 500 (base caída a medias)
+      bundleFalla: false,            // true = reg_prod_3_0_bundle contesta 503 (base caída: el catálogo no baja)
     };
   }
   const llamadas = (base, fn) => base.llamadas.filter((c) => c.fn === fn);
@@ -139,7 +140,10 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
         return json(200, { ok: false, error: "codigo" });
       }
       if (fn === "reg_prod_3_0_registrar_ingreso") return json(200, 1);
-      if (fn === "reg_prod_3_0_bundle") return conPase ? json(200, base.bundle) : paseMal();
+      if (fn === "reg_prod_3_0_bundle") {
+        if (base.bundleFalla) return json(503, { code: "PGRST000", details: null, hint: null, message: "base caída" });
+        return conPase ? json(200, base.bundle) : paseMal();
+      }
       if (["reg_prod_3_0_tomar_rollo", "reg_prod_3_0_cerrar_rollo", "reg_prod_3_0_rollo_tomar", "reg_prod_3_0_rollo_cerrar"].includes(fn)) {
         if (!conPase) return paseMal();
         base.entregas.push({ fn, cuerpo });
@@ -272,7 +276,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.10" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.11" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -825,8 +829,32 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   }
   await ctx5.close();
 
+  // ============ 12) v3.1.11: sin catálogo dice «sin conexión», no «el legajo no existe» (auditoría 30/09, base caída) ============
+  const base6 = nuevaBase();
+  base6.bundleFalla = true;
+  const { ctx: ctx6, p: p7 } = await contexto(base6);
+  const avisos7 = [];
+  p7.on("dialog", (d) => avisos7.push(d.message()));
+  await p7.goto(srv.url + "/cervantes-gp2/", { waitUntil: "domcontentloaded" });
+  await entrarConCodigo(p7, CODIGO_TV);
+  await esperar(() => llamadas(base6, "reg_prod_3_0_bundle").length >= 1);
+  await p7.fill("#legajoInput", "999");
+  await p7.click("#btnContinuar");
+  await esperar(() => avisos7.length >= 1);
+  chequeo("12 celular nuevo con la base caída: avisa «Sin conexión», no «el legajo no existe»", /Sin conexión/.test(avisos7[0]) && !/no existe/.test(avisos7[0]) && !(await p7.isVisible("#optionsScreen")));
+  base6.bundleFalla = false;
+  await esperar(async () => { await p7.click("#btnContinuar"); return p7.isVisible("#optionsScreen"); });
+  chequeo("12 cuando vuelve la base, el mismo legajo entra", await p7.isVisible("#optionsScreen"));
+  await p7.click("#btnBackTop");
+  const nAvisos = avisos7.length;
+  await p7.fill("#legajoInput", "123456");
+  await p7.click("#btnContinuar");
+  await esperar(() => avisos7.length > nAvisos);
+  chequeo("12 con catálogo, un legajo que no está sigue diciendo «no existe»", /no existe/.test(avisos7[nAvisos]));
+  await ctx6.close();
+
   // ============ 9) nada de GP2 ============
-  const todas = base.llamadas.concat(base2.llamadas, base3.llamadas, base4.llamadas, base5.llamadas);
+  const todas = base.llamadas.concat(base2.llamadas, base3.llamadas, base4.llamadas, base5.llamadas, base6.llamadas);
   chequeo("9 no se llamó a ninguna función de GP2 (bundle, registrar, anular, rollos, stock)", todas.length > 0 && todas.every((c) => !GP2_FNS.test(c.url)));
   chequeo("9 todas las funciones son reg_prod_3_0_*", todas.every((c) => /^reg_prod_3_0_/.test(c.fn)));
 
