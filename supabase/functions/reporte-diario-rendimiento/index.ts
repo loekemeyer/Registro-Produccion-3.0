@@ -541,13 +541,25 @@ Deno.serve(async (req: Request) => {
     if (!matricesData || !empleadosData) throw new Error("No se pudieron cargar datos maestros");
     const matMap = new Map<string, any>(); matricesData.forEach((m: any) => matMap.set(String(m.N_Matriz || "").trim(), m));
     const empMap = new Map<string, any>(); empleadosData.forEach((e: any) => empMap.set(String(e.Legajo || "").trim(), e));
+    // Registro Producción 3.0 graba el legajo VERDADERO (c19 = CHEF SRL); Empleados lo tiene sin la letra. El nombre de los de 3.0
+    // sale de reg_prod_3_0.operario, así el reporte sigue mostrando el nombre [Elías, 09/10: «el reporte pone el nombre, que siga así»].
+    // El recuadro «Eduardo» es el del ALIMENTADOR (permiso en reg_prod_3_0.operario_permiso), no el legajo «19» escrito acá.
+    const alimentadores = new Set<string>([EDUARDO_LEGAJO]);
+    try {
+      const { data: ops } = await sb.schema("reg_prod_3_0").from("operario").select("legajo, nombre");
+      (ops || []).forEach((o: any) => { const k = String(o.legajo || "").trim(); if (k && !empMap.has(k)) empMap.set(k, { Legajo: k, Empleado: o.nombre, Activo: "SI" }); });
+      const { data: perms } = await sb.schema("reg_prod_3_0").from("operario_permiso").select("legajo").eq("es_alimentador", true);
+      (perms || []).forEach((x: any) => { const k = String(x.legajo || "").trim(); if (k) alimentadores.add(k); });
+    } catch (err) { console.error("operarios 3.0:", String(err)); }
+    const esEduardo = (leg: string) => alimentadores.has(leg);
+    const sinLetra = (leg: string) => leg.replace(/^c/i, "");
     // Registro Producción 2.0 + 3.0 (09/10/2026, Elías: «que de momento lean todas»): la vista reg_prod_3_0.espejo_todas junta
     // public.db_n8n_espejo (2.0) y reg_prod_3_0.procesado_cervantes (3.0) con los mismos nombres de columna.
     const espejo = () => sb.schema("reg_prod_3_0").from("espejo_todas");
     const allRegs: any[] = []; const PAGE = 1000; let from = 0;
     while (true) { const { data } = await espejo().select("Matriz, Nombre_Matriz, Uni, Segundos_Trabajados, Segundos_Historico, Anular_Tiempo, Eliminar, Legajo, Fecha, Hora_Inicio").gte("Fecha", hoy + "T00:00:00").lte("Fecha", hoy + "T23:59:59").or("Eliminar.is.null,Eliminar.neq.S").range(from, from + PAGE - 1); if (!data || !data.length) break; allRegs.push(...data); if (data.length < PAGE) break; from += PAGE; }
 
-    const esExcluido = (leg: string) => leg === "1" || leg === DAVID_LEGAJO || leg === EDUARDO_LEGAJO;
+    const esExcluido = (leg: string) => leg === "1" || leg === DAVID_LEGAJO || esEduardo(leg);
     const cajones = allRegs.filter((r: any) => { const mat = String(r.Matriz || "").trim(); const leg = String(r.Legajo || "").trim(); return !esCM(r) && esMatriz(mat) && !esPiedra(mat) && nm(r.Uni) > 0 && !esExcluido(leg); });
     const piedraRegs = allRegs.filter((r: any) => { const mat = String(r.Matriz || "").trim(); return esPiedra(mat) && nm(r.Uni) > 0 && String(r.Legajo || "").trim() !== "1"; });
     const tmEntries = allRegs.filter((r: any) => { const leg = String(r.Legajo || "").trim(); if (esExcluido(leg)) return false; if (nm(r.Segundos_Trabajados) <= 0) return false; if (esCM(r)) return true; const mat = String(r.Matriz || "").trim(); return esTM(mat); });
@@ -629,7 +641,7 @@ Deno.serve(async (req: Request) => {
     const eduardoTMaggr = new Map<string, { nombre: string; seg: number }>();
     allRegs.forEach((r: any) => {
       const leg = String(r.Legajo || "").trim();
-      if (leg !== EDUARDO_LEGAJO) return;
+      if (!esEduardo(leg)) return;
       const seg = nm(r.Segundos_Trabajados);
       const mat = String(r.Matriz || "").trim();
       if (!esCM(r) && esMatriz(mat) && !esPiedra(mat) && nm(r.Uni) > 0) {
@@ -665,7 +677,7 @@ Deno.serve(async (req: Request) => {
       // Quien aparece hoy (cualquier registro)
       const todayActiveSet = new Set<string>();
       allRegs.forEach((r: any) => {
-        const leg = String(r.Legajo || "").trim();
+        const leg = sinLetra(String(r.Legajo || "").trim());   // Empleados no tiene la letra: c19 de 3.0 = 19
         if (leg) todayActiveSet.add(leg);
       });
       // Buscar registros en los 4 dias laborables anteriores
@@ -687,7 +699,7 @@ Deno.serve(async (req: Request) => {
       }
       const diasPorLegajo = new Map<string, Set<string>>();
       prevRegs.forEach((r: any) => {
-        const leg = String(r.Legajo || "").trim();
+        const leg = sinLetra(String(r.Legajo || "").trim());
         if (!leg || leg === "1") return;
         const fechaStr = String(r.Fecha || "").slice(0, 10);
         if (!labKeys.has(fechaStr)) return; // solo dias laborables
