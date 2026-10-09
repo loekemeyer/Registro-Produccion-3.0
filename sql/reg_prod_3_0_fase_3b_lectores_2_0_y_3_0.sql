@@ -1,5 +1,5 @@
 -- ESTADO: APLICADO el 09/10/2026 (MCP execute_sql), con el «sí» de Elías. Verificado: las 5 funciones leen las vistas, toggle con id < 0, cron del
--- reporte cuenta espejo_todas, anon no ve las vistas. FALTA la Edge Function reporte-diario-rendimiento (sigue leyendo sólo db_n8n_espejo).
+-- reporte cuenta espejo_todas, anon no ve las vistas. Edge Function reporte-diario-rendimiento v94 (supabase/functions/, lee espejo_todas) + grant usage a service_role.
 -- Registro Producción 3.0 — FASE 3b · lo que hoy lee sólo Registro Producción 2.0 pasa a leer 2.0 + 3.0
 -- [Elías, 09/10: «si tienen que leer que de momento lean todas» — los operarios de Cervantes pasan a 3.0 el martes 13/10].
 --
@@ -109,3 +109,6 @@ do $v$ begin
 end $v$;
 
 commit;
+
+-- (agregado al publicar la Edge Function, 09/10) la función entra con service_role: necesita USAGE en el schema.
+grant usage on schema reg_prod_3_0 to service_role;
