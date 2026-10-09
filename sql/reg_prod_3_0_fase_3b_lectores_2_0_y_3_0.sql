@@ -1,5 +1,5 @@
--- ESTADO: PROPUESTO (09/10/2026), sin aplicar. Probado por partes en transacciones deshechas: planify 12 legajos
--- 0,1 s · mensajes 0,0 s · ingresos 0,0 s · alerta 0,0 s · horas 0,1 s (igual que antes) · cron 0,0 s.
+-- ESTADO: APLICADO el 09/10/2026 (MCP execute_sql), con el «sí» de Elías. Verificado: las 5 funciones leen las vistas, toggle con id < 0, cron del
+-- reporte cuenta espejo_todas, anon no ve las vistas. FALTA la Edge Function reporte-diario-rendimiento (sigue leyendo sólo db_n8n_espejo).
 -- Registro Producción 3.0 — FASE 3b · lo que hoy lee sólo Registro Producción 2.0 pasa a leer 2.0 + 3.0
 -- [Elías, 09/10: «si tienen que leer que de momento lean todas» — los operarios de Cervantes pasan a 3.0 el martes 13/10].
 --
