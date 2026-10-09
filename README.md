@@ -80,6 +80,13 @@ select grupo, tipo, objeto from dep order by grupo, tipo, objeto;   -- sin la ú
   el 07/10.** Sigue abierta una decisión: qué es «la armada» de Virgilio (hoy lo armado sale de triggers y vistas de Gestión Virgilio
   sobre la cruda).
 
+## Cervantes · v3.1.11 (09/10/2026): el sistema de diseño de GP2
+
+[Elías: «Habilito lo de tablet de operarios»] `cervantes-gp2/` toma los tokens de `gp2-modulo.css` de Gestión Productiva 2.0
+(v2.0): barra oscura fija con el sello GP2, azul GP2 = acción que avanza, **tinta rellena = elegido** (botonera, matriz, rollo),
+avisos con borde a la izquierda, tocables ≥ 44px. Sólo presentación (CSS de `index.html` y los `style` del cartel del código de la
+TV en `app.js`); ninguna lógica cambió. `tests/cervantes-gp2.cjs` 126/126 (sólo cambia la versión esperada).
+
 ## Cervantes · la botonera de Registro Producción 2.0 (v3.1.9 y v3.1.10, 08/10/2026)
 
 [Elías, 08/10: «2.0», «todo lo del 10 debería ser como Reg Prod», «la 501 pone los kilos», «sacá el editar de momento», «que no se

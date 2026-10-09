@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Registro" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="theme-color" content="#1e40af" />
+  <meta name="theme-color" content="#0f172a" />
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <title>Registro Produccion</title>
@@ -38,60 +38,89 @@
     })();
   </script>
   <style>
+    /* Sistema de diseño de GP2 (v2.0, 09/10/2026) [Elías: «Habilito lo de tablet de operarios»]: mismos tokens que
+       gp2-modulo.css de Gestión Productiva 2.0 — tinta para la estructura, AZUL GP2 = acción que avanza, TINTA
+       RELLENA = elegido, verde/ámbar/rojo = bien/alerta/error. Barra oscura fija con el sello GP2 arriba. */
+    :root {
+      --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      --ink-950:#0a1020; --ink-900:#0f172a; --ink-800:#1e293b; --ink-700:#334155; --ink-600:#475569; --ink-500:#64748b;
+      --ink-400:#94a3b8; --ink-300:#cbd5e1; --ink-200:#e2e8f0; --ink-100:#f1f5f9; --ink-50:#f8fafc;
+      --brand-700:#123274; --brand-600:#163e98; --brand-500:#1f55c9; --brand-200:#c7d7f6; --brand-50:#f0f4fd;
+      --ok-700:#15803d; --ok-600:#16a34a; --ok-200:#bbf7d0; --ok-50:#f0fdf4;
+      --warn-700:#b45309; --warn-200:#fde68a; --warn-50:#fffbeb;
+      --err-700:#b91c1c; --err-600:#dc2626; --err-50:#fef2f2;
+      --bg:#eef1f5; --line:#e2e8f0; --line-strong:#cbd5e1;
+      --sh-1:0 1px 2px rgba(15,23,42,.06),0 1px 3px rgba(15,23,42,.04);
+      --ring:0 0 0 3px rgba(31,85,201,.28);
+      --bar-h:68px;
+    }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, sans-serif; background: #f1f5f9; min-height: 100dvh; padding: 0; }
-    h1 { font-size: 24px; font-weight: 800; color: #1e293b; text-align: center; margin: 24px 0 16px; }
-    input[type=number], input[type=text] { width: 100%; max-width: 320px; font-size: 28px; padding: 12px 16px; border: 2px solid #cbd5e1; border-radius: 12px; text-align: center; display: block; margin: 0 auto; }
+    body { font-family: var(--font); background: var(--bg); color: var(--ink-800); min-height: 100dvh; padding: 0;
+           -webkit-font-smoothing: antialiased; }
+    /* barra fija: los botones fijos (Menú, 📅, Terminar Día) quedan ENCIMA de ella */
+    .op-bar { position: fixed; top: 0; left: 0; right: 0; height: var(--bar-h); z-index: 40; background: var(--ink-900);
+              display: flex; align-items: center; justify-content: center; gap: 8px; color: #fff; font-weight: 700; font-size: 15px;
+              box-shadow: 0 2px 10px rgba(15,23,42,.18); pointer-events: none; }
+    .op-bar .sello { height: 26px; padding: 0 7px; border-radius: 6px; background: var(--brand-600); font-size: 12.5px; font-weight: 800;
+                     letter-spacing: .06em; display: inline-flex; align-items: center; box-shadow: inset 0 -2px 0 rgba(0,0,0,.18); }
+    .op-bar .op-bar-t { color: var(--ink-300); font-weight: 600; }
+    @media (max-width: 420px) { .op-bar .op-bar-t { display: none; } }
+    h1 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: var(--ink-900); text-align: center; margin: 24px 0 16px; }
+    input[type=number], input[type=text] { width: 100%; max-width: 320px; font-size: 28px; padding: 12px 16px; border: 1.5px solid var(--line-strong); border-radius: 10px; text-align: center; display: block; margin: 0 auto; background: #fff; color: var(--ink-900); }
+    input[type=number]:focus, input[type=text]:focus { outline: none; border-color: var(--brand-500); box-shadow: var(--ring); }
     /* El boton principal era #fff sobre #e7ebf8 (contraste 1.2:1, ilegible en la
        tablet del galpon). Los fondos palidos se dejan donde son ESTADO (una caja
        elegida), pero un boton de accion va solido — corregido 2026-09-03. */
-    .primary-btn { display: block; width: 100%; max-width: 320px; margin: 16px auto; padding: 16px; font-size: 20px; font-weight: 800; background: #1d4ed8; color: #fff; border: none; border-radius: 12px; cursor: pointer; }
+    .primary-btn { display: block; width: 100%; max-width: 320px; margin: 16px auto; padding: 16px; min-height: 56px; font-size: 20px; font-weight: 700; background: var(--brand-600); color: #fff; border: none; border-radius: 10px; cursor: pointer; box-shadow: var(--sh-1); }
+    .primary-btn:active { background: var(--brand-700); }
     .primary-btn:disabled { opacity: .5; }
     /* #btnMenu y #btnHistDias son fixed a top:12 con 44px de alto: sin este colchon
        el h1 les quedaba debajo a 390px (corregido 2026-09-03). */
-    #legajoScreen { padding: 68px 12px 12px; max-width: 480px; margin: 0 auto; }
+    #legajoScreen { padding: calc(var(--bar-h) + 4px) 12px 12px; max-width: 480px; margin: 0 auto; }
     .history-wrap { margin-top: 24px; }
-    .history-title { font-size: 13px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
-    .history-empty { color: #475569; font-size: 14px; padding: 12px; }
-    #daySummary { background: #fff; border-radius: 12px; padding: 12px; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
-    .day-item .t1 { font-size: 12px; font-weight: 700; color: #64748b; margin-bottom: 8px; }
+    .history-title { font-size: 12px; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
+    .history-empty { color: var(--ink-600); font-size: 14px; padding: 12px; }
+    #daySummary { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px; box-shadow: var(--sh-1); }
+    .day-item .t1 { font-size: 12px; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 8px; }
     .day-item .t2 { font-size: 14px; }
     .hidden { display: none !important; }
-    #optionsScreen { padding: 8px; max-width: 520px; margin: 0 auto; }
+    #optionsScreen { padding: calc(var(--bar-h) + 4px) 8px 40px; max-width: 520px; margin: 0 auto; }
     .top-bar { display: flex; align-items: center; gap: 10px; padding: 8px 0 12px; }
-    .back-top { width: 40px; height: 40px; border-radius: 50%; border: 2px solid #cbd5e1; background: #f8fafc; font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
-    .back-label { font-size: 14px; color: #64748b; }
+    .back-top { width: 44px; height: 44px; border-radius: 10px; border: 1.5px solid var(--line-strong); background: #fff; color: var(--ink-700); font-size: 20px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .back-label { font-size: 14px; font-weight: 600; color: var(--ink-500); }
     .row { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-    .box { flex: 1 1 auto; min-width: 70px; padding: 18px 10px; border-radius: 12px; background: #fff; border: 3px solid #d4dae2; box-shadow: 0 2px 0 #cbd5e1; font-size: 16px; font-weight: 800; text-align: center; cursor: pointer; user-select: none; transition: border-color .15s, background .15s; }
-    .box:active, .box.selected { background: #e7ebf8; color: #0f172a; border-color: #7c8fd4; }
-    .box.ct-btn { background: #e7f8ed; color: #14532d; border-color: #7fbf95; }
-    .box.ct-btn.selected { background: #e7f8ee; border-color: #cdead8; }
+    /* botonera: baldosas blancas; elegida = TINTA RELLENA (la misma señal de "elegido" de todo GP2) */
+    .box { flex: 1 1 auto; min-width: 70px; min-height: 64px; padding: 16px 10px; border-radius: 12px; background: #fff; color: var(--ink-900); border: 1.5px solid var(--line-strong); box-shadow: 0 2px 0 var(--line); font-size: 16px; font-weight: 800; text-align: center; cursor: pointer; user-select: none; transition: border-color .12s, background .12s, color .12s; }
+    .box:active, .box.selected { background: var(--ink-900); color: #fff; border-color: var(--ink-900); box-shadow: none; }
+    .box.ct-btn { background: var(--ok-50); color: #14532d; border-color: var(--ok-200); }
+    .box.ct-btn.selected { background: var(--ok-700); color: #fff; border-color: var(--ok-700); }
     /* Como 2.0: con un tiempo muerto abierto sólo se puede tocar ése; E sin cajón, C sin matriz: grises y sin respuesta */
     .box.bloq { opacity: .35; filter: grayscale(100%); pointer-events: none; }
-    .aviso-botones { margin: 0 0 8px; padding: 8px 10px; border-radius: 8px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; font-size: 15px; font-weight: 700; }
-    #selectedArea { margin-top: 10px; background: #fff; border-radius: 14px; padding: 16px; box-shadow: 0 1px 6px rgba(0,0,0,.1); }
+    .aviso-botones { margin: 0 0 8px; padding: 10px 12px; border-radius: 8px; background: var(--warn-50); border: 1px solid var(--warn-200); border-left: 4px solid #d97706; color: #6b4100; font-size: 15px; font-weight: 700; }
+    #selectedArea { margin-top: 10px; background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 16px; box-shadow: var(--sh-1); }
     .selected-container { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .back-arrow { width: 36px; height: 36px; border-radius: 50%; border: 2px solid #cbd5e1; background: #f8fafc; font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
-    .selected-box { font-size: 32px; font-weight: 900; color: #1e40af; }
-    .selected-desc { font-size: 15px; color: #475569; font-weight: 600; }
+    .back-arrow { width: 44px; height: 44px; border-radius: 10px; border: 1.5px solid var(--line-strong); background: #fff; color: var(--ink-700); font-size: 18px; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; }
+    .selected-box { font-size: 32px; font-weight: 800; color: var(--brand-600); letter-spacing: -.01em; }
+    .selected-desc { font-size: 15px; color: var(--ink-600); font-weight: 600; }
     #inputArea { margin-bottom: 10px; }
-    .label { font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 6px; }
+    .label { font-size: 14px; font-weight: 600; color: var(--ink-600); margin-bottom: 6px; }
     .golpe-hint { margin-top: 8px; padding: 10px 12px; border-radius: 8px; background: #eff6ff;
                   border: 2px solid #bfdbfe; color: #1e3a8a; font-size: 19px; font-weight: 800; line-height: 1.3; }
     .golpe-hint.x1 { background: #f8fafc; border-color: #e2e8f0; color: #475569; font-weight: 700; }
-    .text-input { width: 100%; font-size: 26px; padding: 10px 14px; border: 2px solid #cbd5e1; border-radius: 10px; text-align: center; }
-    #matrizInfo { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; font-size: 14px; color: #334155; margin-bottom: 10px; }
+    .text-input { width: 100%; font-size: 26px; padding: 10px 14px; border: 1.5px solid var(--line-strong); border-radius: 10px; text-align: center; }
+    #matrizInfo { background: var(--ink-50); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; font-size: 14px; color: #334155; margin-bottom: 10px; }
     /* Listado de matrices (E / CM) */
     #matrizPicker { margin-bottom: 10px; }
-    #matrizPicker .mp-label { font-size: 14px; font-weight: 600; color: #64748b; margin-bottom: 6px; }
+    #matrizPicker .mp-label { font-size: 12px; font-weight: 700; color: var(--ink-500); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
     #matrizGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; max-height: 320px; overflow-y: auto; padding: 2px; }
-    .mz { background: #f8fafc; border: 2px solid #d5dae1; border-radius: 10px; padding: 10px 8px; text-align: left; cursor: pointer; user-select: none; }
-    .mz .mz-n { font-size: 18px; font-weight: 900; color: #1e40af; }
-    .mz .mz-d { font-size: 11px; font-weight: 600; color: #64748b; margin-top: 2px; overflow-wrap: anywhere; }
+    .mz { background: #fff; border: 1.5px solid var(--line-strong); border-radius: 10px; padding: 10px 8px; text-align: left; cursor: pointer; user-select: none; min-height: 44px; }
+    .mz .mz-n { font-size: 18px; font-weight: 800; color: var(--brand-600); }
+    .mz .mz-d { font-size: 12px; font-weight: 600; color: var(--ink-500); margin-top: 2px; overflow-wrap: anywhere; }
     .mz .mz-a { font-size: 14px; font-weight: 800; color: #854d0e; margin-top: 4px; overflow-wrap: anywhere; }
-    .mz.sel { background: #e7ebf8; border-color: #cdd4ea; }
-    .mz.sel .mz-n { color: #0f172a; }
-    .mz.sel .mz-d { color: #334155; }
+    .mz.sel { background: var(--ink-900); border-color: var(--ink-900); }
+    .mz.sel .mz-n { color: #fff; }
+    .mz.sel .mz-d { color: var(--ink-300); }
+    .mz.sel .mz-a { color: #fde68a; }
     /* Matriz elegida con pieza: la pieza queda a la DERECHA del numero [usuario 2026-08-31] */
     /* La card con chip ocupa la fila entera pero mide lo que su contenido (justify-self: start): en una celda de 150px
        el chip no entraba y quedaba AFUERA de la tarjeta, y el nombre se partia a mitad de palabra [usuario 2026-10-07].
@@ -101,7 +130,7 @@
     .mz.has-chip .mz-d { overflow-wrap: break-word; }
     .mz-chip { flex: 0 1 auto; background: #fef9c3; color: #854d0e; font-weight: 900; font-size: 17px; padding: 8px 12px; border-radius: 8px; text-align: center; line-height: 1.1; }
     .mz-chip small { display: block; font-size: 10px; font-weight: 700; opacity: .8; margin-top: 1px; }
-    .mz-empty { grid-column: 1 / -1; color: #475569; font-size: 14px; padding: 10px; text-align: center; }
+    .mz-empty { grid-column: 1 / -1; color: var(--ink-600); font-size: 14px; padding: 10px; text-align: center; }
     /* Selector de pieza (matrices con varias salidas) */
     #piezaPicker { margin-bottom: 10px; background: #fefce8; border: 2px solid #eae0cd; border-radius: 10px; padding: 10px; }
     #piezaPicker .pp-label { font-size: 14px; font-weight: 700; color: #854d0e; margin-bottom: 8px; }
@@ -115,7 +144,7 @@
     /* Opcion de pieza con etiqueta corta (GP2.matriz_salida_etiqueta): SOLO la etiqueta, grande y centrada [usuario 2026-10-07] */
     .mz.mz-et { display: flex; align-items: center; justify-content: center; text-align: center; min-height: 64px; }
     .mz.mz-et .mz-n { font-size: 20px; line-height: 1.15; overflow-wrap: anywhere; }
-    .error { color: #dc2626; font-size: 14px; font-weight: 600; margin-top: 8px; min-height: 20px; }
+    .error { color: var(--err-700); font-size: 14px; font-weight: 700; margin-top: 8px; min-height: 20px; }
     /* Rollo picker (todos en E) */
     #rolloPicker { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
     #rolloPicker .rp-label { font-size: 13px; font-weight: 700; color: #166534; margin-bottom: 8px; }
@@ -124,9 +153,9 @@
     .rl { background: #fff; border: 2px solid #86efac; border-radius: 10px; padding: 12px 10px; text-align: left; cursor: pointer; user-select: none; min-height: 44px; }
     .rl .rl-kg { font-size: 19px; font-weight: 900; color: #166534; }
     .rl .rl-sub { font-size: 12px; font-weight: 600; color: #4b7a5a; margin-top: 2px; }
-    .rl.sel { background: #e7f8ee; border-color: #cdead8; }
-    .rl.sel .rl-kg { color: #0f172a; }
-    .rl.sel .rl-sub { color: #14532d; }
+    .rl.sel { background: var(--ink-900); border-color: var(--ink-900); }
+    .rl.sel .rl-kg { color: #fff; }
+    .rl.sel .rl-sub { color: var(--ink-300); }
     .rl-msg { grid-column: 1 / -1; color: #4b7a5a; font-size: 14px; padding: 8px 2px; }
     /* PR «¿quedó resto?» (alimentador) */
     #quedoRestoWrap { background: #fefce8; border: 1px solid #fde68a; border-radius: 8px; padding: 10px 14px; margin-bottom: 10px; }
@@ -152,24 +181,24 @@
     .adv-cont-cancel { background: #fff; color: #1e40af; border-color: #1e40af; }
     .adv-cont-ok { background: #dc2626; color: #fff; border-color: #991b1b; }
     /* Terminar Dia button */
-    #btnTerminarDia { position: fixed; top: 10px; right: 10px; padding: 8px 14px; font-size: 14px; font-weight: 700; background: #b91c1c; color: #fff; border: 2px solid #991b1b; border-radius: 8px; cursor: pointer; z-index: 50; }
+    #btnTerminarDia { position: fixed; top: 12px; right: 12px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 700; background: var(--err-700); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; cursor: pointer; z-index: 50; }
     /* Sync badge */
-    #syncBadge { position: fixed; bottom: 6px; left: 8px; font-size: 12px; font-weight: 800; z-index: 100; cursor: pointer; padding: 4px 10px; border-radius: 999px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; user-select: none; }
+    #syncBadge { position: fixed; bottom: 6px; left: 8px; font-size: 12px; font-weight: 700; z-index: 100; cursor: pointer; padding: 4px 10px; border-radius: 999px; background: #fff; color: var(--ink-600); border: 1px solid var(--line); box-shadow: var(--sh-1); user-select: none; }
     /* Historial items */
     .hist-btn { cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; background: #f1f5f9; border: 1px solid #e2e8f0; }
     /* Hist dias btn */
-    #btnHistDias { position: fixed; top: 12px; right: 12px; width: 44px; height: 44px; border-radius: 50%; border: 2px solid #cbd5e1; background: #f8fafc; font-size: 20px; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; }
+    #btnHistDias { position: fixed; top: 12px; right: 12px; width: 44px; height: 44px; border-radius: 8px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.08); font-size: 20px; cursor: pointer; z-index: 100; display: flex; align-items: center; justify-content: center; }
     /* Salir al menu principal */
-    #btnMenu { position: fixed; top: 12px; left: 12px; height: 44px; padding: 0 16px; border-radius: 999px; border: 2px solid #cbd5e1; background: #f8fafc; color: #475569; font-size: 15px; font-weight: 700; cursor: pointer; z-index: 100; }
+    #btnMenu { position: fixed; top: 12px; left: 12px; height: 44px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.08); color: #fff; font-size: 15px; font-weight: 600; cursor: pointer; z-index: 100; }
     /* TD modal */
     .td-modal { position: fixed; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; z-index: 200; padding: 0; }
     .td-modal-card { background: #fff; border-radius: 16px 16px 0 0; width: 100%; max-width: 520px; padding: 20px; }
     .td-modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
-    .td-modal-title { font-size: 18px; font-weight: 800; color: #1e293b; }
-    .td-modal-close { background: none; border: none; font-size: 14px; color: #64748b; cursor: pointer; }
+    .td-modal-title { font-size: 18px; font-weight: 700; color: var(--ink-900); }
+    .td-modal-close { background: none; border: none; min-height: 44px; padding: 0 8px; font-size: 15px; font-weight: 600; color: var(--ink-500); cursor: pointer; }
     .td-modal-body { font-size: 15px; color: #334155; margin-bottom: 16px; }
     .td-modal-footer { display: flex; justify-content: flex-end; }
-    .td-confirm-btn { background: #b91c1c; color: #fff; border: none; border-radius: 8px; padding: 12px 24px; font-size: 16px; font-weight: 700; min-height: 44px; cursor: pointer; }
+    .td-confirm-btn { background: var(--err-700); color: #fff; border: none; border-radius: 8px; padding: 12px 24px; font-size: 16px; font-weight: 700; min-height: 44px; cursor: pointer; }
     .td-confirm-btn:disabled { background: #9ca3af; cursor: not-allowed; }
     /* Terminar día como 2.0 (v3.1.10): resumen, «ya cerraste», tiempo muerto abierto, último cajón / ¿seguís mañana? */
     .td-modal-card { max-height: 92vh; overflow-y: auto; box-sizing: border-box; }
@@ -201,6 +230,8 @@
   </style>
 </head>
 <body>
+
+<div class="op-bar" aria-hidden="true"><span class="sello">GP2</span><span class="op-bar-t">Registro · Cervantes</span></div>
 
 <div id="syncBadge" title="Tocar para forzar envio">&#10003; al día</div>
 

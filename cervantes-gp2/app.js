@@ -174,9 +174,9 @@ function pedirClaveTv(aviso, cancelable) {
     if (viejo) viejo.remove();
     const fondo = document.createElement("div");
     fondo.id = "tvClaveModal";
-    fondo.style.cssText = "position:fixed;inset:0;z-index:400;background:#f1f5f9;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;";
+    fondo.style.cssText = "position:fixed;inset:0;z-index:400;background:#eef1f5;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto;";
     const caja = document.createElement("div");
-    caja.style.cssText = "background:#fff;border-radius:14px;padding:22px 20px;max-width:340px;width:100%;box-shadow:0 10px 30px rgba(15,23,42,.25);text-align:center;font-family:inherit;";
+    caja.style.cssText = "background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:22px 20px;max-width:340px;width:100%;box-shadow:0 6px 24px rgba(15,23,42,.12);text-align:center;font-family:inherit;";
     const t = document.createElement("div");
     t.style.cssText = "font-size:22px;font-weight:800;color:#0f172a;margin-bottom:6px;";
     t.textContent = "📺 Código de la TV";
@@ -187,7 +187,7 @@ function pedirClaveTv(aviso, cancelable) {
     inp.id = "tvClaveInput";
     inp.type = "text"; inp.inputMode = "numeric"; inp.maxLength = 4; inp.autocomplete = "one-time-code";
     inp.setAttribute("pattern", "[0-9]*");
-    inp.style.cssText = "width:100%;box-sizing:border-box;font-size:34px;letter-spacing:12px;text-align:center;padding:8px;border:2px solid #cbd5e1;border-radius:10px;font-weight:800;";
+    inp.style.cssText = "width:100%;box-sizing:border-box;font-size:34px;letter-spacing:12px;text-align:center;padding:8px;border:1.5px solid #cbd5e1;border-radius:10px;font-weight:800;";
     const err = document.createElement("div");
     err.id = "tvClaveError";
     err.style.cssText = "min-height:20px;margin:8px 0;font-size:14px;font-weight:700;color:#b91c1c;";
@@ -196,11 +196,11 @@ function pedirClaveTv(aviso, cancelable) {
     fila.style.cssText = "display:flex;gap:8px;";
     const ok = document.createElement("button");
     ok.id = "tvClaveOk"; ok.type = "button"; ok.textContent = "Entrar";
-    ok.style.cssText = "flex:1;padding:12px;border-radius:10px;border:none;background:#1e40af;color:#fff;font-size:17px;font-weight:800;";
+    ok.style.cssText = "flex:1;min-height:52px;padding:12px;border-radius:10px;border:none;background:#163e98;color:#fff;font-size:17px;font-weight:700;";
     if (cancelable) {
       const no = document.createElement("button");
       no.id = "tvClaveNo"; no.type = "button"; no.textContent = "Ahora no";
-      no.style.cssText = "flex:1;padding:12px;border-radius:10px;border:1px solid #cbd5e1;background:#f8fafc;font-size:16px;font-weight:700;";
+      no.style.cssText = "flex:1;min-height:52px;padding:12px;border-radius:10px;border:1.5px solid #cbd5e1;background:#fff;font-size:16px;font-weight:600;";
       no.addEventListener("click", () => cerrar(null));
       fila.append(no);
     }
@@ -208,7 +208,7 @@ function pedirClaveTv(aviso, cancelable) {
     caja.append(t, d, inp, err, fila);
     const volver = document.createElement("a");
     volver.id = "tvClaveVolver"; volver.href = "../"; volver.textContent = "← Volver al inicio";
-    volver.style.cssText = "display:inline-block;margin-top:14px;font-size:14px;font-weight:600;color:#0e7490;text-decoration:none;";
+    volver.style.cssText = "display:inline-block;margin-top:14px;font-size:14px;font-weight:600;color:#163e98;text-decoration:none;";
     caja.append(volver);
     fondo.appendChild(caja);
     document.body.appendChild(fondo);
