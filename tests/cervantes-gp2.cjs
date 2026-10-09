@@ -276,7 +276,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.12" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.13" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -853,8 +853,48 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   chequeo("12 con catálogo, un legajo que no está sigue diciendo «no existe»", /no existe/.test(avisos7[nAvisos]));
   await ctx6.close();
 
+  // ============ 13) v3.1.13: el legajo VERDADERO (c = CHEF SRL) y «¿Quién sos?» si el número es de dos personas ============
+  const base7 = nuevaBase();
+  base7.bundle = Object.assign({}, BUNDLE, { empleados: {
+    "c29": { nombre: "Nora Chef", activo: true, hora_entrada: "00:01:00" },
+    "29": { nombre: "Viviana Loeke", activo: true, hora_entrada: "00:01:00" },
+    "c94": { nombre: "Isidro Chef", activo: true, hora_entrada: "00:01:00" },
+  } });
+  const { ctx: ctx7, p: p8 } = await contexto(base7);
+  const preguntas8 = [];
+  p8.on("dialog", (d) => preguntas8.push(d.message()));
+  await p8.goto(srv.url + "/cervantes-gp2/", { waitUntil: "domcontentloaded" });
+  await entrarConCodigo(p8, CODIGO_TV);
+  await esperar(() => llamadas(base7, "reg_prod_3_0_bundle").length >= 1);
+  await esperar(() => p8.evaluate(() => !!(D.empleados && D.empleados.c94)));
+  // número de una sola persona: escribe 94 y es c94
+  await ponerLegajo(p8, "94");
+  chequeo("13 escribe «94» y entra Isidro con su legajo verdadero c94", /Isidro Chef/.test(await p8.textContent("#btnBackLabel")) && /c94/.test(await p8.textContent("#btnBackLabel")));
+  await enviarOpcion(p8, "PB");
+  await esperar(() => base7.eventos.length >= 1);
+  chequeo("13 lo que carga va con el legajo verdadero c94", base7.eventos.some((e) => e.p.legajo === "c94") && !base7.eventos.some((e) => e.p.legajo === "94"));
+  await p8.click("#btnBackTop").catch(() => {});
+  // número de dos personas: 29 → «¿Quién sos?»
+  await p8.fill("#legajoInput", "29");
+  await p8.click("#btnContinuar");
+  await p8.waitForSelector(".rp-modal .rp-op");
+  const opciones = await p8.$$eval(".rp-modal .rp-op", (bs) => bs.map((b) => b.textContent));
+  chequeo("13 el 29 está en las dos empresas: pregunta «¿Quién sos?» con los dos nombres", /Quién sos/.test(await p8.textContent(".rp-modal")) && opciones.length === 2 && opciones.some((t) => /Nora Chef/.test(t)) && opciones.some((t) => /Viviana Loeke/.test(t)));
+  await p8.click('.rp-modal .rp-op[data-val="c29"]');
+  await p8.waitForSelector("#optionsScreen:not(.hidden)");
+  chequeo("13 eligió Nora: entra como c29", /Nora Chef/.test(await p8.textContent("#btnBackLabel")) && /c29/.test(await p8.textContent("#btnBackLabel")));
+  await enviarOpcion(p8, "PB");
+  await esperar(() => base7.eventos.some((e) => e.p.legajo === "c29"));
+  chequeo("13 y lo que carga Nora va como c29, no como 29", base7.eventos.some((e) => e.p.legajo === "c29") && !base7.eventos.some((e) => e.p.legajo === "29"));
+  await p8.click("#btnBackTop").catch(() => {});
+  // vuelve a escribir 29 en el mismo celular: ya eligió, no pregunta otra vez
+  const modales = await p8.locator(".rp-modal").count();
+  await ponerLegajo(p8, "29");
+  chequeo("13 el mismo celular vuelve a escribir 29: entra como c29 sin volver a preguntar", /Nora Chef/.test(await p8.textContent("#btnBackLabel")) && (await p8.locator(".rp-modal").count()) === modales);
+  await ctx7.close();
+
   // ============ 9) nada de GP2 ============
-  const todas = base.llamadas.concat(base2.llamadas, base3.llamadas, base4.llamadas, base5.llamadas, base6.llamadas);
+  const todas = base.llamadas.concat(base2.llamadas, base3.llamadas, base4.llamadas, base5.llamadas, base6.llamadas, base7.llamadas);
   chequeo("9 no se llamó a ninguna función de GP2 (bundle, registrar, anular, rollos, stock)", todas.length > 0 && todas.every((c) => !GP2_FNS.test(c.url)));
   chequeo("9 todas las funciones son reg_prod_3_0_*", todas.every((c) => /^reg_prod_3_0_/.test(c.fn)));
 

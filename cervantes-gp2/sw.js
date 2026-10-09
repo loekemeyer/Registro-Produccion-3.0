@@ -4,7 +4,7 @@
 // «rp3c-envio» ya lista para mandar (el cuerpo de cada toque, el pase y el equipo) y pide un «sync»; cuando vuelve la señal, aunque la
 // app esté cerrada, este service worker la manda a reg_prod_3_0_registrar_evento con ese pase. Lo enviado queda anotado en «enviados»
 // y la app, al volver, lo da por enviado. La base no duplica (id del toque): si la app y el service worker mandan lo mismo, no pasa nada.
-const SW_VERSION = "v3.1.12";
+const SW_VERSION = "v3.1.13";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";

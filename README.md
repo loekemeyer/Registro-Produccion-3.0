@@ -126,6 +126,10 @@ comportamiento de 2.0 (`cervantes/app.js`):
   si el celular todavía no tiene catálogo (celular nuevo o caché borrado, sin señal o con la base caída), el legajo y la matriz no se
   rechazan como inexistentes: avisa «Sin conexión…» y vuelve a pedir el catálogo. Con catálogo, un legajo que no está sigue diciendo
   «no existe». `tests/cervantes-gp2.cjs` §12 (falla con v3.1.10).
+- **v3.1.13 — el legajo verdadero** [Elías, 09/10: «guarda su legajo verdadero» · «si hay un legajo que exista de alta al mismo tiempo
+  con C y sin C que le pregunte quién es»]: los operarios salen de `reg_prod_3_0.operario` (liquidación de Planify, activo y de planta;
+  fases 3e y 3f) con su legajo real (c19 = CHEF SRL). El operario escribe el número; si es de una sola persona entra con su legajo
+  real, si es de dos (29 y c29) aparece «¿Quién sos?». Lo que carga se graba con el legajo verdadero. `tests/cervantes-gp2.cjs` §13.
 - SQL: `sql/reg_prod_3_0_fase_2a_premio_con_tm.sql`, `sql/reg_prod_3_0_fase_2b_botonera.sql`, `sql/reg_prod_3_0_fase_2c_fin_de_jornada_y_cajon.sql`.
   Prueba: `tests/cervantes-gp2.cjs` §10 y §11.
 

@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.11)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.13)
    ESTE ARCHIVO ES LA FUENTE de la botonera de Cervantes desde el 08/10/2026 [Elías: «se va a dejar de modificar en GP2 y
    modificar en este, y GP2 sólo hacer copia y hacer modificaciones para testear»]: los cambios se hacen ACÁ, a mano.
    Nació de la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de loekemeyer/Gestion-Productiva-2.0, commit e110890,
@@ -30,7 +30,7 @@
    de ayer), los errores de envío a la auditoría, reintento cada 3 s y envío en segundo plano por el service worker.
    ============================================================ */
 
-const APP_VERSION = "v3.1.12";
+const APP_VERSION = "v3.1.13";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -1112,7 +1112,24 @@ let selected = null;
 // Escapar texto libre de la BD antes de meterlo en innerHTML (mismo esc que Registro_GP2)
 function esc(s) { return (s == null ? "" : String(s)).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
-function legajoKey() { return String($("legajoInput").value || "").trim(); }
+/* EL LEGAJO VERDADERO [Elías, 09/10: «guarda su legajo verdadero» · «si hay un legajo que exista de alta al mismo tiempo con C y sin
+   C que le pregunte quién es»]. El catálogo trae los operarios con su legajo real (c19 = CHEF SRL, 19 = Loekemeyer), en minúscula.
+   El operario escribe el número (o con la c): si ese número es de una sola persona, es ella; si es de dos (29 y c29), «¿Quién sos?». */
+let _legajoElegido = "";   // lo que eligió en «¿Quién sos?»
+const numLegajo = (l) => String(l || "").trim().toLowerCase().replace(/^c/, "");
+function candidatosLegajo(t) {
+  const n = numLegajo(t);
+  return n ? Object.keys(D.empleados || {}).filter((k) => numLegajo(k) === n) : [];
+}
+function legajoKey() {
+  const t = String($("legajoInput").value || "").trim().toLowerCase();
+  if (!t) return "";
+  if (/^c/.test(t)) return t;                                  // escribió la letra: es ése
+  const c = candidatosLegajo(t);
+  if (c.length === 1) return c[0];                             // un solo dueño del número
+  if (c.length > 1 && c.includes(_legajoElegido)) return _legajoElegido;
+  return t;                                                    // nadie, o dos sin elegir todavía (goToOptions pregunta)
+}
 function esAlimentadorLeg() { return capsDe(legajoKey()).alimentador; }   // lo que antes era «de Eduardo» (legajo fijo)
 
 function computeHsInicio(state) {
@@ -2456,9 +2473,16 @@ function openHistDias() {
    NAVEGACION
    ============================================================ */
 async function goToOptions() {
-  const legajo = legajoKey();
+  let legajo = legajoKey();
   if (!legajo) { alert("Ingresa el número de legajo"); return; }
-  if (!D.empleados?.[legajo]) await refrescarCatalogoSiFalta();
+  if (!D.empleados?.[legajo] && !candidatosLegajo(legajo).length) await refrescarCatalogoSiFalta();
+  const cands = candidatosLegajo($("legajoInput").value);
+  if (cands.length > 1 && !/^c/i.test(String($("legajoInput").value || "").trim()) && !cands.includes(_legajoElegido)) {
+    const op = await elegirOpcion("¿Quién sos?", cands.map((k) => ({ val: k, label: `${D.empleados[k].nombre} · ${k}` })));
+    if (!op) return;
+    _legajoElegido = op.val;
+  }
+  legajo = legajoKey();
   if (!D.empleados?.[legajo]) {
     if (!hayCatalogo()) { cargarBundle().catch(() => {}); alert(AVISO_SIN_CATALOGO); return; }
     alert(`El legajo ${legajo} no existe en el sistema.`); return;
