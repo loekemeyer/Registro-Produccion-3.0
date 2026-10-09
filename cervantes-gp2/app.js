@@ -30,7 +30,7 @@
    de ayer), los errores de envío a la auditoría, reintento cada 3 s y envío en segundo plano por el service worker.
    ============================================================ */
 
-const APP_VERSION = "v3.1.11";
+const APP_VERSION = "v3.1.12";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
