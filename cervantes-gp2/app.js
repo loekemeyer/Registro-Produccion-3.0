@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.13)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.14)
    ESTE ARCHIVO ES LA FUENTE de la botonera de Cervantes desde el 08/10/2026 [Elías: «se va a dejar de modificar en GP2 y
    modificar en este, y GP2 sólo hacer copia y hacer modificaciones para testear»]: los cambios se hacen ACÁ, a mano.
    Nació de la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de loekemeyer/Gestion-Productiva-2.0, commit e110890,
@@ -30,7 +30,7 @@
    de ayer), los errores de envío a la auditoría, reintento cada 3 s y envío en segundo plano por el service worker.
    ============================================================ */
 
-const APP_VERSION = "v3.1.13";
+const APP_VERSION = "v3.1.14";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -206,10 +206,22 @@ function pedirClaveTv(aviso, cancelable) {
     }
     fila.append(ok);
     caja.append(t, d, inp, err, fila);
-    const volver = document.createElement("a");
-    volver.id = "tvClaveVolver"; volver.href = "../"; volver.textContent = "← Volver al inicio";
-    volver.style.cssText = "display:inline-block;margin-top:14px;font-size:14px;font-weight:600;color:#163e98;text-decoration:none;";
-    caja.append(volver);
+    const cambio = cambioHaciaAca();
+    if (cambio) {
+      // Cambio de sede: el tiempo ya corre; «Cancelar» vuelve a la sede de antes y no graba nada.
+      d.textContent = "Cambio de sede: mirá la TV de Cervantes y poné los 4 números (cambian cada minuto).";
+      const cancelar = document.createElement("button");
+      cancelar.id = "tvClaveCancelarCambio"; cancelar.type = "button";
+      cancelar.textContent = cambio.desde === "virgilio" ? "✕ Cancelar el cambio y volver a Virgilio" : "✕ Cancelar el cambio";
+      cancelar.style.cssText = "display:block;width:100%;margin-top:14px;min-height:52px;padding:12px;border-radius:10px;border:1.5px solid #b91c1c;background:#fff;color:#b91c1c;font-size:16px;font-weight:700;";
+      cancelar.addEventListener("click", cancelarCambioSede);
+      caja.append(cancelar);
+    } else {
+      const volver = document.createElement("a");
+      volver.id = "tvClaveVolver"; volver.href = "../"; volver.textContent = "← Volver al inicio";
+      volver.style.cssText = "display:inline-block;margin-top:14px;font-size:14px;font-weight:600;color:#163e98;text-decoration:none;";
+      caja.append(volver);
+    }
     fondo.appendChild(caja);
     document.body.appendChild(fondo);
 
@@ -650,8 +662,8 @@ function updateStateAfterSend(legajo, payload) {
     s.last2.push({ ...payload, status: "queued" });
     writeState(legajo, s); return;
   }
-  if (["RM", "RD", "LT"].includes(op)) {        // puntuales (PM es tiempo muerto desde la v3.1.9, como 2.0)
-    if (op !== "LT") s.lastDowntime = null;
+  if (["RM", "RD", "LT", "CS"].includes(op)) {  // puntuales (PM es tiempo muerto desde la v3.1.9, como 2.0); CS llega ya cerrado
+    if (op !== "LT" && op !== "CS") s.lastDowntime = null;
     s.last2.push({ ...payload, status: "queued" });
     writeState(legajo, s); return;
   }
@@ -1131,6 +1143,78 @@ function legajoKey() {
   return t;                                                    // nadie, o dos sin elegir todavía (goToOptions pregunta)
 }
 function esAlimentadorLeg() { return capsDe(legajoKey()).alimentador; }   // lo que antes era «de Eduardo» (legajo fijo)
+
+/* ============================================================
+   CAMBIAR SEDE [Elías, 09/10: «te pide confirmar en grande, sí / no; si le da que sí lo cambia a la otra sede (con opción de
+   cancelar y regresa a su sede anterior con el tiempo cancelado) … en poner la TV de la otra sede inicia el contador de tiempo;
+   al lograr hacer el login en la otra sede, termina»].
+   Cervantes y Virgilio están en el mismo sitio y comparten el localStorage: el cambio en curso queda en LS_CAMBIO_SEDE y lo lee la
+   otra app. El tiempo muerto «CS · Cambio de Sede» lo graba la sede a la que LLEGA, cuando ESE operario termina de entrar (código de
+   la TV + legajo), desde que tocó «Sí» hasta ahí. «Cancelar» lo borra y no queda nada grabado.
+   El legajo se compara por el número (c104 = 104): Virgilio todavía graba el número.
+   Sólo en Registro Producción 3.0: la copia de la tablet de GP2 no tiene a dónde ir (el botón aparece sólo dentro de /cervantes-gp2/).
+   ============================================================ */
+const LS_CAMBIO_SEDE = "rp3_cambio_sede";
+const hayOtraSede = () => /\/cervantes-gp2\//.test(location.pathname);
+function leerCambioSede() {
+  try {
+    const c = JSON.parse(localStorage.getItem(LS_CAMBIO_SEDE) || "null");
+    return c && c.dia === dayKeyAR() ? c : null;     // uno de otro día ya no vale
+  } catch { return null; }
+}
+function cambioHaciaAca() { const c = leerCambioSede(); return c && c.hacia === "cervantes" ? c : null; }
+function borrarCambioSede() { try { localStorage.removeItem(LS_CAMBIO_SEDE); } catch { /* sin storage */ } }
+function cancelarCambioSede() {
+  const c = cambioHaciaAca();
+  borrarCambioSede();
+  location.href = c && c.desde === "virgilio" ? "../virgilio/" : "../";
+}
+
+async function cambiarSede() {
+  const leg = legajoKey();
+  if (!leg || !D.empleados?.[leg]) return;
+  const s = readState(leg);
+  if (s.matrixNeedsC) { alert("Antes de cambiar de sede cerrá el cajón con C."); return; }
+  if (s.lastDowntime) { alert(`Antes de cambiar de sede cerrá «${s.lastDowntime.opcion}»: tocalo de nuevo.`); return; }
+  const op = await elegirOpcion("¿Te cambiás a Virgilio?",
+    [{ val: "si", label: "Sí, me voy a Virgilio" }, { val: "no", label: "No" }], true);
+  if (!op || op.val !== "si") return;
+  const emp = D.empleados[leg];
+  try {
+    localStorage.setItem(LS_CAMBIO_SEDE, JSON.stringify({
+      desde: "cervantes", hacia: "virgilio", legajo: leg, nombre: (emp && emp.nombre) || "", inicio: isoNow(), dia: dayKeyAR()
+    }));
+  } catch { alert("No se pudo guardar el cambio en este celular."); return; }
+  location.href = "../virgilio/";
+}
+
+// Llegó desde Virgilio: hay que poner el código de la TV de Cervantes (el pase que hubiera de antes no vale) y el legajo ya queda escrito.
+function prepararLlegadaCambioSede() {
+  const c = cambioHaciaAca();
+  if (!c) return;
+  if (!c.paseBorrado) {
+    borrarPase();
+    c.paseBorrado = true;
+    try { localStorage.setItem(LS_CAMBIO_SEDE, JSON.stringify(c)); } catch { /* sin storage */ }
+  }
+  $("legajoInput").value = numLegajo(c.legajo);
+}
+
+// Ese operario terminó de entrar: se graba el tiempo muerto del viaje y el cambio queda cerrado.
+function cerrarCambioSede(legajo) {
+  const c = cambioHaciaAca();
+  if (!c || numLegajo(c.legajo) !== numLegajo(legajo)) return;   // entró otro: el cambio sigue esperando a su dueño
+  borrarCambioSede();
+  // ya no está en Virgilio: si vuelve, que entre con el código de esa TV (y no con la sesión de hoy guardada en el celular)
+  if (c.desde === "virgilio") { try { localStorage.removeItem("vir_legajo_auth"); } catch { /* sin storage */ } }
+  const payload = {
+    id: uuidv4(), legajo, opcion: "CS", descripcion: "Cambio de Sede",
+    texto: c.desde === "virgilio" ? "desde Virgilio" : "", ts_event: isoNow(), hs_inicio: c.inicio, matriz: ""
+  };
+  updateStateAfterSend(legajo, payload);
+  enqueue(payload);
+  despacharCola();
+}
 
 function computeHsInicio(state) {
   if (state.lastCajon?.ts) return state.lastCajon.ts;
@@ -2491,9 +2575,11 @@ async function goToOptions() {
   const nombre = typeof emp === "string" ? emp : (emp?.nombre || "");
   $("btnBackLabel").innerText = `${nombre} · Legajo ${legajo}`;
   registrarLegajoEnEquipo(legajo, nombre);
+  cerrarCambioSede(legajo);
   $("legajoScreen").classList.add("hidden");
   $("optionsScreen").classList.remove("hidden");
   selected = null;
+  $("btnCambiarSede")?.classList.toggle("hidden", !hayOtraSede());
   renderOptions();
   resetSelection();
   resumirFlujoRMSiHace(legajo);   // una rotura que quedó a medias (se recargó la página): se retoma
@@ -2651,6 +2737,7 @@ async function recogerEnviadosSW() {
    ============================================================ */
 document.addEventListener("DOMContentLoaded", () => {
   cleanupOldStates();
+  prepararLlegadaCambioSede();   // viene de Virgilio con «Cambiar sede»: código de la TV de Cervantes y el legajo ya escrito
 
   // Antes de entrar: el código de la TV (si falta el pase). Hasta que haya pase, el catálogo sale de lo guardado en el celular.
   verificarEntrada();
@@ -2676,6 +2763,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   $("btnHistDias").addEventListener("click", openHistDias);
   $("btnTerminarDia").addEventListener("click", openTerminarDia);
+  $("btnCambiarSede")?.addEventListener("click", cambiarSede);
   $("btnCancelTD").addEventListener("click", () => $("terminarDiaModal").classList.add("hidden"));
   $("btnConfirmTD").addEventListener("click", confirmarTerminarDia);
 

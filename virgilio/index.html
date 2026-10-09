@@ -1377,7 +1377,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 
 <!-- ================= LEGAJO ================= -->
 <div id="legajoScreen">
-  <a id="btnCambiarPlanta" href="javascript:void(0)" onclick="cambiarPlanta()" style="display:none;margin:0 0 10px;padding:6px 12px;font-size:13px;font-weight:600;color:#1e6bd6;background:#eaf1fb;border:1px solid #cfe0f7;border-radius:999px;text-decoration:none;">← Cambiar planta</a>
+  <a id="btnCambiarPlanta" href="javascript:void(0)" onclick="cambiarPlanta()" style="display:none;margin:0 0 10px;padding:6px 12px;font-size:13px;font-weight:600;color:#1e6bd6;background:#eaf1fb;border:1px solid #cfe0f7;border-radius:999px;text-decoration:none;">🔁 Cambiar a Cervantes</a>
   <h1 id="legajoTitle">Producción Virgilio</h1>
 
   <!-- Login con Google (obligatorio). Visible mientras no haya sesión. -->
@@ -1419,6 +1419,8 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
     <!-- v30.13 (Registro Producción 3.0, Elías 07/10: «necesita un botón de regresar, por si entró al equivocado»): vuelve a la
          pantalla de inicio que separa Virgilio y Cervantes. Sólo en este repo: Gestión Virgilio no tiene esa pantalla. -->
     <a id="tvVolverInicio" href="../" style="display:block;margin:16px auto 0;width:max-content;font-size:15px;font-weight:700;color:#1e6bd6;text-decoration:none;">← Volver al inicio</a>
+    <!-- v30.15 (Elías, 09/10): llegó con «Cambiar sede» desde Cervantes → «Cancelar» vuelve allá y no graba el tiempo. -->
+    <button id="tvCancelarCambio" type="button" onclick="cancelarCambioSede()" style="display:none;width:100%;margin:16px 0 0;min-height:52px;padding:12px;border-radius:10px;border:1.5px solid #b91c1c;background:#fff;color:#b91c1c;font-size:16px;font-weight:700;">✕ Cancelar el cambio y volver a Cervantes</button>
   </div>
 
   <button id="btnInstructivo" onclick="showInstructivo()" style="margin:14px auto 0;display:block;background:none;border:none;color:#1e6bd6;font-weight:700;font-size:13.5px;cursor:pointer;text-decoration:underline;">❓ ¿Cómo se usa? — instructivo rápido</button>
@@ -1762,6 +1764,92 @@ function getTodayKey() {
   const dd = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${dd}`;
 }
+/* v30.15 — CAMBIAR SEDE [Elías, 09/10: «te pide confirmar en grande, sí / no; si le da que sí lo cambia a la otra sede (con opción
+   de cancelar y regresa a su sede anterior con el tiempo cancelado) … en poner la TV de la otra sede inicia el contador de tiempo; al
+   lograr hacer el login en la otra sede, termina»]. Mismo contrato que cervantes-gp2/app.js: las dos apps están en el mismo sitio y
+   comparten el localStorage, el cambio en curso queda en «rp3_cambio_sede». El tiempo muerto «CS · Cambio de Sede» lo graba la sede a
+   la que LLEGA cuando ESE operario termina de entrar, desde que tocó «Sí»; acá van las dos filas de siempre (apertura y cierre con
+   ts_inicio). El legajo se compara por el número (c104 = 104). Sólo en Registro Producción 3.0. */
+const LS_CAMBIO_SEDE = "rp3_cambio_sede";
+const _numLegCS = function (l) { return String(l || "").trim().toLowerCase().replace(/^c/, ""); };
+function leerCambioSede() {
+  try { var c = JSON.parse(localStorage.getItem(LS_CAMBIO_SEDE) || "null"); return c && c.dia === getTodayKey() ? c : null; }
+  catch (_e) { return null; }
+}
+function cambioHaciaVirgilio() { var c = leerCambioSede(); return c && c.hacia === "virgilio" ? c : null; }
+function borrarCambioSede() { try { localStorage.removeItem(LS_CAMBIO_SEDE); } catch (_e) {} }
+window.cancelarCambioSede = function () {
+  var c = cambioHaciaVirgilio();
+  borrarCambioSede();
+  window.location.href = c && c.desde === "cervantes" ? "../cervantes-gp2/" : "../";
+};
+// Llega desde Cervantes: se entra con el código de la TV de Virgilio (la sesión que hubiera de antes no vale). Corre antes del login.
+(function () {
+  var c = cambioHaciaVirgilio();
+  if (!c) return;
+  if (!c.sesionBorrada) {
+    try { localStorage.removeItem("vir_legajo_auth"); } catch (_e) {}
+    c.sesionBorrada = true;
+    try { localStorage.setItem(LS_CAMBIO_SEDE, JSON.stringify(c)); } catch (_e) {}
+  }
+  var v = document.getElementById("tvVolverInicio"), x = document.getElementById("tvCancelarCambio");
+  if (v) v.style.display = "none";
+  if (x) x.style.display = "block";
+})();
+// Cartel grande Sí / No (el confirm() nativo es chico y en la app de Play Store no siempre aparece).
+function confirmarGrande(pregunta, textoSi, textoNo) {
+  return new Promise(function (resolve) {
+    var fondo = document.createElement("div");
+    fondo.id = "csConfirmar";
+    fondo.style.cssText = "position:fixed;inset:0;z-index:100000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px;";
+    var caja = document.createElement("div");
+    caja.style.cssText = "background:#fff;border-radius:16px;padding:24px 20px;max-width:440px;width:100%;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.3);";
+    var t = document.createElement("p");
+    t.style.cssText = "font-size:24px;font-weight:800;margin:0 0 18px;line-height:1.25;color:#0f172a;";
+    t.textContent = pregunta;
+    caja.appendChild(t);
+    [[true, textoSi, "#1e6bd6", "#fff"], [false, textoNo, "#f8f9fa", "#0f172a"]].forEach(function (o) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = o[0] ? "cs-si" : "cs-no"; b.textContent = o[1];
+      b.style.cssText = "display:block;width:100%;padding:20px;margin-bottom:12px;border:1px solid #c9d1d9;border-radius:14px;font-size:22px;font-weight:800;background:" + o[2] + ";color:" + o[3] + ";";
+      b.onclick = function () { fondo.remove(); resolve(o[0]); };
+      caja.appendChild(b);
+    });
+    fondo.appendChild(caja);
+    document.body.appendChild(fondo);
+  });
+}
+// Sale de Virgilio: confirma en grande y va al código de la TV de Cervantes. El tiempo corre desde el «Sí».
+async function cambiarSedeDesdeVirgilio(emp) {
+  var leg = String((emp && emp.legajo) || "").trim();
+  if (!leg) { window.location.href = "../"; return; }
+  var st = getLegajoState(leg);
+  var abiertos = Object.keys(st.toggles || {}).filter(function (k) { return st.toggles[k]; });
+  if (st.picking && st.picking.active) abiertos.push("EP");
+  if (st.armado && st.armado.active) abiertos.push("AP");
+  if (abiertos.length) { alert("Antes de cambiar de sede cerrá lo que tenés abierto: " + abiertos.join(", ") + "."); return; }
+  if (!(await confirmarGrande("¿Te cambiás a Cervantes?", "Sí, me voy a Cervantes", "No"))) return;
+  try {
+    localStorage.setItem(LS_CAMBIO_SEDE, JSON.stringify({ desde: "virgilio", hacia: "cervantes", legajo: leg,
+      nombre: (emp && emp.nombre) || "", inicio: new Date().toISOString(), dia: getTodayKey() }));
+  } catch (_e) { alert("No se pudo guardar el cambio en este celular."); return; }
+  try { localStorage.removeItem("vir_planta_dia"); } catch (_e) {}
+  window.location.href = "../cervantes-gp2/";
+}
+// Ese operario terminó de entrar con el código de la TV: se graba el tiempo muerto del viaje (apertura + cierre) y el cambio se cierra.
+function cerrarCambioSedeVirgilio(legajo) {
+  var c = cambioHaciaVirgilio();
+  if (!c || _numLegCS(c.legajo) !== _numLegCS(legajo)) return;   // entró otro: el cambio sigue esperando a su dueño
+  borrarCambioSede();
+  var ini = Date.parse(c.inicio), fin = Date.now();
+  if (!(ini > 0) || fin < ini) return;
+  var base = { legajo: String(legajo), opcion: "CS", descripcion: "Cambio de Sede", texto: c.desde === "cervantes" ? "desde Cervantes" : "" };
+  var rnd = function () { return Math.random().toString(36).slice(2, 8); };
+  enqueueReport(Object.assign({}, base, { ts: ini, id: ini.toString(36) + "_" + rnd(), ts_inicio_iso: null }));
+  enqueueReport(Object.assign({}, base, { ts: fin, id: fin.toString(36) + "_" + rnd(), ts_inicio_iso: new Date(ini).toISOString() }));
+  try { flushQueue(); } catch (_e) {}
+}
+window.cerrarCambioSedeVirgilio = cerrarCambioSedeVirgilio;
 /* v19.02 — RELOJ DE 24 h FORZADO. `toLocaleString("es-AR")` sin opciones deja que el
    dispositivo elija el ciclo horario, y el WebView de varios Android resuelve es-AR a
    12 h SIN mostrar el a.m./p.m. → las 13:34 se leían "01:34" y el operario/supervisor
@@ -5142,7 +5230,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.14";
+const APP_VERSION = "v30.15";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17288,6 +17376,7 @@ function _routeAfterAuth() {
   _renderIdentity();
   if (__identity && __identity.type === "operario" && !window.__pendingMonitorParam) {
     try { if (typeof goToOptions === "function") goToOptions(); } catch (_e) {}
+    if (_rpM) { try { cerrarCambioSedeVirgilio(__identity.emp.legajo); } catch (_e) {} }   // v30.15: llegó con «Cambiar sede»
   }
 }
 
@@ -17345,6 +17434,8 @@ window.__gvAuthTest = {
 };
 window.cambiarPlanta = function () {
   // v30.01 (Registro Producción 3.0): la planta se elige en la pantalla de inicio del sitio (../).
+  // v30.15 (Elías, 09/10): es el «Cambiar sede» — confirma en grande y cuenta el tiempo hasta entrar en Cervantes.
+  if (__identity && __identity.type === "operario" && __identity.emp) { cambiarSedeDesdeVirgilio(__identity.emp); return; }
   __plantChosen = false;
   try { localStorage.removeItem("vir_planta_dia"); } catch (_e) {}
   window.location.href = "../";

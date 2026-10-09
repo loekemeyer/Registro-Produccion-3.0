@@ -20,7 +20,7 @@
     (function(){
       // El operario ya no tiene version propia: se compara el TOKEN de cache compartido
       // (el mismo ?v= que llevan todos los assets). Si cambia, el HTML cacheado es viejo.
-      var MI_V = '3.1.13';
+      var MI_V = '3.1.14';
       function chequear(){
         fetch(location.pathname, { cache: 'no-store' }).then(function(r){ return r.text(); }).then(function(html){
           var m = html.match(/app\.js\?v=([\w.]+)/);
@@ -181,6 +181,8 @@
     .adv-cont-cancel { background: #fff; color: #1e40af; border-color: #1e40af; }
     .adv-cont-ok { background: #dc2626; color: #fff; border-color: #991b1b; }
     /* Terminar Dia button */
+    #btnCambiarSede { display: block; width: 100%; max-width: 520px; margin: 14px auto 8px; min-height: 52px; padding: 12px; font-size: 17px; font-weight: 700; color: var(--ink-900, #0f172a); background: #fff; border: 1.5px solid var(--line, #cbd5e1); border-radius: 10px; cursor: pointer; }
+    #btnCambiarSede.hidden { display: none; }
     #btnTerminarDia { position: fixed; top: 12px; right: 12px; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 700; background: var(--err-700); color: #fff; border: 1px solid rgba(255,255,255,.18); border-radius: 8px; cursor: pointer; z-index: 50; }
     /* Sync badge */
     #syncBadge { position: fixed; bottom: 6px; left: 8px; font-size: 12px; font-weight: 700; z-index: 100; cursor: pointer; padding: 4px 10px; border-radius: 999px; background: #fff; color: var(--ink-600); border: 1px solid var(--line); box-shadow: var(--sh-1); user-select: none; }
@@ -262,6 +264,7 @@
   <div class="row" id="row2"></div>
   <div class="row" id="row3"></div>
   <div class="row" id="row4"></div>
+  <button id="btnCambiarSede" class="hidden" type="button">🔁 Cambiar a Virgilio</button>
 
   <div id="selectedArea" class="hidden">
     <div class="selected-container">
@@ -332,6 +335,6 @@
   </div>
 </div>
 
-<script src="app.js?v=3.1.13"></script>
+<script src="app.js?v=3.1.14"></script>
 </body>
 </html>
