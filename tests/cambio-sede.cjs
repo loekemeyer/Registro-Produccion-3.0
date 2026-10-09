@@ -199,6 +199,15 @@ const BUNDLE = {
     await p.goto(srv.url + "/cervantes-gp2/", { waitUntil: "domcontentloaded" });
     chequeo("6 hayOtraSede() sólo en /cervantes-gp2/", await p.evaluate(() => hayOtraSede() === true &&
       /\/cervantes-gp2\//.test("/cervantes-gp2/") && !/\/cervantes-gp2\//.test("/Produccion/RegistroApp/Operarios_GP2.html")));
+    // un cambio hacia Cervantes en curso no afecta a la copia (mismo dominio): fuera de /cervantes-gp2/ cambioHaciaAca() no lo ve
+    chequeo("6 fuera de /cervantes-gp2/ el cambio en curso no se toma", await p.evaluate(() => {
+      localStorage.setItem("rp3_cambio_sede", JSON.stringify({ desde: "virgilio", hacia: "cervantes", legajo: "104", inicio: new Date().toISOString(), dia: dayKeyAR() }));
+      const dentro = !!cambioHaciaAca();
+      history.replaceState(null, "", "/Produccion/RegistroApp/Operarios_GP2.html");
+      const fuera = cambioHaciaAca() === null;
+      localStorage.removeItem("rp3_cambio_sede");
+      return dentro && fuera;
+    }));
     await ctx.close();
   }
 

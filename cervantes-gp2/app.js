@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.14)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.15)
    ESTE ARCHIVO ES LA FUENTE de la botonera de Cervantes desde el 08/10/2026 [Elías: «se va a dejar de modificar en GP2 y
    modificar en este, y GP2 sólo hacer copia y hacer modificaciones para testear»]: los cambios se hacen ACÁ, a mano.
    Nació de la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de loekemeyer/Gestion-Productiva-2.0, commit e110890,
@@ -30,7 +30,7 @@
    de ayer), los errores de envío a la auditoría, reintento cada 3 s y envío en segundo plano por el service worker.
    ============================================================ */
 
-const APP_VERSION = "v3.1.14";
+const APP_VERSION = "v3.1.15";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -1162,7 +1162,11 @@ function leerCambioSede() {
     return c && c.dia === dayKeyAR() ? c : null;     // uno de otro día ya no vale
   } catch { return null; }
 }
-function cambioHaciaAca() { const c = leerCambioSede(); return c && c.hacia === "cervantes" ? c : null; }
+function cambioHaciaAca() {
+  if (!hayOtraSede()) return null;   // la copia de la tablet de GP2 comparte el dominio (y el localStorage): ahí no hay cambio de sede
+  const c = leerCambioSede();
+  return c && c.hacia === "cervantes" ? c : null;
+}
 function borrarCambioSede() { try { localStorage.removeItem(LS_CAMBIO_SEDE); } catch { /* sin storage */ } }
 function cancelarCambioSede() {
   const c = cambioHaciaAca();

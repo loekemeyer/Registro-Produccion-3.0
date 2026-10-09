@@ -130,7 +130,7 @@ comportamiento de 2.0 (`cervantes/app.js`):
   con C y sin C que le pregunte quién es»]: los operarios salen de `reg_prod_3_0.operario` (liquidación de Planify, activo y de planta;
   fases 3e y 3f) con su legajo real (c19 = CHEF SRL). El operario escribe el número; si es de una sola persona entra con su legajo
   real, si es de dos (29 y c29) aparece «¿Quién sos?». Lo que carga se graba con el legajo verdadero. `tests/cervantes-gp2.cjs` §13.
-- **v3.1.14 (Cervantes) / v30.15 (Virgilio) — Cambiar sede** [Elías, 09/10: «te pide confirmar en grande, sí / no; si le da que sí lo
+- **v3.1.14–v3.1.15 (Cervantes) / v30.15 (Virgilio) — Cambiar sede** [Elías, 09/10: «te pide confirmar en grande, sí / no; si le da que sí lo
   cambia a la otra sede (con opción de cancelar y regresa a su sede anterior con el tiempo cancelado) … en poner la TV de la otra sede
   inicia el contador de tiempo; al lograr hacer el login en la otra sede, termina»]: «🔁 Cambiar a Virgilio» en la botonera de
   Cervantes y «🔁 Cambiar a Cervantes» en Virgilio (el «← Cambiar planta» de antes). Confirma en grande; con «Sí» abre el código de la
@@ -138,7 +138,7 @@ comportamiento de 2.0 (`cervantes/app.js`):
   operario (código + legajo), la sede a la que llega graba el tiempo muerto «CS · Cambio de Sede» desde el «Sí». No deja cambiar con
   un cajón o un tiempo muerto abierto (Cervantes) ni con algo abierto (Virgilio). Las dos apps comparten el localStorage (mismo sitio):
   el cambio en curso es `rp3_cambio_sede`; el legajo se compara por el número (Virgilio todavía graba 104, Cervantes c104). La copia de
-  la tablet de GP2 no muestra el botón (sólo aparece dentro de `/cervantes-gp2/`). `tests/cambio-sede.cjs`.
+  la tablet de GP2 no muestra el botón ni toma un cambio en curso (sólo dentro de `/cervantes-gp2/`; v3.1.15). `tests/cambio-sede.cjs`.
 - SQL: `sql/reg_prod_3_0_fase_2a_premio_con_tm.sql`, `sql/reg_prod_3_0_fase_2b_botonera.sql`, `sql/reg_prod_3_0_fase_2c_fin_de_jornada_y_cajon.sql`.
   Prueba: `tests/cervantes-gp2.cjs` §10 y §11.
 
