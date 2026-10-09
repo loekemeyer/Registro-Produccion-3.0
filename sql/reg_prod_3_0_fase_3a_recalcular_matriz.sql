@@ -1,4 +1,4 @@
--- ESTADO: PROPUESTO (09/10/2026), sin aplicar.
+-- ESTADO: APLICADO el 09/10/2026 (MCP execute_sql), con el «sí» de Elías. Probado en transacción deshecha: matriz de prueba, 100 uni, 500 s netos, tiempo 10 → toma 5,00 · premio 5,00.
 -- Registro Producción 3.0 — FASE 3a · public.recalcular_matriz también recalcula lo cargado en 3.0
 -- [Elías, 09/10: «si tienen que leer que de momento lean todas» — los operarios pasan a 3.0 el martes 13/10].
 --
