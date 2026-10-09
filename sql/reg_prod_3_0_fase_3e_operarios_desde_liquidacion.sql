@@ -111,3 +111,52 @@ create trigger reg_prod_3_0_operario_sync_emp after update of activo or delete o
   for each row execute function reg_prod_3_0.reg_prod_3_0_operario_sync_emp();
 
 select cron.schedule('reg-prod-3-0-operarios-resync', '10 6 * * *', 'select reg_prod_3_0.reg_prod_3_0_operario_resync(null)');
+
+-- ============================================================================================================================
+-- D) 09/10 [Elías: «6, 7 está ok»]. APLICADO. Probado en transacción deshecha: baja de Eduardo (c19) guarda alimentador+CM;
+--    alta de Eduardo los recupera; el mismo c19 dado de alta con otro nombre arranca SIN botones.
+--    Una baja guarda los botones especiales con el nombre; un alta del MISMO legajo con el MISMO nombre los recupera sola.
+--    Con otro nombre (legajo reasignado, como el 282 de Oscar a Melany) no se recuperan. Sin borrar filas: el respaldo
+--    usado queda marcado (usado_en).
+-- ============================================================================================================================
+create table reg_prod_3_0.operario_permiso_baja (
+  legajo text primary key, nombre text not null, borrado_en timestamptz not null default now(),
+  es_matriceria bool not null default false, es_piedra bool not null default false, es_alimentador bool not null default false,
+  ve_cm bool not null default false, ve_trm bool not null default false, ve_tl bool not null default false,
+  ve_rem bool not null default false, ve_mm bool not null default false);
+alter table reg_prod_3_0.operario_permiso_baja add column usado_en timestamptz;
+alter table reg_prod_3_0.operario_permiso_baja enable row level security;
+revoke all on reg_prod_3_0.operario_permiso_baja from public, anon, authenticated;
+
+create or replace function reg_prod_3_0.reg_prod_3_0_operario_baja_guarda() returns trigger language plpgsql security definer set search_path to '' as $$
+begin
+  insert into reg_prod_3_0.operario_permiso_baja (legajo, nombre, borrado_en, usado_en, es_matriceria, es_piedra, es_alimentador, ve_cm, ve_trm, ve_tl, ve_rem, ve_mm)
+  select old.legajo, old.nombre, now(), null, p.es_matriceria, p.es_piedra, p.es_alimentador, p.ve_cm, p.ve_trm, p.ve_tl, p.ve_rem, p.ve_mm
+    from reg_prod_3_0.operario_permiso p
+   where p.legajo = old.legajo
+     and (p.es_matriceria or p.es_piedra or p.es_alimentador or p.ve_cm or p.ve_trm or p.ve_tl or p.ve_rem or p.ve_mm)
+  on conflict (legajo) do update set nombre = excluded.nombre, borrado_en = excluded.borrado_en, usado_en = null,
+    es_matriceria = excluded.es_matriceria, es_piedra = excluded.es_piedra, es_alimentador = excluded.es_alimentador,
+    ve_cm = excluded.ve_cm, ve_trm = excluded.ve_trm, ve_tl = excluded.ve_tl, ve_rem = excluded.ve_rem, ve_mm = excluded.ve_mm;
+  return old;
+end $$;
+create or replace function reg_prod_3_0.reg_prod_3_0_operario_alta_recupera() returns trigger language plpgsql security definer set search_path to '' as $$
+declare b reg_prod_3_0.operario_permiso_baja;
+begin
+  select * into b from reg_prod_3_0.operario_permiso_baja where legajo = new.legajo and usado_en is null;
+  if found then
+    if lower(btrim(b.nombre)) = lower(btrim(new.nombre)) then
+      insert into reg_prod_3_0.operario_permiso (legajo, es_matriceria, es_piedra, es_alimentador, ve_cm, ve_trm, ve_tl, ve_rem, ve_mm)
+      values (new.legajo, b.es_matriceria, b.es_piedra, b.es_alimentador, b.ve_cm, b.ve_trm, b.ve_tl, b.ve_rem, b.ve_mm)
+      on conflict (legajo) do nothing;
+    end if;
+    update reg_prod_3_0.operario_permiso_baja set usado_en = now() where legajo = new.legajo;
+  end if;
+  return null;
+end $$;
+revoke all on function reg_prod_3_0.reg_prod_3_0_operario_baja_guarda() from public, anon, authenticated;
+revoke all on function reg_prod_3_0.reg_prod_3_0_operario_alta_recupera() from public, anon, authenticated;
+create trigger reg_prod_3_0_operario_baja_guarda before delete on reg_prod_3_0.operario
+  for each row execute function reg_prod_3_0.reg_prod_3_0_operario_baja_guarda();
+create trigger reg_prod_3_0_operario_alta_recupera after insert on reg_prod_3_0.operario
+  for each row execute function reg_prod_3_0.reg_prod_3_0_operario_alta_recupera();
