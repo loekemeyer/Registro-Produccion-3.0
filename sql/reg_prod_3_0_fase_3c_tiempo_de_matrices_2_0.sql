@@ -1,4 +1,4 @@
--- ESTADO: PROPUESTO (09/10/2026), sin aplicar. Probado en transacción deshecha: compila y queda leyendo Matrices (no se probó un toque real).
+-- ESTADO: DESCARTADO (09/10/2026), nunca aplicado. Lo reemplaza la fase 3d: el tiempo de 2.0 se copia solo a GP2 y 3.0 sigue leyendo GP2.
 -- Registro Producción 3.0 — FASE 3c · el tiempo histórico y las unidades por golpe salen de public."Matrices", como en 2.0
 -- [Elías, 09/10: «3.0 de Cervantes tiene que hacer lo mismo que Reg Prod 2.0 — no estamos hablando de Gestión Productiva»;
 --  los tiempos se cambian «actualmente en 2.0»].
