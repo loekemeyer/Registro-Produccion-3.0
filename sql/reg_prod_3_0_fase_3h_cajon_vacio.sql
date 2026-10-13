@@ -1,4 +1,4 @@
--- ESTADO: PROPUESTO (13/10/2026), sin aplicar. Espera el «sí» de Elías.
+-- ESTADO: APLICADO el 13/10/2026 (MCP execute_sql), con el «sí» de Elías («1 si»). Antes, compilado en una transacción deshecha.
 -- Registro Producción 3.0 — FASE 3h · E con «empiezo con el cajón vacío»
 -- [Elías, 13/10: «faltaría un tilde de si empiezo con el cajón vacío (no en caso de envasado y piedra)»].
 --
