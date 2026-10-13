@@ -139,6 +139,10 @@ comportamiento de 2.0 (`cervantes/app.js`):
   un cajón o un tiempo muerto abierto (Cervantes) ni con algo abierto (Virgilio). Las dos apps comparten el localStorage (mismo sitio):
   el cambio en curso es `rp3_cambio_sede`; el legajo se compara por el número (Virgilio todavía graba 104, Cervantes c104). La copia de
   la tablet de GP2 no muestra el botón ni toma un cambio en curso (sólo dentro de `/cervantes-gp2/`; v3.1.15). `tests/cambio-sede.cjs`.
+- **v3.1.16 (Cervantes) — el contador en Terminar Día** [Elías, 13/10: «falta el contador»]: en «¿Hiciste un último cajón?» y en
+  «completá lo que falta» aparece, mientras se escribe, el mismo aviso que el C (golpes / cajas → unidades) y lo que faltaría del cajón.
+  Reporte de las 18 h v96: el legajo 0 (pruebas) no entra ni a la tabla ni a «Operarios Ausentes» [Elías: «no quiero darle una falsa
+  alarma al jefe»]. El WhatsApp de PM, RM y matriz sin tiempo ya no salía con el 0; ahora lo prueba `tests/cervantes-gp2.cjs` §10i.
 - **v30.16 (Virgilio) — la misma lista de operarios** [Elías, 09/10: «GP2 y 3.0 Cervantes tienen que tomar del mismo lugar … y el de
   Virgilio también» · «no es anon, tiene que ser al enviar con el token que se obtiene de la pantalla»]: el código de la TV llama a
   `reg_prod_3_0_virgilio_operarios` (schema `reg_prod_3_0`), que devuelve los operarios de `reg_prod_3_0.operario` (los 18 de planta,

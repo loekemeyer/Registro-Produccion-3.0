@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.15)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.16)
    ESTE ARCHIVO ES LA FUENTE de la botonera de Cervantes desde el 08/10/2026 [Elías: «se va a dejar de modificar en GP2 y
    modificar en este, y GP2 sólo hacer copia y hacer modificaciones para testear»]: los cambios se hacen ACÁ, a mano.
    Nació de la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de loekemeyer/Gestion-Productiva-2.0, commit e110890,
@@ -30,7 +30,7 @@
    de ayer), los errores de envío a la auditoría, reintento cada 3 s y envío en segundo plano por el service worker.
    ============================================================ */
 
-const APP_VERSION = "v3.1.15";
+const APP_VERSION = "v3.1.16";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -2267,6 +2267,32 @@ function unidadCajon(matriz) {
   if (envasadoDe(matriz)) return { txt: "CAJAS armadas", re: /^\d+$/, im: "numeric", err: "Sólo números enteros." };
   return { txt: pideGolpes() ? "GOLPES del contador" : "Unidades hechas", re: /^\d+$/, im: "numeric", err: "Sólo números enteros." };
 }
+// Terminar Día [Elías, 13/10: «falta el contador»]: el mismo aviso que el C (golpes / cajas → unidades) y lo que faltaría del
+// cajón con lo que se está escribiendo.
+function avisoCantidadTD(matriz, compId, valor) {
+  const n = String(matriz || "").trim();
+  if (!n || es501(n)) return "";
+  const v = Number(String(valor || "").trim()) || 0;
+  let txt, uni;
+  if (envasadoDe(n)) {
+    const apc = apcEnvase(n, compId) || 1;
+    uni = v * apc;
+    txt = `Matriz ${n} (envasado): ${apc} unidades por caja.` + (v > 0 ? ` ${v} cajas = ${uni} unidades.` : "");
+  } else if (pideGolpes()) {
+    const f = uniXGolpe(n);
+    uni = v * f;
+    txt = f === 1 ? `Matriz ${n}: 1 golpe = 1 unidad.` : `Matriz ${n}: cada golpe saca ${f} unidades.` + (v > 0 ? ` ${v} golpes = ${uni} unidades.` : "");
+  } else {
+    uni = v;
+    txt = "";
+  }
+  const c = contadorDe(n, compId);
+  if (c && Number(c.uxc) > 0 && uni > 0) {
+    const resta = Number(c.uxc) - (Number(c.act) || 0) - uni;
+    txt += resta > 0 ? ` Con esto faltan ${resta.toLocaleString("es-AR")} para completar el cajón.` : " Con esto se completa el cajón.";
+  }
+  return txt.trim();
+}
 function inicioDesdeUltimoCajon(s) {
   const tsLM = s.lastMatrix?.ts || "", tsLC = s.lastCajon?.ts || "";
   return (tsLC && tsLC > tsLM) ? tsLC : tsLM;
@@ -2356,6 +2382,7 @@ function openTerminarDia() {
         <div class="td-cont-btns"><button type="button" id="btnUltSi" class="td-cont-btn-si">Sí</button><button type="button" id="btnUltNo" class="td-cont-btn-no">No</button></div>
         <div class="td-cont-no-form hidden" id="tdUltSiForm">
           <div class="td-cont-no-row"><label for="tdUltUni">${esc(cant.txt)} en ese último cajón:</label><input type="text" id="tdUltUni" inputmode="${cant.im}" autocomplete="off"></div>
+          <div class="golpe-hint" id="tdUltHint"></div>
           <div class="td-cont-no-row"><label class="td-chk"><input type="checkbox" id="tdUltCompleto"> Cajón completo (no hay más material: el contador vuelve a 0)</label></div>
           <button type="button" id="btnUltSiCargar" class="td-cont-no-cargar">Cargar y finalizar día</button>
         </div>
@@ -2382,6 +2409,7 @@ function openTerminarDia() {
       <div class="td-cont-no-form hidden" id="tdContNoForm">
         <div class="td-cont-no-title">Antes de terminar, completá lo que falta (una sola cosa):</div>
         <div class="td-cont-no-row"><label for="tdContNoUni">${esc(cant.txt)} del cajón (Matriz ${esc(matriz)}):</label><input type="text" id="tdContNoUni" inputmode="${cant.im}" autocomplete="off" placeholder="o vacío si fue tiempo muerto"></div>
+        <div class="golpe-hint" id="tdContNoHint"></div>
         <div class="td-cont-no-row"><label for="tdContNoTM">O un Tiempo Muerto:</label><select id="tdContNoTM"><option value="">-- ninguno --</option>${optsTM}</select></div>
         <button type="button" id="btnContNoCargar" class="td-cont-no-cargar">Cargar y habilitar Terminar Día</button>
         <div class="td-cont-no-feedback" id="tdContNoFeedback"></div>
@@ -2394,6 +2422,15 @@ function openTerminarDia() {
   btn.textContent = "Sí, terminar día";
   btn.style.display = modo === "ultimo" ? "none" : "";          // el último cajón tiene su propio botón (cargar y finalizar)
   btn.disabled = modo === "seguir" && !(s.terminoConContinuacion || s.tdCargaPreviaListo);
+
+  // el aviso de golpes / cajas → unidades y lo que falta del cajón, en vivo
+  [["tdUltUni", "tdUltHint"], ["tdContNoUni", "tdContNoHint"]].forEach(([inp, hint]) => {
+    const i = $(inp), h = $(hint);
+    if (!i || !h) return;
+    const pintar = () => { const t = avisoCantidadTD(matriz, s.lastMatrix?.comp_salida_id, i.value); h.textContent = t; h.classList.toggle("hidden", !t); };
+    pintar();
+    i.addEventListener("input", pintar);
+  });
 
   if (modo === "ultimo") {
     const cerrarConCarga = (tipo, v, completo) => {

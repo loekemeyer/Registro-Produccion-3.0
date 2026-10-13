@@ -559,6 +559,8 @@ Deno.serve(async (req: Request) => {
     const allRegs: any[] = []; const PAGE = 1000; let from = 0;
     while (true) { const { data } = await espejo().select("Matriz, Nombre_Matriz, Uni, Segundos_Trabajados, Segundos_Historico, Anular_Tiempo, Eliminar, Legajo, Fecha, Hora_Inicio").gte("Fecha", hoy + "T00:00:00").lte("Fecha", hoy + "T23:59:59").or("Eliminar.is.null,Eliminar.neq.S").range(from, from + PAGE - 1); if (!data || !data.length) break; allRegs.push(...data); if (data.length < PAGE) break; from += PAGE; }
 
+    // Legajo 0 = pruebas (Elías, 13/10: «no quiero darle una falsa alarma al jefe»): lo que se carga con el 0 no entra al reporte.
+    for (let i = allRegs.length - 1; i >= 0; i--) if (String(allRegs[i].Legajo || "").trim() === "0") allRegs.splice(i, 1);
     const esExcluido = (leg: string) => leg === "1" || leg === DAVID_LEGAJO || esEduardo(leg);
     const cajones = allRegs.filter((r: any) => { const mat = String(r.Matriz || "").trim(); const leg = String(r.Legajo || "").trim(); return !esCM(r) && esMatriz(mat) && !esPiedra(mat) && nm(r.Uni) > 0 && !esExcluido(leg); });
     const piedraRegs = allRegs.filter((r: any) => { const mat = String(r.Matriz || "").trim(); return esPiedra(mat) && nm(r.Uni) > 0 && String(r.Legajo || "").trim() !== "1"; });
@@ -700,7 +702,7 @@ Deno.serve(async (req: Request) => {
       const diasPorLegajo = new Map<string, Set<string>>();
       prevRegs.forEach((r: any) => {
         const leg = sinLetra(String(r.Legajo || "").trim());
-        if (!leg || leg === "1") return;
+        if (!leg || leg === "1" || leg === "0") return;
         const fechaStr = String(r.Fecha || "").slice(0, 10);
         if (!labKeys.has(fechaStr)) return; // solo dias laborables
         if (!diasPorLegajo.has(leg)) diasPorLegajo.set(leg, new Set());
@@ -709,7 +711,7 @@ Deno.serve(async (req: Request) => {
       // Buscar empleados activos que no estan hoy y tienen >1 dia activo en los 4 anteriores
       empleadosData.forEach((e: any) => {
         const leg = String(e.Legajo || "").trim();
-        if (!leg || leg === "1") return;
+        if (!leg || leg === "1" || leg === "0") return;
         if (String(e.Activo || "").toUpperCase() !== "SI") return;
         if (todayActiveSet.has(leg)) return;
         const dias = diasPorLegajo.get(leg)?.size || 0;

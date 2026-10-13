@@ -276,7 +276,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.15" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.16" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -634,6 +634,22 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   await esperar(() => eventosDe("E").some((e) => e.p.legajo === "0"));
   await pausa(300);
   chequeo("10i el legajo 0 (pruebas) no manda WhatsApp", base4.wa.length === waAntes);
+  // [Elías, 13/10: «no quiero darle una falsa alarma al jefe»] con el 0 tampoco avisan el Pare Matriz ni la Rotura
+  await ponerLegajo(p5, "0");
+  await enviarOpcion(p5, "PM");
+  await esperar(() => eventosDe("PM").some((e) => e.p.legajo === "0"));
+  await ponerLegajo(p5, "0");
+  await enviarOpcion(p5, "PM");
+  await esperar(() => eventosDe("PM").filter((e) => e.p.legajo === "0").length === 2);
+  await ponerLegajo(p5, "0");
+  await p5.click('.box[data-code="RM"]'); await p5.click("#btnEnviar");
+  await p5.waitForSelector("#cantidadCajonModal");
+  await p5.fill("#cantidadCajonInput", "4"); await p5.click("#cantidadCajonOk");
+  await esperar(() => eventosDe("RM").some((e) => e.p.legajo === "0"));
+  await pausa(300);
+  chequeo("10i el legajo 0 hace PM (abre y cierra) y RM y no sale ningún WhatsApp",
+    eventosDe("PM").filter((e) => e.p.legajo === "0").length === 2 && eventosDe("RM").some((e) => e.p.legajo === "0") && base4.wa.length === waAntes);
+  await p5.waitForSelector("#legajoScreen:not(.hidden)").catch(() => {});
   await ponerLegajo(p5, "999");
   await enviarOpcion(p5, "E", "99");
   await esperar(() => base4.wa.length === waAntes + 1);
@@ -727,7 +743,12 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   await p6.click("#btnUltSi");
   await p6.fill("#tdUltUni", "abc"); await p6.click("#btnUltSiCargar");
   chequeo("11c cantidad inválida: avisa y no carga nada", /enteros/.test(await p6.textContent("#tdUltFb")) && ev5("C", "999").length === 2);
-  await p6.fill("#tdUltUni", "5"); await p6.check("#tdUltCompleto"); await p6.click("#btnUltSiCargar");
+  // [Elías, 13/10: «falta el contador»] mientras escribe: golpes → unidades y lo que falta del cajón, como en el C
+  await p6.fill("#tdUltUni", "5");
+  const hintTD = await p6.textContent("#tdUltHint");
+  chequeo("11c en el último cajón se ve el aviso de golpes y lo que falta del cajón: " + hintTD,
+    /Matriz 10/.test(hintTD) && /golpe/.test(hintTD) && /(faltan|completa el cajón)/.test(hintTD) && await p6.isVisible("#tdUltHint"));
+  await p6.check("#tdUltCompleto"); await p6.click("#btnUltSiCargar");
   await p6.waitForSelector("#legajoScreen:not(.hidden)");
   await esperar(() => ev5("FJ", "999").length === 1 && ev5("C", "999").length === 3 && ev5("PB", "999").length === 2);
   const dia5 = await p6.evaluate(() => dayKeyAR());
