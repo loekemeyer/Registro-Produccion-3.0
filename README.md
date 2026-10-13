@@ -139,6 +139,9 @@ comportamiento de 2.0 (`cervantes/app.js`):
   un cajón o un tiempo muerto abierto (Cervantes) ni con algo abierto (Virgilio). Las dos apps comparten el localStorage (mismo sitio):
   el cambio en curso es `rp3_cambio_sede`; el legajo se compara por el número (Virgilio todavía graba 104, Cervantes c104). La copia de
   la tablet de GP2 no muestra el botón ni toma un cambio en curso (sólo dentro de `/cervantes-gp2/`; v3.1.15). `tests/cambio-sede.cjs`.
+- **v3.1.17 (Cervantes) — E «empiezo con el cajón vacío»** [Elías, 13/10: «faltaría un tilde de si empiezo con el cajón vacío (no en
+  caso de envasado y piedra)»]: en el E, si la matriz lleva contador de cajón y no es de envasado ni la 501, aparece el tilde; viaja
+  como `cajon_vacio` y la base pone en 0 el contador de la pieza (fase 3h, `sql/reg_prod_3_0_fase_3h_cajon_vacio.sql`).
 - **v3.1.16 (Cervantes) — el contador en Terminar Día** [Elías, 13/10: «falta el contador»]: en «¿Hiciste un último cajón?» y en
   «completá lo que falta» aparece, mientras se escribe, el mismo aviso que el C (golpes / cajas → unidades) y lo que faltaría del cajón.
   Reporte de las 18 h v96: el legajo 0 (pruebas) no entra ni a la tabla ni a «Operarios Ausentes» [Elías: «no quiero darle una falsa

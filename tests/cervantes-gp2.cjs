@@ -177,6 +177,10 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
         }
         if (previo >= 0) return json(200, { ok: true, id, dup: true });
         base.eventos.push(cuerpo);
+        // fase 3h: E con «empiezo con el cajón vacío» → el contador de las piezas de esa matriz vuelve a 0
+        if (cuerpo.p.cajon_vacio && cuerpo.p.toque && cuerpo.p.toque.opcion === "E") {
+          Object.keys((base.bundle.cajon || {})[String(cuerpo.p.matriz)] || {}).forEach((k) => { base.contador[k] = 0; });
+        }
         // contador de cajón (fase 2c): C/CT de una matriz con contador suman; al llegar (o con «cajón completo») vuelve a 0
         let cajon = null;
         const caj = (base.bundle.cajon || {})[String(cuerpo.p.matriz)];
@@ -276,7 +280,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   const e1 = base.eventos.find((e) => e.p.toque.opcion === "E");
   chequeo("3 el E llega con el pase y el equipo", !!e1 && e1.p_pase === "PASE.OK1" && e1.p_dispositivo === idEquipo);
   chequeo("3 el E lleva la matriz, el legajo y 0 unidades", !!e1 && e1.p.matriz === "10" && e1.p.legajo === "999" && e1.p.uni === 0);
-  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.16" && e1.p.toque.id === e1.p.id_ejecucion);
+  chequeo("3 el toque crudo viaja adentro (opción, texto, hora y versión)", !!e1 && e1.p.toque.texto === "10" && !!e1.p.toque.ts_event && e1.p.toque.app_version === "v3.1.17" && e1.p.toque.id === e1.p.id_ejecucion);
   await ponerLegajo(p, "999");
   await enviarOpcion(p, "C", "120");
   await esperar(() => base.eventos.some((e) => e.p.toque.opcion === "C"));
@@ -718,8 +722,21 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   await ponerLegajo(p6, "999");
   await p6.click('.box[data-code="E"]');
   chequeo("11a en otro botón la casilla no aparece", await p6.isHidden("#cajonCompletoWrap"));
-  await p6.click("#btnResetSelection");
-  await p6.click("#btnBackTop");
+  // 11a-bis) E: «empiezo con el cajón vacío» [Elías, 13/10] — sólo con una matriz que lleva contador (no envasado ni piedra)
+  chequeo("11a-bis E sin matriz: no aparece «empiezo con el cajón vacío»", await p6.isHidden("#cajonVacioWrap"));
+  await p6.fill("#textInput", "99");
+  chequeo("11a-bis E con una matriz sin contador: no aparece", await p6.isHidden("#cajonVacioWrap"));
+  await p6.fill("#textInput", "501");
+  chequeo("11a-bis E con la piedra (501): no aparece", await p6.isHidden("#cajonVacioWrap"));
+  await p6.fill("#textInput", "10");
+  chequeo("11a-bis E con la 10 (tiene contador): aparece el tilde", await p6.isVisible("#cajonVacioWrap"));
+  await p6.evaluate(() => { D.cajon["10"]["500"].act = 55; });   // como si el cajón tuviera algo de antes
+  await p6.check("#cajonVacioChk"); await p6.click("#btnEnviar"); await p6.waitForSelector("#legajoScreen:not(.hidden)");
+  await esperar(() => ev5("E", "999").some((e) => e.p.cajon_vacio === true));
+  await esperar(() => p6.evaluate(() => readQueue().length === 0));
+  chequeo("11a-bis el E viaja con cajon_vacio y el contador queda en 0 (celular y base)",
+    ev5("E", "999").some((e) => e.p.cajon_vacio === true && e.p.matriz === "10") && base5.contador["500"] === 0 && await p6.evaluate(() => D.cajon["10"]["500"].act === 0));
+  chequeo("11a-bis después de mandar, el tilde queda destildado y oculto", await p6.isHidden("#cajonVacioWrap") || !(await p6.isChecked("#cajonVacioChk")));
 
   // 11b) error de envío a la auditoría (al 1.er intento y cada 5) y reintento solo, cada 3 s
   base5.falla500 = true;
@@ -760,7 +777,7 @@ const ARTICULOS = { "322": [{ pieza_codigo: "394", pieza_desc: "394 Terminado", 
   chequeo("11c el FJ tiene id fijo fj_<legajo>_<día> y el día entero en el texto", fj1.p.id_ejecucion === `fj_999_${dia5}` && !!fjTexto && fjTexto.counts.C === 3 && fjTexto.events.length >= 6 && fjTexto.events.every((x) => x.opcion !== "FJ"));
   const idE5 = ev5("E", "999")[0].p.id_ejecucion;
   await esperar(() => intentos5(idE5) >= 2);
-  chequeo("11c después del FJ se reenvía el día entero como respaldo (la base no duplica)", intentos5(idE5) >= 2 && ev5("E", "999").length === 1);
+  chequeo("11c después del FJ se reenvía el día entero como respaldo (la base no duplica)", intentos5(idE5) >= 2 && ev5("E", "999").length === 2);   // 2 E del día (el 2.º con «cajón vacío», §11a-bis), ninguno duplicado
   await p6.fill("#legajoInput", "999");
   await esperar(() => p6.evaluate(() => /FJ/.test(document.getElementById("daySummary").textContent)));
   chequeo("11c el historial muestra el FJ sin el texto del día", !/counts/.test(await p6.textContent("#daySummary")));

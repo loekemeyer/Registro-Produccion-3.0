@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.16)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.17)
    ESTE ARCHIVO ES LA FUENTE de la botonera de Cervantes desde el 08/10/2026 [Elías: «se va a dejar de modificar en GP2 y
    modificar en este, y GP2 sólo hacer copia y hacer modificaciones para testear»]: los cambios se hacen ACÁ, a mano.
    Nació de la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de loekemeyer/Gestion-Productiva-2.0, commit e110890,
@@ -30,7 +30,7 @@
    de ayer), los errores de envío a la auditoría, reintento cada 3 s y envío en segundo plano por el service worker.
    ============================================================ */
 
-const APP_VERSION = "v3.1.16";
+const APP_VERSION = "v3.1.17";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -546,6 +546,14 @@ async function refrescarContador(n) {
 }
 // Mientras la base no contesta, el contador se mueve en el celular con lo que se acaba de cargar (la respuesta de la base lo corrige).
 function contadorOptimista(payload) {
+  if (payload.opcion === "E" && payload.cajon_vacio) {
+    const nE = String(payload.texto || "").trim();
+    const mE = (D.cajon || {})[nE];
+    if (!mE) return;
+    const cE = contadorDe(nE, payload.comp_salida_id);
+    (cE ? [cE.comp_id] : Object.keys(mE)).forEach((k) => aplicarContador(nE, { comp_id: k, act: 0 }));
+    return;
+  }
   if (!["C", "CT"].includes(payload.opcion)) return;
   const n = String(payload.matriz || "").trim();
   if (!n || es501(n)) return;
@@ -765,6 +773,7 @@ function toRpcPayload(p) {
 
   if (p.balancin) rpc.balancin = p.balancin;            // CM: en qué balancín quedó la matriz (va a la cruda)
   if (p.cajon_completo) rpc.cajon_completo = true;      // «cajón completo»: el contador vuelve a 0 (como 2.0)
+  if (p.cajon_vacio) rpc.cajon_vacio = true;            // E «empiezo con el cajón vacío»: el contador de la pieza vuelve a 0
   if (["C", "CT"].includes(op)) {
     const env = envasadoDe(matriz);
     if (es501(matriz)) {
@@ -838,7 +847,7 @@ async function flushQueue() {
       const { data, error } = await rpc("reg_prod_3_0_registrar_evento", { p: eventoParaEnviar(payload) });
       if (!error) {
         markSent(payload.legajo, payload.id); enviados.add(payload.id);
-        if (data && data.cajon) aplicarContador(payload.matriz, data.cajon);   // el contador como quedó en la base
+        if (data && data.cajon) aplicarContador(payload.matriz || (payload.opcion === "E" ? payload.texto : ""), data.cajon);   // el contador como quedó en la base
         continue;
       }
       if (error.code === "28000") { pasePerdido(); break; }   // pase vencido o de otro equipo: vuelve el código, nada se pierde
@@ -1388,7 +1397,18 @@ function etiquetaDeSalida(n, compId) {
   return (sa && String(sa.etiqueta || "").trim()) || "";
 }
 
+// E: «empiezo con el cajón vacío» [Elías, 13/10: «faltaría un tilde de si empiezo con el cajón vacío (no en caso de envasado y
+// piedra)»]. Sólo si la matriz lleva contador de cajón; la base pone en 0 el contador de la pieza.
+function actualizarCajonVacio(n) {
+  const w = $("cajonVacioWrap");
+  if (!w) return;
+  const k = String(n || "").trim();
+  const ver = !!(selected && selected.code === "E" && k && !es501(k) && !envasadoDe(k) && (D.cajon || {})[k]);
+  if (!ver) $("cajonVacioChk").checked = false;
+  w.classList.toggle("hidden", !ver);
+}
 function renderPiezaPicker(n) {
+  actualizarCajonVacio(n);
   const wrap = $("piezaPicker"), grid = $("piezaGrid");
   if (!wrap || !grid) return;
   const salidas = (selected && selected.code === "E") ? salidasDeMatriz(n) : [];
@@ -1696,6 +1716,7 @@ function resetSelection() {
   $("rolloPicker").classList.add("hidden");
   $("quedoRestoWrap").classList.add("hidden");
   $("cajonCompletoWrap")?.classList.add("hidden");
+  $("cajonVacioWrap")?.classList.add("hidden");
   document.querySelectorAll(".box.selected").forEach(x => x.classList.remove("selected"));
 }
 
@@ -2110,6 +2131,7 @@ async function sendFast() {
     payload.comp_salida_id = piezaSel.comp_id;
     payload.pieza = piezaSel.codigo || "";
   }
+  if (payload.opcion === "E" && $("cajonVacioChk")?.checked && !$("cajonVacioWrap")?.classList.contains("hidden")) payload.cajon_vacio = true;
   if (payload.opcion === "E" && rolloInfo) {
     payload.rollo = rolloInfo;   // {comp_id, codigo, kg_por_rollo} -> queda en el estado
   }
