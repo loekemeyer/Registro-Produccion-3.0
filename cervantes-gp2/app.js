@@ -1,7 +1,7 @@
 "use strict";
 
 /* ============================================================
-   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.17)
+   app.js — Registro Producción 3.0 · Cervantes · botonera de GP2 (v3.1.18)
    ESTE ARCHIVO ES LA FUENTE de la botonera de Cervantes desde el 08/10/2026 [Elías: «se va a dejar de modificar en GP2 y
    modificar en este, y GP2 sólo hacer copia y hacer modificaciones para testear»]: los cambios se hacen ACÁ, a mano.
    Nació de la tablet de GP2 (Produccion/RegistroApp/operarios_gp2.js de loekemeyer/Gestion-Productiva-2.0, commit e110890,
@@ -30,7 +30,7 @@
    de ayer), los errores de envío a la auditoría, reintento cada 3 s y envío en segundo plano por el service worker.
    ============================================================ */
 
-const APP_VERSION = "v3.1.17";
+const APP_VERSION = "v3.1.18";
 
 const SUPABASE_URL = "https://hrxfctzncixxqmpfhskv.supabase.co";
 const SUPABASE_KEY = "sb_publishable_BqpAgZH6ty-9wft10_YMhw_0rcIPuWT";
@@ -238,7 +238,9 @@ function pedirClaveTv(aviso, cancelable) {
   });
 }
 
-// Manda el código a la base. -> { estado: "ok" | "codigo" | "bloqueo" | "sin_red" }
+// Manda el código a la base. -> { estado: "ok" | "codigo" | "espera" | "dispositivo" | "bloqueo" | "sin_red" }
+// v3.1.18 (Elías, 13/10: «limitar a cada 2 seg.»): la base frena 2 s después de un intento fallido (espera) y pide
+// el equipo desde la 6.ª falla (dispositivo). ≡ gv_clave_chequear (Gestión Virgilio, sql/gv_tv_seguridad_v2974.sql).
 async function consultarClaveTv(clave) {
   if (navigator.onLine === false) return { estado: "sin_red" };
   const info = await infoDispositivo().catch(_infoVacia);
@@ -249,7 +251,8 @@ async function consultarClaveTv(clave) {
   if (error) return { estado: "sin_red" };   // 404 (función sin crear) / 5xx / sin señal: no se pudo verificar; no es culpa del operario
   if (data && data.ok && data.pase) { guardarPase(data); return { estado: "ok" }; }
   if (data && data.ok) return { estado: "sin_red" };   // la base no devolvió pase: no se puede seguir
-  return { estado: String((data && data.error) || "") === "bloqueo" ? "bloqueo" : "codigo" };
+  const e = String((data && data.error) || "");
+  return { estado: (e === "bloqueo" || e === "espera" || e === "dispositivo") ? e : "codigo" };
 }
 
 // Con el pase conseguido: catálogo al día y lo que estaba en cola se manda.
@@ -278,7 +281,9 @@ function asegurarEntrada(opts) {
       if (r.estado === "ok") { alTenerPase(); return { ok: true, pendiente: false }; }
       if (r.estado === "sin_red") { _entradaPospuestaHasta = Date.now() + ENTRADA_POSPONER_MS; return { ok: true, pendiente: true }; }
       aviso = r.estado === "bloqueo"
-        ? "Demasiados intentos con el código. Esperá unos minutos y probá de nuevo."
+        ? "Demasiados intentos con el código. Esperá 10 minutos o pedile ayuda a un supervisor."
+        : r.estado === "espera" ? "Esperá 2 segundos y probá de nuevo."
+        : r.estado === "dispositivo" ? "Demasiados intentos: actualizá la app y probá de nuevo."
         : "Código incorrecto o vencido: mirá la TV y probá de nuevo.";
     }
   })().finally(() => { _entradaEnCurso = null; renderSyncBadge(); });

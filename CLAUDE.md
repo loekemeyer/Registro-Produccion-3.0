@@ -175,4 +175,8 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
   GP2»]`: `python3 tools/traer_de_gp2.py --gp2 <clon de GP2> --revisar` (no escribe nada). Si dice que en GP2 hay cambios sin traer,
   avisarle a Elías ANTES de tocar (o traerlos primero, si él lo pide); si no, cambiar acá. Del otro lado, el script de copia de GP2
   se niega a pisar la tablet si tiene cambios sin traer (salvo `--pisar`).
+- **El código de la TV se prueba de a uno cada 2 s** `[Elías, 13/10/2026: «limitar a cada 2 seg. … el código anterior durante 5 segundos … que envíen su mac a los 6 intentos»]`:
+  los validadores de 3.0 (`reg_prod_3_0_virgilio_operarios`, `reg_prod_3_0_cerv_ingresar`) pasan por `public.gv_clave_chequear`
+  (Gestión Virgilio, `sql/gv_tv_seguridad_v2974.sql`), que contesta `espera` / `dispositivo` / `bloqueo` además de `codigo`.
+  Las dos apps mandan el equipo (gv_dispositivo / huella / navegador) y muestran el motivo. Virgilio v30.17, Cervantes v3.1.18.
 - **Cambios en `main`** `[usuario, 06/10/2026]`: se hacen directo en `main`, sin pull request, salvo que se pida otra cosa.

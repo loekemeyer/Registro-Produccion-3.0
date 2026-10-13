@@ -5230,7 +5230,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.16";
+const APP_VERSION = "v30.17";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17617,7 +17617,22 @@ window.promptNombreEntrevista = promptNombreEntrevista;
    resolvemos contra Empleados (mismo lookup que email->legajo). No usa
    Supabase Auth; la sesión se guarda en localStorage y dura el día. */
 /* v23.82 (Luis): antes de elegir nombre o legajo, la clave de 4 dígitos que muestra la TV
-   (gv_tv_clave_validar; cambia cada 15 min y vale la anterior). Así se entra estando en el depósito. */
+   (cambia cada minuto; v30.17, Elías 13/10: el anterior vale 5 s más, un intento fallido frena 2 s y desde la 6.ª
+   falla se manda el equipo — ≡ gv_clave_chequear de Gestión Virgilio). Así se entra estando en el depósito. */
+function _gvHuella() {
+  try {
+    const s = [screen.width, screen.height, screen.colorDepth, new Date().getTimezoneOffset(),
+      navigator.language, navigator.platform, navigator.hardwareConcurrency || 0, navigator.maxTouchPoints || 0].join("|");
+    let h = 0; for (let i = 0; i < s.length; i++) { h = ((h << 5) - h + s.charCodeAt(i)) | 0; }
+    return (h >>> 0).toString(16);
+  } catch (_e) { return null; }
+}
+function _tvClaveError(e) {
+  if (e === "espera") return "Esperá 2 segundos y probá de nuevo.";
+  if (e === "bloqueo") return "Demasiados intentos fallidos desde este celular. Esperá 10 minutos o pedile ayuda a un supervisor.";
+  if (e === "dispositivo") return "Demasiados intentos: actualizá la app y probá de nuevo.";
+  return "Clave incorrecta. Mirá la TV (cambia cada minuto).";
+}
 let __tvClaveOkAt = 0;
 const TV_CLAVE_VALIDA_MS = 10 * 60 * 1000;   // una vez validada, 10 min para elegir nombre/legajo
 function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt) < TV_CLAVE_VALIDA_MS; }
@@ -17635,11 +17650,12 @@ window.loginConClaveTv = async function () {
        (la misma lista que Cervantes y el admin de GP2), no la de Gestión Virgilio. «legajo» es el número (lo que Virgilio graba hoy). */
     const r = await fetch(SB_URL + "/rest/v1/rpc/reg_prod_3_0_virgilio_operarios", { method: "POST",
       headers: { apikey: SB_KEY, Authorization: "Bearer " + SB_KEY, "Content-Type": "application/json", "Content-Profile": "reg_prod_3_0" },
-      body: JSON.stringify({ p_clave: clave }) });
+      body: JSON.stringify({ p_clave: clave, p_dispositivo: gvDispositivoId(), p_huella: _gvHuella(),
+        p_navegador: String(navigator.userAgent || "").slice(0, 200) }) });
     j = r.ok ? await r.json() : null;
   } catch (_e) { j = null; }
   if (!j) { if (errEl) errEl.textContent = "Sin conexión: probá de nuevo."; return; }
-  if (!j.ok) { if (errEl) errEl.textContent = "Clave incorrecta. Mirá la TV (cambia cada 15 min)."; return; }
+  if (!j.ok) { if (errEl) errEl.textContent = _tvClaveError(j.error); return; }
   __tvClaveOkAt = Date.now();
   const lista = $("tvNombreLista");
   if (lista) {
