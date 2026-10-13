@@ -1,0 +1,14 @@
+// Deploy en Cloudflare Workers (archivos estáticos), 13/10/2026.
+// Se sirve el repo tal cual, sin build. Lo que NO se publica está en .assetsignore.
+// "name" tiene que coincidir con el nombre del Worker en el panel de Cloudflare.
+// El subdominio va ACÁ y no en el panel: cada deploy pisa las rutas con las de este archivo.
+{
+  "name": "rp",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./"
+  },
+  "routes": [
+    { "pattern": "rp.loeke-erp.com", "custom_domain": true }
+  ]
+}

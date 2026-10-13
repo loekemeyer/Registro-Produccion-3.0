@@ -1,0 +1,32 @@
+# Lo que NO se publica en Cloudflare (mismo formato que .gitignore).
+# Ninguno de estos archivos lo pide la app en vivo (verificado con grep, 13/10/2026).
+
+# git y configuración de herramientas
+.git
+.gitignore
+.nojekyll
+.claude/
+.github/
+.vscode/
+.mcp.json
+node_modules/
+wrangler.jsonc
+.assetsignore
+vercel.json
+
+# documentación interna, SQL y scripts de desarrollo
+*.md
+LOCKS.txt
+*.sql
+*.ps1
+*.sh
+*.py
+*.bat
+*.cjs
+docs/
+sql/
+supabase/
+tests/
+tools/
+scripts/
+hooks/
