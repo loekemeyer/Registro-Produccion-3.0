@@ -8,7 +8,7 @@
    (Además admin/admin.js tiene la anon key del proyecto LK — esa es aparte.)
    ========================================================= */
 importScripts("supabase-config.js");
-const SW_VERSION = "v30.19-vir";
+const SW_VERSION = "v30.20-vir";
 /* nota: v7.68 — generador de OCs desde stock (vista_generador_oc). */
 
 const SUPABASE_URL = self.VIR_SUPABASE_URL;
@@ -267,6 +267,33 @@ self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "FLUSH_NOW") {
     event.waitUntil(flushQueueInSW().catch(() => {}));
   }
+});
+
+/* v31.10 (Luis, 15/10): Web Push de los pop-ups de sistema. Llega aunque la app esté cerrada (con
+   Chrome corriendo): muestra el aviso de Windows (suena, queda fijo) y le avisa a la página abierta para
+   que saque el pop-up ya. Lo manda la Edge Function gv-popup-push al último dispositivo activo de Luis. */
+self.addEventListener("push", (event) => {
+  let d = {};
+  try { d = event.data ? event.data.json() : {}; } catch (_e) { d = { texto: event.data ? event.data.text() : "" }; }
+  event.waitUntil((async () => {
+    await self.registration.showNotification(d.titulo || "Aviso de sistema", {
+      body: d.texto || "", tag: "gv-popup", renotify: true, requireInteraction: true,
+      icon: "icons/icon-192.png", data: { url: "./" }
+    });
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    wins.forEach((w) => { try { w.postMessage({ type: "GV_POPUP_TICK" }); } catch (_e) {} });
+  })());
+});
+
+/* v31.05 (Luis, 15/10): al tocar el aviso de Windows de un pop-up de sistema, trae la app al frente
+   (la página sola no puede: window.focus() sin click está bloqueado). Si no hay ventana abierta, la abre. */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  event.waitUntil((async () => {
+    const wins = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const w of wins) { if ("focus" in w) { try { return await w.focus(); } catch (_e) {} } }
+    if (self.clients.openWindow) return self.clients.openWindow((event.notification.data && event.notification.data.url) || "./");
+  })());
 });
 
 /* Fetch handler vacío. No interceptamos requests (no hacemos offline caching

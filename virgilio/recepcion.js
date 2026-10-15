@@ -3231,16 +3231,20 @@ async function renderBajadasRacks() {
   opActions.innerHTML = "";
   opBody.innerHTML = '<div class="opEmpty">Cargando…</div>';
   await sessionReady;
-  let res, fres;
+  let res, fres, cres;
   try {
     res = await supabase.from("Racks_Bajadas").select("id,orden_id,cod_art,descripcion,cajas,estado,creada_por,ts,sector").eq("estado", "propuesta").order("ts", { ascending: true }).limit(500);
-    fres = await supabase.from("Articulos Virgilio X Tallerista").select("Cod_Art,Cajas_x_Master,Uni_x_Caja").limit(20000);
+    fres = await supabase.from("Articulos Virgilio X Tallerista").select("Cod_Art,Uni_x_Caja").limit(20000);
+    cres = await supabase.from("GV_Rack_CxM").select("cod,cxm,sin_master").limit(20000);   // v31.13: cajas por master, de la canónica
   } catch (e) { res = { error: e }; }
   if (opState.step !== "racks") return;
   if (res.error) { opBody.innerHTML = '<div class="opEmpty" style="color:var(--danger)">No se pudo leer Racks_Bajadas.<br><small>' + (res.error.message || "") + '</small></div>'; return; }
   const rows = res.data || [];
   _racksFactors = {};
-  ((fres && fres.data) || []).forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (k && !_racksFactors[k]) _racksFactors[k] = { cajasXMaster: Number(x.Cajas_x_Master) || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; });
+  const _cxm = {};
+  ((cres && cres.data) || []).forEach(function (x) { const k = String(x.cod || "").toUpperCase().trim(); const v = x.sin_master ? 0 : (Number(x.cxm) || 0); if (k && (_cxm[k] == null || v > _cxm[k])) _cxm[k] = v; });
+  ((fres && fres.data) || []).forEach(function (x) { const k = String(x.Cod_Art || "").toUpperCase(); if (k && !_racksFactors[k]) _racksFactors[k] = { cajasXMaster: _cxm[k] || 0, uniXCaja: Number(x.Uni_x_Caja) || 0 }; });
+  Object.keys(_cxm).forEach(function (k) { if (!_racksFactors[k]) _racksFactors[k] = { cajasXMaster: _cxm[k], uniXCaja: 0 }; });
   if (!rows.length) {
     opBody.innerHTML = '<div class="opOk">✓ No hay bajadas pendientes de aprobar.</div>';
     // Mostrar histórico de aprobadas recientes (últimas 2h) para confirmar que se procesaron

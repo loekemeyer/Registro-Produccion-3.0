@@ -1,3 +1,3 @@
-c667659638a07fc5576048b46b610fb2c73b4c2a  v31.04: Telegram y pop-up conviven (Luis, no se pregunta más); C3 queda sólo en Telegram
+de3eb66bd51793afd4640db3fe9114d60de0cefc  v31.15: Bajar de racks sin posición no se graba (D4) y se saca la bajada por orden
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).
