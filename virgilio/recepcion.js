@@ -1485,6 +1485,9 @@ async function arSaveCodeRemote(cod) {
    _ocgNorm de index.html, así que replicamos el canónico acá para que "027" cruce
    con "27" y no se dupliquen artículos. */
 function _ocgNorm(c) { return String(c == null ? "" : c).toUpperCase().trim().replace(/^0+(?=.)/, ""); }
+/* v28.74 (Luis, D10/D11): el código se MUESTRA y se GUARDA con el cero adelante (058, 035E), igual que
+   _padCod de index.html. La clave de comparación sigue siendo _ocgNorm (sin ceros). */
+function _rcpPad(c) { const s = String(c == null ? "" : c).toUpperCase().trim(); const m = s.match(/^([0-9]+)(.*)$/); return m ? m[1].padStart(3, "0") + m[2] : s; }
 
 /* ============== v15.39 — alta de artículo nuevo: AVISO a Thomas por WhatsApp =========
    Pedido del dueño (2026-09-11): *"si están por recibir un artículo nuevo que no
@@ -1624,7 +1627,7 @@ function arCatalogoCargar() {
         if (!cn || vistos[cn]) return;
         vistos[cn] = 1;
         const desc = String(r.descripcion || "").trim();
-        out.push({ cod: cn, desc: desc, busq: opNorm(cn + " " + desc) });
+        out.push({ cod: cn, ver: _rcpPad(cn), desc: desc, busq: opNorm(_rcpPad(cn) + " " + cn + " " + desc) });
       });
       out.sort(function (a, b) { return a.cod < b.cod ? -1 : a.cod > b.cod ? 1 : 0; });
       // Catálogo VACÍO = no lo tomamos por bueno. Si RLS o la red lo dejan en cero, dar
@@ -1705,7 +1708,7 @@ function arBusDibujar() {
     const b = document.createElement("button");
     b.type = "button";
     b.className = "arBusRow";
-    b.innerHTML = '<span class="arBusCod">' + escapeHtmlRcp(a.cod) + '</span>' +
+    b.innerHTML = '<span class="arBusCod">' + escapeHtmlRcp(a.ver || _rcpPad(a.cod)) + '</span>' +
                   '<span class="arBusDesc">' + escapeHtmlRcp(a.desc) + '</span>';
     b.onclick = function () { arBusCerrar(); arAddCodeAplicar(a.cod, false); };
     arBusList.appendChild(b);
@@ -1757,12 +1760,12 @@ async function arAddCodeAplicar(cod, fueraDeLista) {
     const par = arCatalogoParecidos(cod);
     if (par.length) {
       const otros = par.length > 1
-        ? "\n\n(También existen: " + par.slice(1).map(function (a) { return a.cod; }).join(", ") + ")"
+        ? "\n\n(También existen: " + par.slice(1).map(function (a) { return a.ver || _rcpPad(a.cod); }).join(", ") + ")"
         : "";
       const ok = confirm(
-        "El código " + cod + " no está en la lista de activos.\n\n" +
-        "¿Quisiste decir " + par[0].cod + (par[0].desc ? " — " + par[0].desc : "") + "?" + otros + "\n\n" +
-        "Aceptar = cargo " + par[0].cod + "\n" +
+        "El código " + _rcpPad(cod) + " no está en la lista de activos.\n\n" +
+        "¿Quisiste decir " + _rcpPad(par[0].cod) + (par[0].desc ? " — " + par[0].desc : "") + "?" + otros + "\n\n" +
+        "Aceptar = cargo " + _rcpPad(par[0].cod) + "\n" +
         "Cancelar = sigo con " + cod + " y le aviso a Thomy que es un artículo nuevo");
       if (ok) { await arAddCodeAplicar(par[0].cod, false); return; }
     }
@@ -1776,11 +1779,11 @@ async function arAddCodeAplicar(cod, fueraDeLista) {
         // Sin red no frenamos la recepción: se avisa que el mensaje no salió. El aviso
         // igual no se pierde — al enviar sale el evento RSP, que dispara su Telegram.
         alert("⚠ No se pudo avisarle a Thomy (sin conexión).\n\n" +
-              "Podés seguir con la recepción igual, pero decile vos que estás creando el " + cod + ".");
+              "Podés seguir con la recepción igual, pero decile vos que estás creando el " + _rcpPad(cod) + ".");
       } else {
         const w = altaPendGet()[cod];
         alert("📲 Listo, le mandé el WhatsApp a Thomy:\n\n" +
-              "\"Hola Thomy, estoy creando un artículo nuevo, que es el " + cod + ".\n" +
+              "\"Hola Thomy, estoy creando un artículo nuevo, que es el " + _rcpPad(cod) + ".\n" +
               "¿Me confirmás que está bien?\"\n\n" +
               (w && w.wa_ok === false ? "⚠ El WhatsApp falló, le llegó por Telegram.\n\n" : "") +
               "Seguí con la recepción normal. No hace falta esperar la respuesta.");
@@ -1788,7 +1791,7 @@ async function arAddCodeAplicar(cod, fueraDeLista) {
       }
     } else if (ya.estado === "rechazado") {
       // Ya contestó que no: se avisa, pero la decisión de cargarlo es del operario.
-      alert("⚠ Ojo: Thomy ya había dicho que NO al alta de " + cod + ".");
+      alert("⚠ Ojo: Thomy ya había dicho que NO al alta de " + _rcpPad(cod) + ".");
     }
   }
 
@@ -1799,12 +1802,13 @@ async function arAddCodeAplicar(cod, fueraDeLista) {
     // del resumen lo diga con todas las letras (no es "se pasó de la OC": no es de él).
     if (!opState.artExtra) opState.artExtra = {};
     opState.artExtra[cod] = true;
-    opState.articulos.push({ Cod_Art: cod, Desc: "" });   // mostrar al instante
-    arSaveCodeRemote(cod);                                  // Log/Fabr: guardar fijo
+    opState.articulos.push({ Cod_Art: _rcpPad(cod), Desc: "" });   // mostrar al instante (con el cero)
+    arSaveCodeRemote(_rcpPad(cod));                                  // Log/Fabr: guardar fijo
     rcpDraftSave();
   }
   drawArticulosGrid();
-  openCajas(cod);                                // que le cargue las cajas ya mismo
+  { const _ex = opState.articulos.find(a => _ocgNorm(a.Cod_Art) === cod);
+    openCajas(_ex ? _ex.Cod_Art : _rcpPad(cod)); } // que le cargue las cajas ya mismo (la grafía de la grilla)
 }
 
 /* ============== Paso 5: resumen ============== */
@@ -2580,9 +2584,23 @@ async function opEnviar() {
   // cola offline, así el reintento (POST que llegó pero cuya respuesta se perdió) NO
   // duplica cajas (índice único parcial mov_stock_clientid_dedup + ignore-duplicates).
   const _cid = () => { try { if (typeof crypto !== "undefined" && crypto.randomUUID) return "mst_" + crypto.randomUUID(); } catch (_e) {} return "mst_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 10); };
+  /* v30.10 (Luis, 13/10, D1 «sí»): el PAPEL va en el movimiento (columna gv_doc), no sólo en
+     `ref`. Antes `ref` llevaba el número (remito o factura, sin decir cuál) y las FECHAS y el otro
+     número se perdían: vivían en `Entregas Prov AT` / el recibo, no en el libro de stock. */
+  const _doc = (function () {
+    const d = {
+      tipo: opState.tipoDoc || null,
+      remito: opState.nroRemito || null, fecha_remito: opState.fechaRemito || null,
+      factura: opState.nroFactura || null, fecha_factura: opState.fechaFactura || null,
+      proveedor: opState.tallNombre || null
+    };
+    const o2 = {}; Object.keys(d).forEach(function (k) { if (d[k]) o2[k] = d[k]; });
+    return Object.keys(o2).length ? o2 : null;
+  })();
   const stockRows = items.map(i => ({
     cod_art: String(i.cod), descripcion: i.desc || null,
     deposito: 'a_guardar', delta: i.cajas, tipo: 'recepcion', ref: opState.remito || null,
+    gv_doc: _doc,
     legajo: RECP.legajo || null,   // idea 7725: legajo para sumar el total del día cruzando dispositivos al cerrar RT
     // v12.38 — empresa de la recepción = línea que eligió el operario (LK/CH). Para los
     // códigos duales (437E/438E/439E/809E) esto ubica el stock recibido en la góndola
@@ -3393,7 +3411,11 @@ function pendFmtDemora(tsMs) {
   let hh = Math.round((Date.now() - tsMs) / 1800000);   // medias horas
   if (hh < 0) hh = 0;
   const h = hh / 2;
-  return (Number.isInteger(h) ? String(h) : (Math.floor(h) + ",5")) + "hs";
+  if (h < 24) return (Number.isInteger(h) ? String(h) : (Math.floor(h) + ",5")) + "hs";
+  // Thomas, 07/10/2026: desde 1 día va en días y horas ("6d 22hs"), no en "165,5hs".
+  let d = Math.floor(h / 24), r = Math.round(h - d * 24);
+  if (r === 24) { d++; r = 0; }
+  return d + "d" + (r ? " " + r + "hs" : "");
 }
 function pendTickElapsed() {
   if (opState.step !== "pend") { if (_pendTimer) { clearInterval(_pendTimer); _pendTimer = null; } return; }

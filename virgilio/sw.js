@@ -8,7 +8,7 @@
    (Además admin/admin.js tiene la anon key del proyecto LK — esa es aparte.)
    ========================================================= */
 importScripts("supabase-config.js");
-const SW_VERSION = "v30.17-vir";
+const SW_VERSION = "v30.18-vir";
 /* nota: v7.68 — generador de OCs desde stock (vista_generador_oc). */
 
 const SUPABASE_URL = self.VIR_SUPABASE_URL;
@@ -135,7 +135,7 @@ async function trySendOneReport(payload) {
         // el legajo 277 el 14/09, un solo celular, con el TP de D72A sin sello y su PUB de 5 ms
         // después sellado `gestion@v17.71`. Va con prefijo propio para poder distinguir qué
         // mandó la pantalla y qué mandó el SW.
-        gv_app: "gestion-sw@" + String(SW_VERSION || "").replace("-vir", "")
+        gv_app: "rp3-sw@" + String(SW_VERSION || "").replace("-vir", "")
       }),
       signal: ctrl.signal
     });

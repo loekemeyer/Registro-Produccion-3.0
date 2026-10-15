@@ -1,0 +1,3 @@
+072cb1e6918c8f378eb22b77edac86a41306838b  v30.95: Retira — el remito controlado al retirar queda como entregado (CRN) en el mismo toque
+# Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
+# el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).

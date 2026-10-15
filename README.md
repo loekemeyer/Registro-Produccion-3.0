@@ -14,7 +14,7 @@ todo lo de supervisor (ver «Qué cambió» y «Qué se recortó»). Las apps ha
 | Carpeta | Qué es | Origen (commit) | Versión propia | Login |
 |---|---|---|---|---|
 | `/` | **Inicio**: elegir Virgilio o Cervantes | `selector/` de `loekemeyer/Gestion-Virgilio` · `e7a7bbd` | `sw.js` → `inicio-v1.4` | — |
-| `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada | `v30.NN` (hoy `v30.05`) | **sólo el código de la TV** |
+| `virgilio/` | App del operario de **Virgilio**: **sólo la botonera** (picking, armado, carga, remitos, racks, insumos…) | `loekemeyer/Gestion-Virgilio` · `e7a7bbd` (v26.92), recortada; **desde el 15/10 se trae con `tools/traer_de_gv.cjs`** (el commit de GV está en `tools/gv_base.txt`) | `v30.NN` (hoy `v30.18`) | **sólo el código de la TV** |
 | ~~`gp2/`~~ | **Borrada el 08/10/2026** [Elías: «2 si»]: era la copia vieja de la tablet de GP2 (`Operarios_GP2.html` + lo mínimo que necesitaba), sin enlace desde el 07/10 y lo único que seguía llamando a las 4 funciones de GP2 anotadas para borrar. Queda en el historial de git | `loekemeyer/Gestion-Productiva-2.0` · `3a526e8` (v1.245.2) | — | — |
 | `cervantes/` | App de **Registro Producción 2.0** (matrices, cajones, tiempos muertos). **Sin enlace desde el 08/10** (la tarjeta «Cervantes» pasó a `cervantes-gp2/`); se abre a mano. **Se borra cuando hayan pasado todos los operarios** a `cervantes-gp2/` [Elías, 08/10]; hasta entonces sigue publicada. Ingreso por el código de la TV antes de entrar y registro del equipo | `loekemeyer/Gestion-Virgilio` · `e7a7bbd`, carpeta `cervantes/` (v1.9.3) | `v3.0.N` | **el código de la TV de Cervantes**, en el primer mensaje del día |
 | `cervantes-gp2/` | **La botonera de la tablet de GP2 llevada al celular** (v3.1.8, 08/10/2026; **es la fuente**: se edita acá y GP2 copia): entra con el código de la TV, usa el **pase firmado**, escribe en `reg_prod_3_0` y mueve el stock de GP2 (Fase 1c). **Es lo que abre «Cervantes» en el inicio desde el 08/10** (Inicio v1.4) [Elías: «si»]. Ver «Cervantes · botonera de GP2» | `Produccion/RegistroApp/` de `loekemeyer/Gestion-Productiva-2.0` (hoy `e110890`), portada por script | `v3.1.N` | **el código de la TV de Cervantes** + pase |
@@ -362,10 +362,37 @@ ventana y manda a imprimir).
   producción) ni nada contra Supabase real. Si alguna pantalla del operario se ve distinta o falta un botón, es un error
   del recorte: avisar.
 
-**Cómo portar un cambio de Gestión Virgilio**: ya no se puede copiar el archivo. Se busca la función por nombre en los dos
-(`grep -a -n "function nombre" virgilio/index.html`) y se lleva a mano; si la función nueva usa algo que acá es cascarón,
-hay que traer esa parte también. Un fix de operario que Gestión Virgilio ya tenga y acá no se mide con los comandos de
-«Fuente de verdad».
+**Cómo portar un cambio de Gestión Virgilio**: con el generador, no a mano (ver «Virgilio · traer lo nuevo de GV»).
+
+## Virgilio · traer lo nuevo de GV (generador, 15/10/2026)
+
+[Luis, 15/10: «quiero comprobar que la parte de operarios de GV sea igual a la de RP3.0 (que cuando haya update en GV, se vea
+reflejado automáticamente en RP3.0)» · D1 «generador» · D2 «sí» · «esto es para pasarle funcionalidades a RP3.0, no para GV»]
+
+```
+git -C ../Gestion-Virgilio fetch origin main
+node tools/traer_de_gv.cjs --gv ../Gestion-Virgilio --hasta origin/main --revisar          # ¿hay algo? (sale 3 si hay)
+node tools/traer_de_gv.cjs --gv ../Gestion-Virgilio --hasta origin/main --version 30.NN    # traerlo
+```
+
+- **Sólo lee** el clon de Gestión Virgilio (`git show`); escribe `virgilio/` y `tools/gv_base.txt` de este repo.
+- **Merge de 3 lados**: base = el commit de GV de `tools/gv_base.txt` (el de la última traída); nuestro = `virgilio/`; de ellos =
+  GV. El JS se une **por unidad** (función, `const`/`let`/`var`, asignación de nivel superior; `initAuth` se abre y se une por
+  adentro); el HTML y el CSS de afuera del JS, por líneas (`git merge-file`).
+- **Lo recortado no vuelve**: una unidad de GV que acá no está sólo entra si el código que queda la **nombra** (mismo criterio
+  que el recorte del 06/10). Las entradas de supervisor y los cascarones nunca entran; un `<script>`/`<link>` de `monitor/`,
+  `admin/` o de los módulos de supervisor que GV sume, tampoco.
+- **Lo propio de 3.0** (login con la TV, cascarones, `APP_VERSION`) está en `tools/traer_de_gv.propio.json` con su motivo: si
+  GV cambia una de esas, queda la de acá y el informe la lista. Cualquier otro choque **corta** el script.
+- **Vuelta exacta**: antes de escribir, el merge con «GV = base» tiene que dar `virgilio/` byte por byte.
+- A la salida pone la versión (`--version`: `APP_VERSION`, `SW_VERSION`, `version.json`, `?v=` de `recepcion.js`) y el sello
+  `gv_app` **`rp3@v30.NN`** / **`rp3-sw@v30.NN`** (D3: GV llegó a v30 el 13/10 y `gestion@v30.NN` ya no decía de qué app venía).
+- `tests/virgilio-al-dia-con-gv.cjs` (D2): falla si GV tiene algo de operario sin traer. Sin clon de GV dice SALTEADA.
+
+**Primera traída (v30.18, 15/10/2026)**: de GV v27.57 (`cb75e2b3`) a GV v30.95 (`072cb1e6`). 91 unidades traídas, 3 borradas
+como en GV, 84 nuevas que el operario nombra (702 líneas), `gv-ui.css` nuevo; `recepcion.js`, `planimetria.js` y
+`supabase-config.js` quedan iguales a GV. `send` y `gvRacksTramo` chocaban sólo porque acá ya estaban los ports de v27.58 y
+v27.63, que la versión de GV contiene: se tomó la de GV (`--usar-gv`). Quedó afuera `monitor/tv-clave.js` (código del monitor).
 
 ## Lo que falta o no coincide (a 06/10/2026)
 
@@ -435,6 +462,7 @@ supervisor). De esos tests se trajeron 8 de operario.
 | `inicio-selector` | `/` con las 2 tarjetas; Virgilio abre `virgilio/` con su login; **Cervantes abre `cervantes/`** y, antes de entrar, muestra la pantalla del código de la TV con «Volver al inicio»; `supabase.js` compartido; redirección de `selector/`; el alcance (`scope`) de las 3 apps instalables cubre el inicio |
 | `virgilio-solo-operario` | **el recorte**: los archivos de supervisor no están; la página carga sin 404 ni errores; la botonera tiene sus 20 botones y cada uno se toca sin error; las entradas de supervisor no existen y los 5 cascarones y los paneles están vacíos (51 chequeos). Con el código sin recortar falla en 19 |
 | `articulo-envasado` | nombre y marca del artículo en envasado, en `cervantes/` (8 chequeos; la parte de la tablet de GP2 se fue con `gp2/` el 08/10): regla «mismo artículo → sólo marca» (322) y «nombres distintos → nombre y marca» (389), abreviaturas LK/CH, línea colapsada, matriz de una sola pieza, matriz que no es de envasado y la RPC caída |
+| `virgilio-al-dia-con-gv` | que GV no tenga nada de operario sin traer (corre `tools/traer_de_gv.cjs --revisar`; sin clon de GV, SALTEADA) |
 | `virgilio-solo-tv` | login de Virgilio sólo con TV, sin entrada por legajo y con la entrada por nombre (v30.08); el registro del equipo en cada ingreso (v30.12) y que si falla el operario entra igual (24 chequeos) |
 | `cervantes-tv` | entrada de `cervantes/` con el código de la TV (52 chequeos): la pantalla aparece ANTES de la del legajo y la tapa, código mal y bien, qué manda a la base (app, código, id del equipo, huella, navegador, pantalla; sin legajo), anotación de cada legajo en el equipo (1 vez por día), recarga con pase, vigencia 17:44/17:50, 08:00 sin LT, arranque sin internet (retenido) y pantalla sola al volver, internet cortado con la pantalla abierta, «Ingresar código» / «Ahora no», demasiados intentos, función caída o sin crear, 7 códigos malos seguidos |
 | `operario-queda-botonera`, `modulo-minimizar-anular`, `tarea-abierta-otro-dia`, `botonera-tm-historial`, `mg-reentrada`, `toggle-anular`, `rr-sin-remitos-cierra`, `encoding-utf8` | de Gestión Virgilio, con las rutas nuevas. `operario-queda-botonera` sin el segundo selector ni `chooseVirgilio` (lo llamaba el selector de planta); `modulo-minimizar-anular` sin el chequeo del monitor |

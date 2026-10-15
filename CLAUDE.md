@@ -154,8 +154,19 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
   operarios de GV y GP2»]`. **No agregar código de supervisor** (Facturación, PPP, Stock, Monitor, Cobranzas, Importación,
   OC, Configuración…) ni traer scripts o librerías que sólo ellos usen. Los 5 cascarones (`showSupervisor`, `showConteo`,
   `stkRender`, `pppRenderProg`, `psRender`) y los 5 paneles ocultos son a propósito. **No se puede copiar el archivo de
-  Gestión Virgilio**: un cambio de operario se lleva a mano, función por función (README, «Cómo portar un cambio»).
+  Gestión Virgilio**: lo nuevo de GV se trae con el generador (abajo), nunca a mano.
   `tests/virgilio-solo-operario.cjs` falla si vuelve lo recortado.
+- **«Traé lo nuevo de GV a Reg Prod 3.0 en Virgilio»** `[Luis, 15/10/2026: D1 «generador», D2 «sí»; «esto es para pasarle
+  funcionalidades a RP3.0, no para GV»]`: `node tools/traer_de_gv.cjs --gv <clon de Gestion-Virgilio> --hasta origin/main
+  --version 30.NN`. Merge de 3 lados por función (base = el commit de GV en `tools/gv_base.txt`), trae lo que el operario
+  nombra, deja afuera supervisor y monitor, exige la «vuelta exacta» y se corta ante un choque que no esté en
+  `tools/traer_de_gv.propio.json` (lo propio de 3.0: login con la TV, cascarones, versión). **Sólo lee el clon de GV.** Un
+  choque se une a mano o, si la versión de GV ya contiene lo de 3.0, con `--usar-gv "fn x"`. Después: `tests/` entera,
+  `git diff`, commit. `tests/virgilio-al-dia-con-gv.cjs` (D2) falla mientras GV tenga algo de operario sin traer.
+  ⚠ Un cambio propio de 3.0 en una función que también es de GV la vuelve «propia»: agregarla a `traer_de_gv.propio.json`
+  con el motivo, o el próximo cambio de GV en esa función va a cortar el script (a propósito).
+- **El sello `gv_app` de Virgilio es `rp3@v30.NN` / `rp3-sw@v30.NN`** `[Luis, 15/10/2026, D3: «que quede registrado de qué lugar
+  salió el evento»]`: GV llegó a la serie v30 el 13/10 y `gestion@v30.NN` ya no decía de qué app venía. Lo pone el generador.
 - **El CSS de `virgilio/index.html` también está podado**: una regla nueva para una clase que sólo arma el JS por
   concatenación necesita que el prefijo aparezca como `"prefijo-" + x` o `` `prefijo-${x}` `` (así lo reconoció la poda).
 - **`cervantes-gp2/` ES LA FUENTE de la botonera de Cervantes** `[Elías, 08/10/2026: «se va a dejar de modificar en GP2 y modificar en
