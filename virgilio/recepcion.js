@@ -257,6 +257,11 @@ const RCP_CSS = `
 #rcpRoot .pcActs{ margin-top:10px; border-top:1px solid #eee; padding-top:10px; display:flex; flex-direction:column; gap:10px; }
 #rcpRoot .pcRow{ display:flex; align-items:center; gap:12px; }
 #rcpRoot .pcRow.pcFotoRow{ flex-wrap:wrap; }
+/* v31.28 (Thomas) — acordeón: ISIS + Control Partes ocultos hasta tildar Recibido. display:none
+   cuando está cerrado (así el gap del flex de .pcActs no deja un hueco fantasma); al abrir, revela. */
+#rcpRoot .pcCollapse{ display:none; flex-direction:column; gap:10px; }
+#rcpRoot .pcCollapse.open{ display:flex; animation:pcReveal .2s ease; }
+@keyframes pcReveal{ from{ opacity:0; transform:translateY(-4px); } to{ opacity:1; transform:none; } }
 #rcpRoot .pcLbl{ font-size:16px; font-weight:800; color:#111; }
 #rcpRoot .tickBtn{ width:28px; height:28px; border-radius:8px; border:2px solid #cbd5e1; background:#fff; font-size:0; cursor:pointer; position:relative; padding:0; flex:0 0 auto; }
 #rcpRoot .tickBtn.on{ background:var(--ok); border-color:var(--ok); }
@@ -3453,8 +3458,14 @@ function pendCard(r) {
   card.appendChild(ent);
   const acts = document.createElement("div"); acts.className = "pcActs";
   acts.appendChild(pendRecibidoRow(id, card));   // v22.53: primero quién lo procesa
-  acts.appendChild(pendCheckRow(id, "isis", "Carga ISIS"));
-  acts.appendChild(pendPartesRow(id));
+  /* v31.28 (Thomas) — acordeón: Carga ISIS y Control Partes arrancan colapsados y se abren
+     recién cuando se tilda «Recibido» (lo abre/cierra el sync() de pendRecibidoRow). La Foto NO
+     va acá: habilita el tilde Recibido, así que tiene que verse antes (si no, no se puede recibir). */
+  const collapse = document.createElement("div"); collapse.className = "pcCollapse";
+  collapse.appendChild(pendCheckRow(id, "isis", "Carga ISIS"));
+  collapse.appendChild(pendPartesRow(id));
+  collapse.classList.toggle("open", !!_pendRows[id].recibido);
+  acts.appendChild(collapse);
   /* v12.03 — se sacó el tilde "Faltantes x Día" (pedido del usuario): ese programa
      ya no se hace, así que no hay nada que tildar y no puede seguir bloqueando el
      botón Enviar. La columna Control_Modo_OP.faltantes queda en la base con lo ya
@@ -3614,6 +3625,8 @@ function pendRecibidoRow(id, card) {
     no.classList.toggle("on", !!st.no_recibido_at);
     no.disabled = st.sent;
     no.style.display = st.recibido ? "none" : "";   // v24.93 (Mel): ya recibido, no se ofrece
+    const _col = card && card.querySelector(".pcCollapse");   // v31.28: abre ISIS + Control Partes al recibir
+    if (_col) _col.classList.toggle("open", !!st.recibido);
     if (st.recibido) {
       const ms = st.recibido_at ? new Date(st.recibido_at).getTime() : 0;
       hint.textContent = st.recibido + (ms ? " · " + pendFmtFecha(null, ms) + " " + pendFmtHora(ms) : "");

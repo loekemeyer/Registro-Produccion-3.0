@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.15">
+<link rel="stylesheet" href="gv-ui.css?v=31.31">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1353,7 +1353,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.20"></script>
+<script type="module" src="recepcion.js?v=30.21"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.20";
+const APP_VERSION = "v30.21";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16849,6 +16849,29 @@ function ccUpsertCamionero(nombre) {
     }).catch(function () {});
   } catch (_e) {}
 }
+/* v31.31 (Thomas) — el fletero es un desplegable cerrado; «+ Nuevo fletero…» carga uno a demanda,
+   capitalizado, sin texto libre suelto que duplique nombres. */
+function ccCamioneroCap(s) {
+  return String(s == null ? "" : s).trim().replace(/\s+/g, " ").toLowerCase()
+    .replace(/(^|[^a-záéíóúüñ])([a-záéíóúüñ])/g, function (m, a, b) { return a + b.toUpperCase(); });
+}
+function ccCamioneroPick(sel) {
+  if (!_cc || !sel) return;
+  if (sel.value === "__nuevo__") {
+    let n = "";
+    try { n = prompt("Nombre del fletero nuevo:", ""); } catch (_e) { n = ""; }
+    n = ccCamioneroCap(n);
+    if (!n) { sel.value = _cc.camionero || ""; return; }   // canceló: vuelve a lo que estaba
+    const ya = (_cc.camioneros || []).find(function (x) { return String(x).toLowerCase() === n.toLowerCase(); });
+    if (ya) { _cc.camionero = ya; sel.value = ya; return; }   // ya existe esa persona: no duplica
+    _cc.camioneros = (_cc.camioneros || []).concat([n]);
+    const opt = document.createElement("option"); opt.value = n; opt.textContent = n;
+    sel.insertBefore(opt, sel.querySelector('option[value="__nuevo__"]'));
+    sel.value = n; _cc.camionero = n;
+    return;
+  }
+  _cc.camionero = sel.value;
+}
 function _ccKey(legajo) { return "vir_cc_checked_" + legajo + "_" + getTodayKey(); }
 function ccSaveChecked(legajo, set) { try { localStorage.setItem(_ccKey(legajo), JSON.stringify(Array.from(set || []))); } catch (_e) {} }
 function ccLoadChecked(legajo) { try { const a = JSON.parse(localStorage.getItem(_ccKey(legajo)) || "[]"); return new Set(Array.isArray(a) ? a.map(String) : []); } catch (_e) { return new Set(); } }
@@ -17071,10 +17094,16 @@ function ccRender() {
   // v15.71 (Thomas) — en pantalla se llama FLETERO. La tabla Camioneros y la columna `camionero`
   // del evento no se renombran: es el mismo dato, sólo cambia cómo se lo nombra al operario.
   if (!esRetira) {
-    const opts = (_cc.camioneros || []).map(function (n) { return `<option value="${escapeHtml(n)}"></option>`; }).join("");
+    // v31.31 (Thomas) — DESPLEGABLE CERRADO (no texto libre): el maestro ya está prolijo, así no
+    // entra "Guille" un día y "Guillermo" al otro. «+ Nuevo fletero…» agrega uno a demanda.
+    const cur = String(_cc.camionero || "");
+    const names = (_cc.camioneros || []).slice().sort(function (a, b) { return String(a).localeCompare(String(b), "es"); });
+    if (cur && names.indexOf(cur) < 0) names.unshift(cur);
+    const opts = `<option value=""${cur ? "" : " selected"}>Elegí el fletero…</option>` +
+      names.map(function (n) { return `<option value="${escapeHtml(n)}"${n === cur ? " selected" : ""}>${escapeHtml(n)}</option>`; }).join("") +
+      `<option value="__nuevo__">+ Nuevo fletero…</option>`;
     html += `<div class="cc-camionero-wrap"><label class="cc-camionero-lbl">🚚 Fletero</label>` +
-            `<input id="ccCamioneroInput" class="cc-camionero-inp" list="ccCamioneroList" autocomplete="off" placeholder="Nombre del fletero…" value="${escapeHtml(_cc.camionero || "")}" oninput="_cc && (_cc.camionero = this.value)" />` +
-            `<datalist id="ccCamioneroList">${opts}</datalist></div>`;
+            `<select id="ccCamioneroSel" class="cc-camionero-inp" onchange="ccCamioneroPick(this)">${opts}</select></div>`;
   }
   // v15.70 (Thomas) — "a medida que den click en lo que cargan, en lugar de un simple tilde, que
   // diga 1°, 2°, 3°". Ése es el ORDEN REAL de carga (distinto del sugerido por ruta, el círculo
@@ -17140,7 +17169,7 @@ function ccFinish() {
   // v11.47 — camión: nombre del camionero (leído del input en vivo por si oninput no corrió).
   let camionero = "";
   if (!esRetira) {
-    try { const inp = document.getElementById("ccCamioneroInput"); if (inp) _cc.camionero = inp.value; } catch (_e) {}
+    try { const sel = document.getElementById("ccCamioneroSel"); if (sel) _cc.camionero = (sel.value === "__nuevo__") ? "" : sel.value; } catch (_e) {}
     camionero = String(_cc.camionero || "").trim();
     // v15.70 (Thomas) — el fletero pasa a ser OBLIGATORIO. Era un aviso que se podía saltear y
     // se salteaba: el 10 y el 11/09 salieron 33 cargas sin fletero, el 08/09 otras 10. Sin ese
@@ -17319,7 +17348,16 @@ function crDeadline(loadMs) {
 }
 function crVencido(loadMs) { return loadMs > 0 && Date.now() > crDeadline(loadMs); }
 /* v10.27 — fecha/hora de la carga al camión (CCN) → "DD/MM HH:mm" en hora AR (UTC-3). */
-function crFmtCC(ms) { if (!ms) return ""; const d = new Date(ms - 3 * 3600000); const p = function (n) { return n < 10 ? "0" + n : "" + n; }; return p(d.getUTCDate()) + "/" + p(d.getUTCMonth() + 1) + " " + p(d.getUTCHours()) + ":" + p(d.getUTCMinutes()); }
+/* v31.29 (Thomas) — si es de HOY dice «hoy HH:MM»; ayer o más viejo, la fecha «DD/MM HH:MM». El día
+   se compara en hora de Buenos Aires (UTC-3), igual que el formateo. */
+function crFmtCC(ms) {
+  if (!ms) return "";
+  const p = function (n) { return n < 10 ? "0" + n : "" + n; };
+  const d = new Date(ms - 3 * 3600000), hoy = new Date(Date.now() - 3 * 3600000);
+  const hora = p(d.getUTCHours()) + ":" + p(d.getUTCMinutes());
+  const esHoy = d.getUTCFullYear() === hoy.getUTCFullYear() && d.getUTCMonth() === hoy.getUTCMonth() && d.getUTCDate() === hoy.getUTCDate();
+  return (esHoy ? "hoy" : p(d.getUTCDate()) + "/" + p(d.getUTCMonth() + 1)) + " " + hora;
+}
 
 /* v6.66 — NP marcadas "Facturado sin salida" (evento FSS): se cargaron al camión pero
    el cliente no recibió (cerrado, etc.) y la mercadería volvió al depósito. Devuelve un
