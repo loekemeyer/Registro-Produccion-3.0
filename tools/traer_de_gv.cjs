@@ -404,7 +404,10 @@ function correr(o) {
   // clasificar choques
   const sinResolver = ctx.choques.filter(c => !propio[c.donde]);
   const choquesHtmlReales = ctx.choquesHtml.filter(c => !c.recortado);
-  const hayAlgo = html !== htmlR || ARCHIVOS_JS.some(f => otros[f] !== leerR(f)) || Object.keys(nuevos).length;
+  // Un cambio que es SÓLO un número de caché (`?v=`) no es un cambio: GV mueve el de gv-ui.css en cada versión aunque el
+  // archivo sea idéntico, y eso hacía que el chequeo diera «hay algo» cada vez (15/10, chequeo de las 13:10).
+  const sinTok = s => s.replace(/\?v=[\d.]+/g, "?v=");
+  const hayAlgo = sinTok(html) !== sinTok(htmlR) || ARCHIVOS_JS.some(f => sinTok(otros[f]) !== sinTok(leerR(f))) || Object.keys(nuevos).length;
 
   const inf = informe({ baseRev, hasta, ctx, propio, sinResolver, choquesHtmlReales, nuevos, hayAlgo });
   if (o.informe) fs.writeFileSync(o.informe, inf);
