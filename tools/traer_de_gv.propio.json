@@ -5,5 +5,8 @@
   "iife initAuth › fn showSupervisor": "cascarón de supervisor (función vacía a propósito)",
   "iife initAuth › fn _routeAfterAuth": "login propio de 3.0: sólo el código de la TV, sin Google ni legajo",
   "iife initAuth › fn applyAuthState": "login propio de 3.0: sólo el código de la TV, sin Google ni legajo",
-  "iife initAuth › asg window.loginConClaveTv": "login propio de 3.0: código de la TV con gv_clave_chequear (v30.17) y lista de reg_prod_3_0.operario (v30.16)"
+  "iife initAuth › asg window.loginConClaveTv": "login propio de 3.0: código de la TV con gv_clave_chequear (v30.17) y lista de reg_prod_3_0.operario (v30.16)",
+  "fn stkRender": "cascarón de supervisor (función vacía a propósito)",
+  "fn psRender": "cascarón de supervisor (función vacía a propósito)",
+  "fn showConteo": "cascarón de supervisor (función vacía a propósito)"
 }
