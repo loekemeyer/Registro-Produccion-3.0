@@ -165,10 +165,9 @@ select * from github_repo_problemas.v_problemas order by detectado_en desc;
   `git diff`, commit. `tests/virgilio-al-dia-con-gv.cjs` (D2) falla mientras GV tenga algo de operario sin traer.
   ⚠ Un cambio propio de 3.0 en una función que también es de GV la vuelve «propia»: agregarla a `traer_de_gv.propio.json`
   con el motivo, o el próximo cambio de GV en esa función va a cortar el script (a propósito).
-- **Aviso de atraso con GV** `[Luis, 16/10/2026, D3: «sí. pero que sea solo para cambios del modulo de operarios»]`:
-  `.github/workflows/al-dia-con-gv.yml` corre `tests/virgilio-al-dia-con-gv.cjs` cada hora (7 a 20, lun–sáb), en cada push a `main`
-  y a mano; baja GV (público, sin token) en GitHub. Sólo cuenta lo del operario (supervisor, monitor y los `?v=` no). Si está atrasado
-  abre UN issue `atraso-gv` (comenta sólo si GV avanzó) y lo cierra solo al ponerse al día. Issue abierto = hay que traer.
+- **Sin aviso automático de atraso con GV** `[Luis, 16/10/2026: «no mandes ningun mail. agarro yo la cruz. cada cambio traigo
+  manualmente o sino corro una sesion al final del dia para que reconcilie diferencias»]`: el workflow `al-dia-con-gv.yml` se armó y se
+  sacó el mismo día. **No volver a proponerlo.** El chequeo a mano sigue siendo `tests/virgilio-al-dia-con-gv.cjs`.
 - **El sello `gv_app` de Virgilio es `rp3@v30.NN` / `rp3-sw@v30.NN`** `[Luis, 15/10/2026, D3: «que quede registrado de qué lugar
   salió el evento»]`: GV llegó a la serie v30 el 13/10 y `gestion@v30.NN` ya no decía de qué app venía. Lo pone el generador.
 - **El CSS de `virgilio/index.html` también está podado**: una regla nueva para una clase que sólo arma el JS por
