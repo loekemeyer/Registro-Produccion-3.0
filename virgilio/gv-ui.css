@@ -156,6 +156,10 @@
 .gv-tbl tr.mala td { background: var(--gv-error-bg); }
 .gv-tbl tr.mala td:first-child { box-shadow: inset 4px 0 0 var(--gv-error); }
 .gv-tblwrap { overflow: auto; border-top: 1px solid var(--gv-line-soft); }
+/* Ancho según contenido (Luis, 16/10/2026 — docs/GV-UI.md §5): la tabla mide lo que suman sus
+   columnas; si sobra lugar, sobra a la derecha, no entre columnas. Para toda tabla nueva. */
+.gv-tbl.fit { width: auto; max-width: 100%; }
+.gv-tblwrap.fit { width: fit-content; max-width: 100%; }
 
 /* ── Controles ───────────────────────────────────────────────────────────── */
 .gv button { width: auto; margin-top: 0; padding: 7px 13px; font-size: var(--gv-fs-md);

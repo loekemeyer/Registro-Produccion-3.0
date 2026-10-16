@@ -1,3 +1,3 @@
-295bbd6535d8d51921fffd8179e4b7f1d39c44c7  v31.49: Guardar a góndola pregunta DÓNDE si el código no tiene celda en el Mapa
+232f2fe4fe6f65548d6b7d43d98392044692aff3  v31.51: monitor — «debió armarse» también en el renglón del día de la tabla de tandas
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).

@@ -41,6 +41,9 @@ const { servir } = require("./_servidor.cjs");
   // 2) Virgilio
   await Promise.all([p.waitForURL("**/virgilio/"), p.click("#cardVir")]);
   await p.waitForSelector("#authBlock:not(.hidden)", { timeout: 10000 });
+  // 16/10/2026: con la máquina cargada el chequeo corría antes de que terminara de cargar la página y daba rojo
+  // intermitente. Se espera a que estén el login y supabase-js (hasta 10 s); si no llegan, el chequeo da rojo igual.
+  await p.waitForFunction(() => !!document.getElementById("googleSignInBtn") && !!document.getElementById("tvClaveStep") && typeof window.supabase !== "undefined", null, { timeout: 10000 }).catch(() => {});
   c.virgilioMuestraSuLogin = (await p.locator("#googleSignInBtn").count()) === 1 && (await p.locator("#tvClaveStep").count()) === 1;
   c.virgilioCargaSupabaseJsDeLaRaiz = await p.evaluate(() => !!document.querySelector('script[src="../supabase.js"]') && typeof window.supabase !== "undefined");
 

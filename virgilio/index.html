@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.49">
+<link rel="stylesheet" href="gv-ui.css?v=31.51">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1353,7 +1353,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.24"></script>
+<script type="module" src="recepcion.js?v=30.25"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.24";
+const APP_VERSION = "v30.25";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
