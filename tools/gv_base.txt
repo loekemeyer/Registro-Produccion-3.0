@@ -1,3 +1,3 @@
-37cbf517dde36f6905816ceae334f96702986c06  v32.07: Completar pedido con excedente — busca en excedente y/o góndola y dice de dónde y de qué pos
+730f9fd032aeef9fe2bd82df3361281066abb990  v32.14: el envío de bolsas a inyectores desde el celular suma en GP2
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).

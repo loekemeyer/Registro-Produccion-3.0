@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=32.07">
+<link rel="stylesheet" href="gv-ui.css?v=32.14">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1367,7 +1367,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.36"></script>
+<script type="module" src="recepcion.js?v=30.37"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5322,7 +5322,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.36";
+const APP_VERSION = "v30.37";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -12542,10 +12542,10 @@ function insDocCancel() {
    Si GP2 no responde al abrir, queda el texto libre de siempre (sin GP2). Si GP2 rechaza al
    confirmar, se avisa y se pregunta si registrar igual sólo en Virgilio (los dos ledgers tienen
    que decir lo mismo; la excepción la decide el operario a la vista). Spec: INTEGRACION_GESTION_VIRGILIO.md (repo GP2). */
-async function insGp2Rpc(name, args) {
+async function insGp2Rpc(name, args, schema) {
   const r = await fetch(SUPABASE_URL + "/rest/v1/rpc/" + name, {
     method: "POST",
-    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Content-Profile": "GP2" },
+    headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + SUPABASE_KEY, "Content-Type": "application/json", "Content-Profile": schema || "GP2" },
     body: JSON.stringify(args || {})
   });
   const t = await r.text();
@@ -12674,7 +12674,10 @@ async function _insGp2Enviar(gp2, sel, legajo, remito) {
     if (gp2.modo === "EI") {
       const out = [];
       for (let i = 0; i < rows.length; i++) {
-        const r = await insGp2Rpc("enviar_material_virgilio", { p_cod_virgilio: rows[i].cod, p_bolsas: rows[i].bolsas, p_inyector: gp2.inyector, p_legajo: legajo || null, p_nota: null });
+        // v32.14 (Thomas, D1): GP2.enviar_material_virgilio contesta «No autorizado» a la clave pública (28/09) y
+        // el inyector nunca sumaba. El puente public.gv_insumo_envio_inyector (SECURITY DEFINER, sólo bolsa del
+        // sector 14 → ubicación del inyector) es lo único que el celular puede escribir en GP2.
+        const r = await insGp2Rpc("gv_insumo_envio_inyector", { p_cod_virgilio: rows[i].cod, p_bolsas: rows[i].bolsas, p_inyector: gp2.inyector, p_legajo: legajo || null }, "public");
         out.push(rows[i].cod + " " + rows[i].bolsas + " bolsas" + (r && r.virgilio_negativo ? " ⚠ GP2 quedó en negativo (" + _insNum(Number(r.virgilio_despues)) + " kg)" : ""));
       }
       return { ok: true, msg: "GP2 · " + gp2.inyector + ": " + out.join(" · ") };
