@@ -1,3 +1,3 @@
-eb4d4a376027a358fe2343b68a60b4e4f5671c21  v31.59: la zona P no es fija — el excedente se ubica por su saldo neto en cada posición (Mapa + pick
+b67bad79f1c00ddec8126b170bb8993c3eb9c749  v31.60: 636E / 635E de Chef pickean el 636 / 635 nacional hasta liquidarlo
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).

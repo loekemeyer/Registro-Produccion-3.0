@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.59">
+<link rel="stylesheet" href="gv-ui.css?v=31.60">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1353,7 +1353,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.26"></script>
+<script type="module" src="recepcion.js?v=30.27"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.26";
+const APP_VERSION = "v30.27";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -7543,7 +7543,10 @@ const PICK_UBIC_DUAL = {
    picking (ver showPickingList). Mientras el viejo tenga saldo terminado > 0, el picking
    del pedido levanta primero las cajas del viejo. Al llegar a 0 se apaga solo. */
 const PK_LIQUIDAR_EN = {
-  "574E": { cod: "574", emp: "LK", sector: "F50", nota: "Corta Queso nacional — se liquida" }
+  "574E": { cod: "574", emp: "LK", sector: "F50", nota: "Corta Queso nacional — se liquida" },
+  // v31.60 (Luis, 16/10): 636E / 635E de Chef se pickean del nacional hasta liquidarlo.
+  "636E": { cod: "636", emp: "CH", sector: "M36", nota: "Espátula Calada nacional — se liquida" },
+  "635E": { cod: "635", emp: "CH", sector: "M35", nota: "Espátula Lisa nacional — se liquida" }
 };
 /* v6.83 (idea 9020): este mapa es el FALLBACK de display. Desde que el stock está
    partido por empresa ("438E LK" / "438E CH"), `pkCodEmpresa` ya parte el renglón
@@ -7750,9 +7753,9 @@ async function showPickingList(tanda, legajo, opts) {
       if (_liqCods.length && _liqIt.length) {
         const _viejos = _liqIt.map(function (it) { return PK_LIQUIDAR_EN[codBase(it.art)].cod; });
         const _rows = await supaFetchAllSafe(SUPABASE_URL + "/rest/v1/vista_saldos_stock",
-          "select=cod_art,empresa,terminado&cod_art=in.(" + _viejos.map(encodeURIComponent).join(",") + ")");
+          "select=cod_art,empresa,terminado,excedente&cod_art=in.(" + _viejos.map(encodeURIComponent).join(",") + ")");
         const _saldo = {};
-        (_rows || []).forEach(function (r) { _saldo[String(r.cod_art).toUpperCase() + "|" + String(r.empresa).toUpperCase()] = Number(r.terminado) || 0; });
+        (_rows || []).forEach(function (r) { _saldo[String(r.cod_art).toUpperCase() + "|" + String(r.empresa).toUpperCase()] = (Number(r.terminado) || 0) + (Number(r.excedente) || 0); });   // v31.60: el excedente del viejo también se liquida
         _liqIt.forEach(function (it) {
           const v = PK_LIQUIDAR_EN[codBase(it.art)];
           const n = Math.min(Math.floor(_saldo[v.cod + "|" + v.emp] || 0), Number(it.esp) || 0);
@@ -7772,7 +7775,8 @@ async function showPickingList(tanda, legajo, opts) {
     // se comería todo el descuento.
     let excOk = false;
     try {
-      const excMap = await pkFetchExcedente(Object.keys(agg));
+      // v31.60: + los códigos viejos que se liquidan (no están en agg): su excedente sale primero.
+      const excMap = await pkFetchExcedente(Object.keys(agg).concat(items.filter(function (it) { return it.liqDe && !agg[it.art]; }).map(function (it) { return it.art; })));
       items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); } });
       excOk = true;
     } catch (_e) { excOk = false; }
@@ -7787,7 +7791,7 @@ async function showPickingList(tanda, legajo, opts) {
         const gondNeeded = it.esp - excUsed;           // el resto, de góndola
         if (gondNeeded > 0) { it.esp = gondNeeded; it.excHint = excUsed; }   // góndola pide solo el resto
         else { it.skip = true; }                                              // excedente cubre todo → saltear góndola
-        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null, emp: it.emp || "" });
+        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null, emp: it.emp || "", liqDe: it.liqDe, liqNota: it.liqNota });
       }
     });
     // v20.17 (Thomas, 2026-09-18): los pasos de EXCEDENTE vuelven al RECORRIDO.
