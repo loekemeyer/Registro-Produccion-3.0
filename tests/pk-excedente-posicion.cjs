@@ -7,7 +7,7 @@
      (a) excedente en 2+ posiciones: al confirmar el paso pregunta de cuál — y el PKC ya salió ANTES;
      (b) tocar una posición re-manda el PKC (mismo id) con el 7º campo "P22:5" y avanza;
      (c) «de más de una»: no deja anotar si no suma lo pickeado; con 3+2 manda "P21:3;P22:2";
-     (d) «No sé» avanza sin re-mandar nada;
+     (d) v31.81 (Luis, D1 «no»): NO hay botón para saltear la pregunta;
      (e) excedente en UNA sola posición o «Faltan» con 0: no pregunta;
      (f) sin empresa ni depósito el 7º campo no se corre de lugar (campos 5 y 6 vacíos);
      (g) pkFetchExcedente suma la misma posición escrita de dos maneras (P3 / P03).
@@ -73,10 +73,10 @@ const APP = process.env.PK_APP || path.join(__dirname, "..", "virgilio", "index.
     out.varias = sent.length ? sent[sent.length - 1].texto : "";
     out.variasOk = out.varias === "F12A|066|5|5|5|LK|P21:3;P22:2" && _pk.idx === 1;
 
-    // (d) «No sé»
+    // (d) sin salteo: ningún botón que avance sin anotar la posición
     armar(POS); pkRender(); pkOk();
-    const n1 = sent.length; pkExcPosSkip();
-    out.skip = sent.length === n1 && _pk.idx === 1 && _pk.mode === "item";
+    out.skip = !/No s.|sin anotar/i.test(body().textContent) &&
+               ![...body().querySelectorAll("button")].some((x) => /pkExcPosSkip|pkNext/.test(x.getAttribute("onclick") || ""));
 
     // (e) una sola posición / Faltan con 0
     armar({ P21: 72 }); pkRender(); pkOk();
@@ -120,7 +120,7 @@ const APP = process.env.PK_APP || path.join(__dirname, "..", "virgilio", "index.
   ok(r.hayInputs, "(c) «de más de una» no muestra las cantidades");
   ok(r.frenaSuma, "(c) dejó anotar posiciones que no suman lo pickeado");
   ok(r.variasOk, "(c) varias salió «" + r.varias + "»");
-  ok(r.skip, "(d) «No sé» re-mandó o no avanzó");
+  ok(r.skip, "(d) la pregunta de posición se puede saltear (D1: no)");
   ok(r.unaNoPregunta, "(e) preguntó con el excedente en una sola posición");
   ok(r.ceroNoPregunta, "(e) preguntó con 0 cajas levantadas");
   ok(r.faltanPregunta, "(e) no preguntó con «Faltan» y 2 cajas");
