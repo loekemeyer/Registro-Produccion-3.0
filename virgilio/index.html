@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=32.04">
+<link rel="stylesheet" href="gv-ui.css?v=32.07">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1367,7 +1367,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.35"></script>
+<script type="module" src="recepcion.js?v=30.36"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5322,7 +5322,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.35";
+const APP_VERSION = "v30.36";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -16260,6 +16260,8 @@ function cpRender() {
     const s = e._saldo || {}, ag = Math.round(Number(s.a_guardar) || 0), go = Math.round(Number(s.terminado) || 0);
     const racks = Math.round(Number(e._racksAlert) || 0);
     let stockTxt = ag > 0 ? ("a guardar: " + ag) : (e._guardadoHoy ? ("guardado hoy" + (go > 0 ? " · góndola: " + go : "")) : "");
+    const _exc = Math.round(Number(s.excedente) || 0);   // v32.07: avisar que también hay excedente
+    if (_exc > 0) stockTxt = (stockTxt ? stockTxt + " · " : "") + "excedente: " + _exc;
     const racksWarning = racks > 0 ? " ⚠️ RACKS: " + racks : "";
     return '<button class="cp-frow" onclick="cpPickFalt(' + i + ')" style="' + (racks > 0 ? "background:#fef3c7;border-color:#fca5a5;" : "") + '">' +
       '<div class="cp-frow-top"><span class="cp-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="cp-fdesc">' + escapeHtml(artNombre(e.cod_art, e.desc) || "") + '</span><span style="margin-left:auto;font-size:11.5px;font-weight:800;color:' + (racks > 0 ? "#dc2626" : "#0e7490") + ';white-space:nowrap;">' + escapeHtml(stockTxt + racksWarning) + '</span></div>' +
@@ -16286,13 +16288,34 @@ function cpPickFalt(i) {
   _cp.sel = e; _cp.step = 2; _cp.qty = Math.max(1, Math.round(Number(e.cajas_falto) || 1));
   const sal = e._saldo || {};
   _cp.origen = (Number(sal.a_guardar) || 0) > 0 ? "a_guardar" : ((Number(sal.terminado) || 0) > 0 ? "terminado" : "a_guardar");
+  // v32.07 (Luis, 16/10): si el código tiene EXCEDENTE, el operario lo busca en excedente y/o góndola y TIENE que decir
+  // de dónde lo sacó (puede que el admin todavía no haya dado por vacío un excedente que no estaba).
+  _cp.excPos = null; _cp.excInfo = null;
+  if ((Number(sal.excedente) || 0) > 0) {
+    _cp.origen = null;
+    cpCargarExcedente(e);
+  }
   _cp._liosInfo = null; _cp.liosLoading = true; _cp.lioSel = "__new__";
   cpRender();
   cpLoadLios(e.np).then(function (info) { if (!_cp) return; _cp._liosInfo = info; _cp.liosLoading = false; cpRender(); }).catch(function () { if (!_cp) return; _cp._liosInfo = { resumen: "", tanda: e.tanda || "" }; _cp.liosLoading = false; cpRender(); });
 }
+/* v32.07 — posiciones del excedente del código (las mismas que usa el picking) y la lista del Mapa por si no tiene. */
+async function cpCargarExcedente(e) {
+  let info = null;
+  try {
+    const r = await Promise.all([pkFetchExcedente([String(e.cod_art)]), gvFetchLugares().catch(function () { return null; })]);
+    info = (r[0] || {})[String(e.cod_art).toUpperCase()] || null;
+  } catch (_e) { info = null; }
+  if (!_cp || _cp.sel !== e) return;
+  _cp.excInfo = info || { cajas: Number((e._saldo || {}).excedente) || 0, ubics: [], porUbic: {} };
+  if (_cp.excInfo.ubics && _cp.excInfo.ubics.length === 1) _cp.excPos = _cp.excInfo.ubics[0];
+  cpRender();
+}
+function cpExcPos(u) { if (!_cp) return; _cp.excPos = String(u || "").toUpperCase() || null; cpRender(); }
 function cpRenderStep2(body) {
   const e = _cp.sel; if (!e) { _cp.step = 1; cpRender(); return; }
   const sal = e._saldo || {}; const agu = Math.round(Number(sal.a_guardar) || 0), gon = Math.round(Number(sal.terminado) || 0);
+  const exc = Math.round(Number(sal.excedente) || 0);   // v32.07
   const maxQ = Math.max(1, Math.round(Number(e.cajas_falto) || 1));
   let h = '<button class="cp-back" onclick="cpBack()">← Volver</button>';
   h += '<div class="cp-sel"><span class="cp-cod">' + escapeHtml(codCanonSuf(String(e.cod_art))) + '</span> <span class="cp-fdesc">' + escapeHtml(artNombre(e.cod_art, e.desc) || "") + '</span><div class="cp-selnp">NP ' + escapeHtml(String(e.np)) + (e.tanda ? ' · ' + escapeHtml(String(e.tanda)) : '') + ' · faltan ' + maxQ + '</div></div>';
@@ -16300,7 +16323,30 @@ function cpRenderStep2(body) {
   h += '<div class="cp-fld"><div class="cp-lbl">¿De dónde salen?</div><div class="cp-seg">' +
     '<button class="cp-opt' + (_cp.origen === "a_guardar" ? " on" : "") + '" onclick="cpOrigen(\'a_guardar\')">Tránsito<small>a guardar · ' + agu + '</small></button>' +
     '<button class="cp-opt' + (_cp.origen === "terminado" ? " on" : "") + '" onclick="cpOrigen(\'terminado\')">Góndola<small>hay ' + gon + '</small></button>' +
+    (exc > 0 ? '<button class="cp-opt' + (_cp.origen === "excedente" ? " on" : "") + '" onclick="cpOrigen(\'excedente\')">Excedente<small>hay ' + exc + '</small></button>' : '') +
     '</div></div>';
+  // v32.07 (Luis, 16/10): con excedente, buscarlo ahí y/o en góndola y decir de dónde salió (y de qué posición).
+  if (exc > 0) {
+    const ei = _cp.excInfo;
+    const ubs = (ei && ei.ubics) || [];
+    const lista = ubs.map(function (u) { return u + (ei.porUbic && ei.porUbic[u] ? " (" + Math.round(ei.porUbic[u]) + ")" : ""); }).join(" · ");
+    h += '<div class="cp-pend" style="background:#fffbeb;border-color:#fcd34d;color:#92400e;">📦 Este código tiene <b>excedente</b>' +
+      (lista ? ' en <b>' + escapeHtml(lista) + '</b>' : (ei ? ' sin posición registrada' : '')) +
+      ': buscalo ahí y/o en góndola, y marcá <b>de dónde lo sacaste</b>. Si sacaste de los dos, completá en dos veces.</div>';
+    if (!_cp.origen) h += '<div class="cp-note" style="color:#b91c1c;font-weight:800;">Elegí de dónde salen las cajas.</div>';
+    if (_cp.origen === "excedente") {
+      if (!ei) h += '<div class="cp-liosload">cargando posiciones…</div>';
+      else if (ubs.length) {
+        h += '<div class="cp-fld"><div class="cp-lbl">¿De qué posición?</div><div class="cp-seg">' + ubs.map(function (u) {
+          return '<button class="cp-opt' + (_cp.excPos === u ? " on" : "") + '" onclick="cpExcPos(\'' + escapeHtml(u) + '\')">' + escapeHtml(u) + '<small>hay ' + Math.round((ei.porUbic && ei.porUbic[u]) || 0) + '</small></button>';
+        }).join("") + '</div></div>';
+      } else {
+        const sel = gvExcPosSelect('class="cp-inp" style="width:110px" onchange="cpExcPos(this.value)"', _cp.excPos || "");
+        h += '<div class="cp-fld"><div class="cp-lbl">¿De qué posición? (la del cartel)</div>' + (sel ||
+          '<input class="cp-inp" style="width:110px" type="text" maxlength="6" placeholder="P13" value="' + escapeHtml(_cp.excPos || "") + '" onchange="cpExcPos(pkUbicLimpia(this.value))">') + '</div>';
+      }
+    }
+  }
   h += '<div class="cp-fld"><div class="cp-lbl">¿A qué lío va?</div>';
   let _destTxt = "Lío nuevo";   // v10.13 — destino visible en el botón/mensaje
   if (_cp.liosLoading) h += '<div class="cp-liosload">cargando líos…</div>';
@@ -16324,7 +16370,7 @@ function cpRenderStep2(body) {
   if (_cp.origen === "terminado" && gon <= 0) {
     h += '<div class="cp-pend" style="background:#fef2f2;border-color:#fca5a5;color:#991b1b;">⚠️ Góndola está en <b>0</b> para ' + escapeHtml(codCanonSuf(String(e.cod_art))) + ' — al completar se va a retirar sin stock real (queda negativa). Se avisa por Telegram.</div>';
   }
-  const ok = _cp.qty > 0 && !_cp.liosLoading;
+  const ok = _cp.qty > 0 && !_cp.liosLoading && !!_cp.origen && (_cp.origen !== "excedente" || !!_cp.excPos);   // v32.07
   h += '<button class="cp-fin"' + (ok ? "" : " disabled") + ' onclick="cpConfirm()">✓ Completar ' + _cp.qty + ' caja(s) → <b>' + escapeHtml(_destTxt) + '</b></button>';
   _renderKeepFocus(body, h);
 }
@@ -16390,6 +16436,8 @@ async function cpConfirm() {
   if (!_cp || !_cp.sel) return;
   const s = _cp.sel; let qty = _cp.qty; const origen = _cp.origen, leg = _cp.legajo, lioSel = _cp.lioSel, info = _cp._liosInfo || { resumen: "", tanda: s.tanda || "" };
   if (qty <= 0) return;
+  if (!origen || (origen === "excedente" && !_cp.excPos)) return;   // v32.07: con excedente, de dónde salió es obligatorio
+  const excPos = origen === "excedente" ? _cp.excPos : null;
   // v11.02 — BAJAR EL FALTANTE PRIMERO Y CON TOPE (RPC atómica cp_reducir_faltante_cap): devuelve
   // cuánto se pudo aplicar (nunca más de lo que falta). El stock se mueve SOLO por lo aplicado, así
   // un doble-tap NO descuenta de más (el 2do intento aplica 0). Antes: stock durable + baja del
@@ -16410,9 +16458,11 @@ async function cpConfirm() {
     }
     if (_applied != null && _applied > 0 && _applied < qty) qty = _applied;   // topeado a lo que faltaba
   }
-  const dep = origen === "terminado" ? "terminado" : "a_guardar";
+  const dep = origen === "terminado" ? "terminado" : (origen === "excedente" ? "excedente" : "a_guardar");
   const rows = [
-    { cod_art: s.cod_art, descripcion: s.desc || null, deposito: dep, delta: -qty, tipo: "cp", ref: String(s.np), legajo: leg || null },
+    // v32.07: del excedente sale CON la posición → gv_excedente_posicion descuenta de ésa (y la libera si queda en 0)
+    Object.assign({ cod_art: s.cod_art, descripcion: s.desc || null, deposito: dep, delta: -qty, tipo: "cp", ref: String(s.np), legajo: leg || null },
+                  excPos ? { ubicacion: excPos } : {}),
     { cod_art: s.cod_art, descripcion: s.desc || null, deposito: "a_facturar", delta: qty, tipo: "cp", ref: String(s.np), legajo: leg || null }
   ];
   const lioTag = lioSel === "__new__" ? "NUEVA" : lioSel;
@@ -16423,7 +16473,7 @@ async function cpConfirm() {
   var _cpIni = (_cp && _cp.tStart && _cp.tStart <= Date.now()) ? new Date(_cp.tStart).toISOString() : null;
   const payload = {
     legajo: String(leg || ""), opcion: "CP", descripcion: "Completar Pedido",
-    texto: (String(s.np) + "|" + String(s.cod_art) + "|" + qty + "|" + (origen === "terminado" ? "GONDOLA" : "AGUARDAR") + "|" + lioTag).toUpperCase(),
+    texto: (String(s.np) + "|" + String(s.cod_art) + "|" + qty + "|" + (origen === "terminado" ? "GONDOLA" : (origen === "excedente" ? "EXCEDENTE " + excPos : "AGUARDAR")) + "|" + lioTag).toUpperCase(),
     ts: Date.now(), id: ("cp_" + s.np + "_" + s.cod_art + "_" + Date.now()).replace(/[^a-zA-Z0-9_\-]/g, ""), ts_inicio_iso: _cpIni
   };
   try { enqueueReport(payload); if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {}); } catch (_e) {}
