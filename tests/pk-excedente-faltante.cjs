@@ -1,4 +1,5 @@
 /* v32.00 (Luis, 16/10/2026)
+   D8 — "preguntale al operario por cual paso que faltaba": con 2+ posiciones el operario marca en cuál no estaba.
    D5 — "excedente con posición registrada que el operario no encuentra ahí … Deberia llegarle, simple y se ajusta de ahi":
         «Sin stock» / «Faltan» en un paso de excedente con posición manda «-P21;-P22» en el 8º campo del PKC
         (un aviso por posición en la landing; ✓ vacía esa posición). Volver a confirmar completo lo saca.
@@ -41,10 +42,17 @@ const APP = process.env.PK_APP || path.join(__dirname, "..", "virgilio", "index.
     }; };
     const ult = () => (sent.length ? sent[sent.length - 1].texto : "");
 
-    // D5 — Sin stock en un excedente con 2 posiciones
+    // D5 + D8 — Sin stock en un excedente con 2 posiciones: primero sale el PKC sin aviso, después pregunta
+    // en cuál fue y no estaba (sin salteo: al menos una) y re-manda con esa sola
     armar("P21 · P22", { P21: 72, P22: 52 }); pkRender(); pkSinStock();
+    out.antes = ult();
+    out.pregunta = _pk.mode === "excFalta" && /En qu. posici.n fuiste y no estaba/.test(body().textContent) && _pk.idx === 0;
+    pkExcFaltaOk();
+    out.frenaVacio = _pk.mode === "excFalta" && /al menos una/.test(body().textContent);
+    pkExcFaltaToggle(1); pkExcFaltaOk();
     out.sinStock = ult();
-    out.sinStockOk = out.sinStock === "F12A|066|4|0|0|LK||-P21;-P22";
+    out.sinStockOk = out.antes === "F12A|066|4|0|0|LK" && out.pregunta && out.frenaVacio &&
+                     out.sinStock === "F12A|066|4|0|0|LK||-P22" && _pk.idx === 1;
     // Faltan con 1 posición
     armar("P21", { P21: 72 }); pkRender(); pkF(); pkRender();
     document.getElementById("pkFqty").value = "1"; pkConfirmF();
@@ -82,7 +90,7 @@ const APP = process.env.PK_APP || path.join(__dirname, "..", "virgilio", "index.
   const src = fs.readFileSync(APP, "utf8");
   const mgUsaLista = /const ubicInp = gvExcPosSelect\(/.test(src);
   const fallos = []; const ok = (c, m) => { if (!c) fallos.push(m); };
-  ok(r.sinStockOk, "(D5) Sin stock salió «" + r.sinStock + "» (esperaba F12A|066|4|0|0|LK||-P21;-P22)");
+  ok(r.sinStockOk, "(D8) Sin stock con 2 posiciones: antes «" + r.antes + "» · pregunta " + r.pregunta + " · frena vacío " + r.frenaVacio + " · después «" + r.sinStock + "» (esperaba …||-P22)");
   ok(r.faltanOk, "(D5) Faltan salió «" + r.faltan + "» (esperaba F12A|066|4|1|1|LK||-P21)");
   ok(r.completoOk, "(D5) re-confirmar completo salió «" + r.completo + "» (tiene que ir sin aviso)");
   ok(r.okDirecto, "(D5) «Puse» completo mandó aviso");

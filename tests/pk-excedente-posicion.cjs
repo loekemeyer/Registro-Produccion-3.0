@@ -84,7 +84,7 @@ const APP = process.env.PK_APP || path.join(__dirname, "..", "virgilio", "index.
     armar(POS); pkRender(); pkF(); pkRender();
     const f = document.getElementById("pkFqty"); if (f) f.value = "0";
     pkConfirmF();
-    out.ceroNoPregunta = _pk.mode !== "excPos" && _pk.idx === 1;
+    out.ceroNoPregunta = _pk.mode !== "excPos" && (_pk.idx === 1 || _pk.mode === "excFalta");   // v32.04 (D8): con 0 pregunta dónde faltó, no de dónde sacó
     armar(POS); pkRender(); pkF(); pkRender();
     const f2 = document.getElementById("pkFqty"); if (f2) f2.value = "2";
     pkConfirmF();

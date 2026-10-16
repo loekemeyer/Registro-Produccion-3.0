@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=32.00">
+<link rel="stylesheet" href="gv-ui.css?v=32.04">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -804,6 +804,8 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 .pk-excpos-suma.ok { color:#15803d; }
 .pk-excpos-suma.bad { color:#b91c1c; }
 .pk-pos-sel { letter-spacing:0; }
+.pk-excfalta-btn { background:#f1f5f9; color:#334155; }
+.pk-excfalta-btn.on { background:#b91c1c; color:#fff; }
 .pk-conteo{ width:100%; box-sizing:border-box; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:13px; padding:12px 13px; text-align:left; }
 .pk-conteo.done{ background:#f0fdf4; border-color:#86efac; color:#166534; font-weight:700; text-align:center; }
 .pk-conteo-h{ font-size:14.5px; font-weight:800; color:#92400e; }
@@ -1365,7 +1367,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.34"></script>
+<script type="module" src="recepcion.js?v=30.35"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5320,7 +5322,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.34";
+const APP_VERSION = "v30.35";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -7426,6 +7428,7 @@ function pkSave() {
       gondDone: _pk.gondDone || {},   // v29.69
       excPos: _pk.excPos || {},       // v31.80
       excCartel: _pk.excCartel || {}, // v31.82
+      excFaltaSel: _pk.excFaltaSel || {}, // v32.04 (D8)
       app: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "")   // v18.53 — con qué versión se armó esta lista
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
@@ -7506,7 +7509,7 @@ function pkResume(legajo) {
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
   _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
           idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item",
-          forced: saved.forced || {}, cid: saved.cid || {}, gondDone: saved.gondDone || {}, excPos: saved.excPos || {}, excCartel: saved.excCartel || {} };   // v26.62 · v29.69 · v31.80
+          forced: saved.forced || {}, cid: saved.cid || {}, gondDone: saved.gondDone || {}, excPos: saved.excPos || {}, excCartel: saved.excCartel || {}, excFaltaSel: saved.excFaltaSel || {} };   // v26.62 · v29.69 · v31.80
   m.classList.add("show");
   pkRender();
 }
@@ -7901,6 +7904,7 @@ async function showPickingList(tanda, legajo, opts) {
         _pk.mode = "item";
         if (saved.excPos && typeof saved.excPos === "object") _pk.excPos = saved.excPos;   // v31.80
         if (saved.excCartel && typeof saved.excCartel === "object") _pk.excCartel = saved.excCartel;   // v31.82
+        if (saved.excFaltaSel && typeof saved.excFaltaSel === "object") _pk.excFaltaSel = saved.excFaltaSel;   // v32.04 (D8)
         // v6.11: re-aplicar "retirar de góndola forzado" sobre los ítems frescos
         // (deja de saltear + saca el paso de excedente de ese artículo).
         if (saved.forced && typeof saved.forced === "object") {
@@ -8332,6 +8336,7 @@ function pkRender() {
   const _pkUni = pkEsUnidad(rec);
   const _pkUd = _pkUni ? "unidades" : "cajas";
   if (_pk.mode === "excPos") { body.innerHTML = pkExcPosCardHtml(it); return; }   // v31.80
+  if (_pk.mode === "excFalta") { body.innerHTML = pkExcFaltaCardHtml(it); return; }   // v32.04 (D8)
   if (_pk.mode === "gond") { body.innerHTML = pkGondCardHtml(it); setTimeout(function () { const i = document.getElementById("pkGondInp"); if (i) i.focus(); }, 40); return; }
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
@@ -8542,6 +8547,7 @@ function pkOk() {
   const it = _pk.items[_pk.idx];
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
   _pk.results[it.key] = it.esp;
+  pkExcFaltaReset(it);   // v32.04 (D8): completo → no faltó en ninguna posición
   pkSendDetail(rec, it.esp, it.esp);
   try { pkmConf("ok", it, it.esp); } catch (_e) {}
   if (pkGondPreguntar(it)) { _pk.mode = "gond"; pkRender(); return; }   // v29.69
@@ -8555,8 +8561,10 @@ function pkSinStock() {
   const it = _pk.items[_pk.idx];
   const rec = (it.dual && it.pick) ? it.pick : it.art;
   _pk.results[it.key] = 0;
+  pkExcFaltaReset(it);
   pkSendDetail(rec, it.esp, 0);
   try { pkmConf("sin_stock", it, 0); } catch (_e) {}
+  if (pkExcFaltaPreguntar(it)) { _pk.mode = "excFalta"; pkRender(); return; }   // v32.04 (D8)
   pkAdvance();
 }
 function pkF() { if (_pk) { _pk.mode = "fInput"; pkRender(); } }
@@ -8667,10 +8675,12 @@ function pkConfirmF() {
   if (isNaN(real) || real < 0) real = 0;
   const rec = (it.dual && it.pick) ? it.pick : it.art;   // par Nacional/Importado: registra el elegido
   _pk.results[it.key] = real;
+  pkExcFaltaReset(it);
   pkSendDetail(rec, it.esp, real);
   try { pkmConf("faltan", it, real); } catch (_e) {}
   if (real > 0 && pkGondPreguntar(it)) { _pk.mode = "gond"; pkRender(); return; }   // v29.69: si no agarró nada, no hay góndola que informar
   if (pkExcPosPreguntar(it, real)) { _pk.mode = "excPos"; pkRender(); return; }   // v31.80
+  if (pkExcFaltaPreguntar(it)) { _pk.mode = "excFalta"; pkRender(); return; }   // v32.04 (D8)
   pkAdvance();
 }
 /* ═══ v29.69 (Luis, 13/10): EL CÓDIGO QUE NO TIENE GÓNDOLA EN EL MAPA ═══════════════════════
@@ -8845,6 +8855,8 @@ function pkExcPosSkip() {
   if (!_pk) return;
   _pk.excPosVarias = false;
   _pk.mode = "item";
+  const it = _pk.items[_pk.idx];
+  if (it && pkExcFaltaPreguntar(it)) { _pk.mode = "excFalta"; pkRender(); return; }   // v32.04 (D8): después, dónde faltó
   pkAdvance();
 }
 
@@ -8882,9 +8894,66 @@ function pkExcFaltaPos(art) {
   if (!x) return [];
   const r = _pk.results ? _pk.results[x.key] : null;
   if (r == null || !(Number(r) < Number(x.esp))) return [];
+  const l = pkExcFaltaLista(x);
+  if (l.length < 2) return l;
+  // v32.04 (Luis, D8: "preguntale al operario por cual paso que faltaba"): con 2+ posiciones van sólo las que marcó
+  const sel = _pk.excFaltaSel && _pk.excFaltaSel[A];
+  return Array.isArray(sel) ? sel.filter(function (u) { return l.indexOf(u) >= 0; }) : [];
+}
+function pkExcFaltaLista(x) {
   let l = pkExcPosLista(x).map(function (p) { return p.u; });
   if (!l.length) l = String(x.excUbic || "").split("\u00b7").map(function (u) { return pkUbicLimpia(u); }).filter(Boolean);
   return l;
+}
+/* v32.04 (Luis, D8): faltó en un excedente con 2+ posiciones → el operario marca en cuál(es) fue y no estaba.
+   Sin botón para saltear (D1); al menos una. Con una sola posición no se pregunta: es ésa. */
+function pkExcFaltaPreguntar(it) {
+  if (!_pk || !it || !it.isExc || it.manualExc) return false;
+  const r = _pk.results[it.key];
+  if (r == null || !(Number(r) < Number(it.esp))) return false;
+  if (pkExcFaltaLista(it).length < 2) return false;
+  return !Array.isArray(_pk.excFaltaSel && _pk.excFaltaSel[String(it.art).toUpperCase()]);
+}
+function pkExcFaltaReset(it) {
+  if (!_pk || !it || !it.isExc) return;
+  _pk.excFaltaMarca = [];
+  if (!_pk.excFaltaSel) return;
+  delete _pk.excFaltaSel[String(it.art).toUpperCase()];
+}
+function pkExcFaltaCardHtml(it) {
+  const l = pkExcFaltaLista(it);
+  const marc = _pk.excFaltaMarca || [];
+  return '<div class="pk-flow">' +
+    '<div class="pk-gond-h">📦 ¿En qué posición fuiste y no estaba?</div>' +
+    '<div class="pk-gond-s">Faltaron <b>' + pkFmt(Number(it.esp) - Number(_pk.results[it.key] || 0)) + '</b> del excedente del <b>' +
+      escapeHtml(_padCod(codBase(it.art))) + '</b>. Marcá la(s) posición(es) donde no había (o se terminó): el supervisor las revisa.</div>' +
+    '<div class="pk-excpos-grid">' + l.map(function (u, i) {
+      const on = marc.indexOf(u) >= 0;
+      return '<button class="pk-btn pk-excpos-btn pk-excfalta-btn' + (on ? ' on' : '') + '" onclick="pkExcFaltaToggle(' + i + ')">' +
+        '<span class="pk-excpos-u">' + escapeHtml(u) + '</span><span class="pk-excpos-c">' + (on ? '✓ no estaba' : 'tocá si no estaba') + '</span></button>';
+    }).join("") + '</div>' +
+    '<div id="pkExcFaltaErr" class="pk-excpos-suma bad" style="display:none">Marcá al menos una posición.</div>' +
+    '<button class="pk-btn pk-ok" onclick="pkExcFaltaOk()">✓ Listo</button></div>';
+}
+function pkExcFaltaToggle(i) {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const u = pkExcFaltaLista(_pk.items[_pk.idx])[i]; if (!u) return;
+  const m = _pk.excFaltaMarca || (_pk.excFaltaMarca = []);
+  const k = m.indexOf(u);
+  if (k >= 0) m.splice(k, 1); else m.push(u);
+  pkRender();
+}
+function pkExcFaltaOk() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  const m = (_pk.excFaltaMarca || []).slice();
+  if (!m.length) { const e = document.getElementById("pkExcFaltaErr"); if (e) e.style.display = ""; return; }
+  if (!_pk.excFaltaSel) _pk.excFaltaSel = {};
+  _pk.excFaltaSel[String(it.art).toUpperCase()] = m;
+  _pk.excFaltaMarca = [];
+  try { pkSendDetail(it.art, it.esp, _pk.results[it.key]); } catch (_e) {}   // re-manda el PKC con las posiciones (upsert)
+  _pk.mode = "item";
+  pkAdvance();
 }
 /* v32.00 (Luis, D6): la posición del excedente se ELIGE de la lista de la zona P del Mapa (GV_Lugar), no se tipea.
    Sin la lista (no cargó GV_Lugar) devuelve "" y el que llama deja el input de texto de antes. */

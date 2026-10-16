@@ -1,3 +1,3 @@
-495a6625f7fee2b19d85a6d004df722d3573f9bc  v32.00: excedente — faltó en posición registrada avisa al admin · la posición se elige de la zona P
+0e585c036ab9972b45f56a027cc258f8a213653c  v32.04: excedente en 2+ posiciones — el operario marca en cuál faltó (D8); lista sólo zona P (D7)
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).
