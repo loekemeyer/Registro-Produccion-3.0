@@ -1,3 +1,3 @@
-b67bad79f1c00ddec8126b170bb8993c3eb9c749  v31.60: 636E / 635E de Chef pickean el 636 / 635 nacional hasta liquidarlo
+0921bcf1ea42f4c0a567067595b75b1c42d22ddd  v31.64: 574 — se da de baja al quedar saldado tras el armado; Completar pedido lo completa con 574E
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).
