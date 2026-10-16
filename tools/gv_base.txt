@@ -1,3 +1,3 @@
-4fec016e966f5b68ffdd21b3fbe7795af80d6d42  v31.33: Recepción Remitos — muestra el fletero que se llevó el pedido
+6fa3ec7c8648674d4124b166a4606264a9d7e2e5  v31.35: Recepción Remitos agrupada por camión; revierte el «por camión» del Análisis
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).

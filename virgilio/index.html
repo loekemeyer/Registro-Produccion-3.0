@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.33">
+<link rel="stylesheet" href="gv-ui.css?v=31.35">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1353,7 +1353,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.22"></script>
+<script type="module" src="recepcion.js?v=30.23"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.22";
+const APP_VERSION = "v30.23";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17441,20 +17441,35 @@ function crRender() {
   const vencCount = _cr.items.filter(it => it.venc).length;
   let html = `<div class="cc-sub">${_cr.admin ? "Remitos <b>cargados sin controlar</b>. Tildá los que ya se controlaron y tocá «Terminé» → pasan a <b>Pedidos Entregados</b>." : "Tildá <b>Controlado</b> en cada pedido que controlaste al bajarlo del camión. Al tocar «Terminé» pasan a <b>Pedidos Entregados</b>."}</div>`;
   if (vencCount) html += `<div class="cc-sub" style="color:#b91c1c;font-weight:800;">⚠ ${vencCount} pedido(s) <b>VENCIDOS</b> — cargados hace +30 hs sin controlar.</div>`;
+  // v31.34 (Thomas) — Recepción Remitos agrupada POR CAMIÓN (el fletero que se llevó el viaje):
+  // cada fletero es un viaje y sus remitos se controlan juntos. Los grupos con algún VENCIDO,
+  // primero; «Sin fletero», al final. El fletero va en el encabezado del grupo, no en cada fila.
+  const grupos = {};
+  for (const it of _cr.items) { const f = (it.fletero || "").trim() || "Sin fletero"; (grupos[f] = grupos[f] || []).push(it); }
+  const claves = Object.keys(grupos).sort((a, b) => {
+    const va = grupos[a].some(x => x.venc) ? 0 : 1, vb = grupos[b].some(x => x.venc) ? 0 : 1;
+    if (va !== vb) return va - vb;
+    if (a === "Sin fletero") return 1; if (b === "Sin fletero") return -1;
+    return a.localeCompare(b, "es");
+  });
   let rows = "";
-  for (const it of _cr.items) {
-    const on = _cr.checked.has(it.np);
-    const npc = String(it.np).replace(/[^0-9A-Za-z]/g, "");
-    const cell = _liosCajasCell(it);
-    const liosCls = (cell.txt === "—") ? " cr-lios0" : "";
-    const liosTtl = cell.esCajas ? "cajas" : "líos";
-    rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
-            `<td class="cr-td-np" data-label="NP">${crNpCell(it)}${(it.loadMs || it.fletero) ? `<div class="cr-cc-date">🚚 ${it.fletero ? escapeHtml(it.fletero) + (it.loadMs ? " · " : "") : ""}${it.loadMs ? crFmtCC(it.loadMs) : ""}</div>` : ""}</td>` +
-            `<td class="cr-td-cod" data-label="Cod Cliente">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
-            `<td class="cr-td-rs" data-label="Razón Social">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
-            `<td class="cr-td-lios${liosCls}" data-label="${cell.esCajas ? "Cajas" : "Líos"}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
-            `<td class="cr-td-ctrl" data-label="Controlado"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
-            `<td class="cr-td-act" data-label="Volvió"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
+  for (const f of claves) {
+    const its = grupos[f];
+    rows += `<tr class="cr-grp"><td colspan="6" style="background:#eef2f7;font-weight:800;color:#0f172a;padding:8px 11px;border-top:2px solid #cbd5e1;">🚚 ${escapeHtml(f)} <span style="color:#64748b;font-weight:700;">· ${its.length} pedido${its.length === 1 ? "" : "s"}</span></td></tr>`;
+    for (const it of its) {
+      const on = _cr.checked.has(it.np);
+      const npc = String(it.np).replace(/[^0-9A-Za-z]/g, "");
+      const cell = _liosCajasCell(it);
+      const liosCls = (cell.txt === "—") ? " cr-lios0" : "";
+      const liosTtl = cell.esCajas ? "cajas" : "líos";
+      rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
+              `<td class="cr-td-np" data-label="NP">${crNpCell(it)}${it.loadMs ? `<div class="cr-cc-date">📅 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
+              `<td class="cr-td-cod" data-label="Cod Cliente">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
+              `<td class="cr-td-rs" data-label="Razón Social">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
+              `<td class="cr-td-lios${liosCls}" data-label="${cell.esCajas ? "Cajas" : "Líos"}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
+              `<td class="cr-td-ctrl" data-label="Controlado"><span class="cr-chk">${on ? "✓" : ""}</span></td>` +
+              `<td class="cr-td-act" data-label="Volvió"><button class="cr-sinsal-btn" onclick="event.stopPropagation();crMarkSinSalida('${npc}')" title="El cliente no recibió — la mercadería volvió al depósito. Sale de acá y queda en «FC s/Salida» (Stocks).">↩ s/salida</button></td></tr>`;
+    }
   }
   html += `<div class="cr-tablewrap"><table class="cr-table"><thead><tr>` +
           `<th>Nro Rto</th><th>Cod Cliente</th><th>Razón Social</th>` +
