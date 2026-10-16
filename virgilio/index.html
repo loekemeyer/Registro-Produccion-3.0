@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.81">
+<link rel="stylesheet" href="gv-ui.css?v=31.82">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1364,7 +1364,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.30"></script>
+<script type="module" src="recepcion.js?v=30.31"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5295,7 +5295,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.30";
+const APP_VERSION = "v30.31";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -7400,6 +7400,7 @@ function pkSave() {
       forced: _pk.forced || {}, cid: _pk.cid || {},   // v26.62
       gondDone: _pk.gondDone || {},   // v29.69
       excPos: _pk.excPos || {},       // v31.80
+      excCartel: _pk.excCartel || {}, // v31.82
       app: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "")   // v18.53 — con qué versión se armó esta lista
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
@@ -7480,7 +7481,7 @@ function pkResume(legajo) {
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
   _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
           idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item",
-          forced: saved.forced || {}, cid: saved.cid || {}, gondDone: saved.gondDone || {}, excPos: saved.excPos || {} };   // v26.62 · v29.69 · v31.80
+          forced: saved.forced || {}, cid: saved.cid || {}, gondDone: saved.gondDone || {}, excPos: saved.excPos || {}, excCartel: saved.excCartel || {} };   // v26.62 · v29.69 · v31.80
   m.classList.add("show");
   pkRender();
 }
@@ -7874,6 +7875,7 @@ async function showPickingList(tanda, legajo, opts) {
         _pk.idx = Math.min(saved.idx || 0, items.length);
         _pk.mode = "item";
         if (saved.excPos && typeof saved.excPos === "object") _pk.excPos = saved.excPos;   // v31.80
+        if (saved.excCartel && typeof saved.excCartel === "object") _pk.excCartel = saved.excCartel;   // v31.82
         // v6.11: re-aplicar "retirar de góndola forzado" sobre los ítems frescos
         // (deja de saltear + saca el paso de excedente de ese artículo).
         if (saved.forced && typeof saved.forced === "object") {
@@ -8201,6 +8203,12 @@ function pkRender() {
   if (_pk.idx >= N) { pkRenderDone(body, N, nav); return; }
   const it = _pk.items[_pk.idx];
   const confirmed = _pk.results[it.key];
+  // v31.82 (Luis): excedente SIN posición registrada → se pregunta el cartel y, al llegar, si está.
+  if (it.isExc && !it.manualExc) {
+    const _c = _pk.excCartel && _pk.excCartel[String(it.art).toUpperCase()];
+    if (_c && _c.ok === true) { it.excUbic = _c.u; it.sector = _c.u; }
+    else if (pkExcSinPos(it) && (!_c || _c.ok == null)) { body.innerHTML = pkExcCartelCardHtml(it, _c, nav); return; }
+  }
   // v4.26: artículo cuyo excedente cubre TODO lo pedido → en góndola se SALTEA
   // ("se busca al final"); el pick real va en el paso de excedente del final.
   if (it.skip) {
@@ -8814,6 +8822,76 @@ function pkExcPosSkip() {
   _pk.mode = "item";
   pkAdvance();
 }
+
+/* ═══ v31.82 (Luis, 16/10): EXCEDENTE SIN POSICIÓN REGISTRADA → EL CARTEL ═════════════════════════
+   "Todos los articulos que tienen excedentes ya deberían tener registrada la gondola donde esta el
+    excedente. Si hay alguno que tiene excedente y no esta registrado, que le pida al operario marcar
+    en qué gondola esta el excedente (en que gondola dice el cartel que esta y que, cuando llegue ahi,
+    confirme si esta o no)".
+   Paso art·EXC sin ninguna posición (gv_excedente_posicion lo da con sector NULL: p. ej. un ajuste que
+   entró sin ubicación): 1) ¿qué posición dice el cartel? 2) «Andá a P13 — ¿está?». Sí → se pickea ahí y el
+   PKC lleva la posición en el 8º campo (trg_gv_exc_pick_pos → GV_Excedente_Ubic_Declarada: desde ahí la
+   vista ubica ese saldo en P13). No está → 0 del excedente (faltante, como «Sin stock»).
+   Sin botón para saltear (mismo criterio que D1). sql/gv_excedente_cartel_v3182.sql · tests/pk-excedente-cartel.cjs */
+function pkExcSinPos(it) {
+  if (!it || !it.isExc || it.manualExc) return false;
+  return !String(it.excUbic || "").split("·").some(function (x) { return !!pkUbicLimpia(x); });
+}
+function pkExcCartelCampo(art) {
+  if (!_pk || !_pk.excCartel) return "";
+  const c = _pk.excCartel[String(art).toUpperCase()];
+  return (c && c.ok === true && c.u) ? String(c.u).replace(/[^A-Z0-9Ñ]/gi, "") : "";
+}
+function pkExcCartelCardHtml(it, c, nav) {
+  const cod = escapeHtml(_padCod(codBase(it.art)));
+  if (!c) {
+    return '<div class="pk-flow">' + (nav || "") +
+      '<div class="pk-gond-h">📦 ¿Dónde está el excedente del ' + cod + '?</div>' +
+      '<div class="pk-gond-s">Hay <b>' + pkFmt(it.esp) + '</b> ' + (pkEsUnidad(it.art) ? 'unidades' : 'cajas') + ' para levantar del excedente, ' +
+        'pero no tiene posición registrada. Anotá la posición que dice el <b>cartel</b> (por ejemplo <b>P13</b>) y andá a buscarlo.</div>' +
+      '<div class="pk-gond-row"><input id="pkCartelInp" class="pk-gond-inp" type="text" inputmode="text" autocapitalize="characters" placeholder="P13" maxlength="6">' +
+        '<button class="pk-btn pk-ok pk-gond-btn" onclick="pkExcCartelAnotar()">✓ Anotar</button></div>' +
+      '<div id="pkCartelErr" class="pk-excpos-suma bad" style="display:none"></div></div>';
+  }
+  return '<div class="pk-flow">' + (nav || "") +
+    '<div class="pk-big-row"><div class="pk-big-col"><span class="pk-cod-lbl">📦 CARTEL</span><span class="pk-sector-big exc">' + escapeHtml(c.u) + '</span></div>' +
+      '<div class="pk-big-col pk-big-right"><span class="pk-cod-lbl">EXCEDENTE</span><span class="pk-cod-big">' + cod + '</span></div></div>' +
+    '<div class="pk-gond-h">¿Está el excedente en ' + escapeHtml(c.u) + '?</div>' +
+    '<div class="pk2"><button class="pk-btn pk-nostk" onclick="pkExcCartelEsta(false)">✗ No está</button>' +
+      '<button class="pk-btn pk-ok" onclick="pkExcCartelEsta(true)">✓ Sí, está</button></div>' +
+    '<button class="pk-btn pk-cancel" onclick="pkExcCartelCambiar()">Me equivoqué de posición</button></div>';
+}
+function pkExcCartelAnotar() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  const inp = document.getElementById("pkCartelInp");
+  const u = pkUbicLimpia(String(inp ? inp.value : "").toUpperCase().replace(/[^A-Z0-9Ñ]/g, ""));
+  if (!u) {
+    const e = document.getElementById("pkCartelErr");
+    if (e) { e.textContent = "Escribí la posición como dice el cartel: letra y número (P13)."; e.style.display = ""; }
+    try { if (inp) inp.focus(); } catch (_e) {}
+    return;
+  }
+  if (!_pk.excCartel) _pk.excCartel = {};
+  _pk.excCartel[String(it.art).toUpperCase()] = { u: u, ok: null };
+  pkRender();
+}
+function pkExcCartelCambiar() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  if (_pk.excCartel) delete _pk.excCartel[String(it.art).toUpperCase()];
+  it.excUbic = ""; it.sector = "—";
+  pkRender();
+}
+function pkExcCartelEsta(esta) {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  const c = _pk.excCartel && _pk.excCartel[String(it.art).toUpperCase()];
+  if (!c) return;
+  c.ok = !!esta;
+  if (esta) { pkRender(); return; }   // se pickea en el paso normal; el PKC lleva la posición del cartel
+  pkSinStock();                       // no está: 0 del excedente (faltante)
+}
 function pkClose() { _pk = null; closeTandaModal(); }
 
 /* ===== v7.13 — ANULAR PICKING =====
@@ -9118,13 +9196,15 @@ function pkSendDetail(art, esp, real) {
   // v31.80 — 7º campo: de qué posición(es) del excedente salió ("P18:3;P22:2"). Sólo cuando el
   // operario lo contestó; los campos 5 y 6 van aunque estén vacíos para no correr la posición.
   const posF  = pkExcPosCampo(art);
-  const dep   = _pk.excOk ? ("|" + tot.exc) : ((emp || posF) ? "|" : "");
-  const empF  = (emp || posF) ? ("|" + emp) : "";
+  // v31.82 — 8º campo: la posición del cartel que el operario confirmó (excedente sin posición registrada).
+  const cartF = pkExcCartelCampo(art);
+  const dep   = _pk.excOk ? ("|" + tot.exc) : ((emp || posF || cartF) ? "|" : "");
+  const empF  = (emp || posF || cartF) ? ("|" + emp) : "";
   const payload = {
     legajo: _pk.legajo,
     opcion: "PKC",
     descripcion: "Picking artículo",
-    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep + empF + (posF ? "|" + posF : "")).toUpperCase(),
+    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep + empF + ((posF || cartF) ? "|" + posF : "") + (cartF ? "|" + cartF : "")).toUpperCase(),
     ts: nowMs,
     // client_id determinístico → reenviar/corregir el mismo artículo hace UPSERT
     // (merge-duplicates) en vez de duplicar. Por eso se puede ir y volver.
