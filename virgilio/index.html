@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.35">
+<link rel="stylesheet" href="gv-ui.css?v=31.49">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1353,7 +1353,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.23"></script>
+<script type="module" src="recepcion.js?v=30.24"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.23";
+const APP_VERSION = "v30.24";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -10936,7 +10936,21 @@ try { window.addEventListener("online", function () { try { bajaRacksFlushPend()
 
 /* ===== STOCK — módulo admin (v4.06): saldos + movimientos por artículo,
    cargar stock inicial y marcar el "corte" (desconsiderar lo anterior). ===== */
-async function stockFetchMovs() {
+async function stockFetchMovs(cods) {
+  /* v31.38 — con `cods` (lista de códigos exactos) trae sólo los movimientos de esos códigos.
+     El saldo de un código depende sólo de sus propios movimientos, así que da lo mismo que
+     bajar la tabla entera: el TP del operario bajaba 86.572 filas (25 MB) para mirar 20 códigos. */
+  if (Array.isArray(cods)) {
+    const lista = Array.from(new Set(cods.map(function (c) { return String(c == null ? "" : c).trim(); }).filter(Boolean)));
+    const out = [];
+    for (let i = 0; i < lista.length; i += 100) {
+      const inq = lista.slice(i, i + 100).map(function (c) { return '"' + c.replace(/"/g, "") + '"'; }).join(",");
+      const rows = await supaFetchAll(SUPABASE_STOCK_ENDPOINT, "cod_art=in.(" + encodeURIComponent(inq) + ")&select=*&order=ts.desc,id.desc");
+      for (const r of rows) out.push(r);
+    }
+    out.sort(function (a, b) { return String(b.ts).localeCompare(String(a.ts)); });
+    return out;
+  }
   // ⚠ PostgREST corta en 1000 filas (db-max-rows) AUNQUE se pida limit=20000. Con miles de
   // movimientos, un fetch simple deja la app viendo sólo los ~1000 más recientes → el saldo
   // event-sourced sale MAL: pierde el inicial y el picking viejo pero conserva el armado
@@ -13287,10 +13301,11 @@ function opDraftResume(legajo) {
    a guardar", el operario elige cuántas cajas guarda y al confirmar pasan a
    "Artículo Terminado" (resta de a_guardar, suma a terminado). ===== */
 let _mg = null;
+let _mgCeldas = null;   // v31.49: cod → [celdas de góndola], para el código que se agrega fuera de lista
 async function showMGModal(legajo, _resume) {
   if (!document.getElementById("mgCss")) {
     const s = document.createElement("style"); s.id = "mgCss";
-    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}.mg-gfill{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:8px;}.mg-gfill.lo{background:#fee2e2;color:#b91c1c;}.mg-gfill.mid{background:#fef3c7;color:#92400e;}.mg-gfill.hi{background:#dcfce7;color:#15803d;}.mg-gfill.unk{background:#f1f5f9;color:#64748b;}.mg-gfill.loc{display:block;background:#e0f2fe;color:#075985;margin-top:5px;}.mg-gfill.loc b{color:#0c4a6e;}.mg-prio{display:inline-block;margin-right:6px;font-size:10px;font-weight:900;color:#fff;background:#b91c1c;border-radius:6px;padding:1px 6px;vertical-align:middle;}.mg-mchint-row{margin-top:-2px;}.mg-mchint{font-size:11.5px;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:3px 8px;display:inline-block;}.mg-emp{display:inline-block;margin-right:6px;font-size:10.5px;font-weight:900;color:#fff;border-radius:6px;padding:2px 7px;vertical-align:middle;letter-spacing:.04em;}.mg-emp.lk{background:#1d4ed8;}.mg-emp.ch{background:#b45309;}.mg-ubic-inp.bad{border-color:#dc2626;background:#fef2f2;color:#b91c1c;}.mg-rowact{display:flex;gap:8px;}.mg-ok1{flex:1.4;padding:11px 8px;border:none;border-radius:10px;background:#16a34a;color:#fff;font-size:14.5px;font-weight:800;cursor:pointer;}.mg-reg1{flex:1;padding:11px 8px;border:1.5px solid #94a3b8;border-radius:10px;background:#fff;color:#334155;font-size:13px;font-weight:800;cursor:pointer;}.mg-term{width:100%;margin-top:8px;padding:12px;border:none;border-radius:12px;background:#0f172a;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}.mg-term span{font-weight:600;opacity:.8;font-size:13px;}";
+    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}.mg-gfill{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:8px;}.mg-gfill.lo{background:#fee2e2;color:#b91c1c;}.mg-gfill.mid{background:#fef3c7;color:#92400e;}.mg-gfill.hi{background:#dcfce7;color:#15803d;}.mg-gfill.unk{background:#f1f5f9;color:#64748b;}.mg-gfill.loc{display:block;background:#e0f2fe;color:#075985;margin-top:5px;}.mg-gfill.loc b{color:#0c4a6e;}.mg-prio{display:inline-block;margin-right:6px;font-size:10px;font-weight:900;color:#fff;background:#b91c1c;border-radius:6px;padding:1px 6px;vertical-align:middle;}.mg-mchint-row{margin-top:-2px;}.mg-mchint{font-size:11.5px;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:3px 8px;display:inline-block;}.mg-emp{display:inline-block;margin-right:6px;font-size:10.5px;font-weight:900;color:#fff;border-radius:6px;padding:2px 7px;vertical-align:middle;letter-spacing:.04em;}.mg-emp.lk{background:#1d4ed8;}.mg-emp.ch{background:#b45309;}.mg-ubic-inp.bad{border-color:#dc2626;background:#fef2f2;color:#b91c1c;}.mg-gubic{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:9px 11px;}.mg-gubic-l{font-size:13px;font-weight:800;color:#92400e;flex:1 1 150px;}.mg-gubic-n{flex-basis:100%;font-size:11.5px;color:#b45309;}.mg-rowact{display:flex;gap:8px;}.mg-ok1{flex:1.4;padding:11px 8px;border:none;border-radius:10px;background:#16a34a;color:#fff;font-size:14.5px;font-weight:800;cursor:pointer;}.mg-reg1{flex:1;padding:11px 8px;border:1.5px solid #94a3b8;border-radius:10px;background:#fff;color:#334155;font-size:13px;font-weight:800;cursor:pointer;}.mg-term{width:100%;margin-top:8px;padding:12px;border:none;border-radius:12px;background:#0f172a;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}.mg-term span{font-weight:600;opacity:.8;font-size:13px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("mgModal");
@@ -13319,6 +13334,7 @@ async function showMGModal(legajo, _resume) {
        por (cod, empresa) y para un codigo no dual devuelve la misma suma pelada que antes. */
     const capObj = res[2] || { pelada: {}, porEmp: {} };
     const celdasMap = res[3] || {};   // v10.08 — cod → [celdas de góndola]
+    _mgCeldas = celdasMap;            // v31.49
     const demMap = res[4] || {};      // v12.14 — demanda (cajas pedidas) del día por código
     const cxmMap = res[5] || {};      // v12.14 — cajas por master caja (planimetría)
     // v8.40 — orden por PRIORIDAD: primero lo que tiene la góndola más vacía (stock góndola ÷
@@ -13378,7 +13394,7 @@ async function showMGModal(legajo, _resume) {
       // v12.14 (idea 4926) — máximo de MCs que entran sin rebalsar la góndola (informativo,
       // NO limita el input: el tope real sigue siendo lo disponible en "a guardar").
       const maxMC = (cap > 0 && cxm > 0) ? Math.max(0, Math.floor((cap - gond) / cxm)) : null;
-      return { cod: a.cod, emp: a.emp || "", desc: artNombre(a.cod, a.desc), disponible: a.a_guardar, gond: gond, cap: cap, celdas: celdas, prio: (cap > 0 ? (gond - ped) / cap : Infinity), _maxMC: maxMC, _cxm: cxm || null, cargar: 0, exc: 0, ubic: "", excOn: false };
+      return { cod: a.cod, emp: a.emp || "", desc: artNombre(a.cod, a.desc), disponible: a.a_guardar, gond: gond, cap: cap, celdas: celdas, prio: (cap > 0 ? (gond - ped) / cap : Infinity), _maxMC: maxMC, _cxm: cxm || null, cargar: 0, exc: 0, ubic: "", gubic: "", excOn: false, sinCel: _mgSinCel(celdas) };
     }).sort(function (a, b) {
       if (a.prio !== b.prio) return a.prio - b.prio;   // góndola más vacía primero
       return (parseInt(a.cod, 10) || 0) - (parseInt(b.cod, 10) || 0);
@@ -13430,7 +13446,10 @@ function mgRender() {
       } else {
         gfill = '<div class="mg-gfill unk">🛒 góndola s/capacidad</div>';
       }
+    }
+    {
       // v10.08 — DÓNDE va en góndola: primera ubicación (destacada) + cuántas celdas tiene.
+      // v31.49: también para el código fuera de lista (antes no mostraba nada).
       const _cel = it.celdas || [];
       if (_cel.length) {
         const _first = _cel[0], _rest = _cel.slice(1, 3).join(", ");
@@ -13441,6 +13460,12 @@ function mgRender() {
         gfill += '<div class="mg-gfill unk">📍 sin ubicación fija cargada</div>';
       }
     }
+    // v31.49 (Luis, 16/10): sin celda en el Mapa → se pregunta DÓNDE lo guardó (va al cuadro del admin).
+    const _sinCel = !!it.sinCel;
+    const _gOk = !String(it.gubic || "").trim() || !_gvLugares || !_gvLugares.set.size || _gvLugares.set.has(gvNormSector(it.gubic));
+    const gubicRow = _sinCel
+      ? '<div class="mg-gubic"><span class="mg-gubic-l">📍 ¿En qué góndola lo guardaste?</span><input class="mg-ubic-inp' + (_gOk ? '' : ' bad') + '" type="text" list="mgLugaresDL" maxlength="7" autocomplete="off" enterkeyhint="done" placeholder="G09" value="' + escapeHtml(it.gubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-ZÑ0-9]/g,\'\').slice(0,7);mgSetGubic(' + i + ',this.value)"><div class="mg-gubic-n">No tiene lugar cargado en el Mapa: el supervisor lo da de alta con lo que anotes.</div></div>'
+      : '';
     const gondStp = function (big) { return '<div class="mg-stp' + (big ? ' big' : '') + '"><button class="mg-sb" onclick="mgChg(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxG + '" inputmode="numeric" value="' + it.cargar + '" oninput="mgSet(' + i + ',this.value)"><button class="mg-sb" onclick="mgChg(' + i + ',1)">+</button></div>'; };
     const excStp = '<div class="mg-stp"><button class="mg-sb" onclick="mgChgExc(' + i + ',-1)">–</button><input class="mg-inp" type="text" min="0" max="' + maxE + '" inputmode="numeric" value="' + it.exc + '" oninput="mgSetExc(' + i + ',this.value)"><button class="mg-sb" onclick="mgChgExc(' + i + ',1)">+</button></div>';
     // v15.40 — el lugar se ELIGE, no se inventa. En el celular el operario tipea
@@ -13454,7 +13479,7 @@ function mgRender() {
     const mcHint = (!it.manual && it._maxMC != null && it._cxm)
       ? '<div class="mg-mchint-row"><span class="mg-mchint">📐 Máx sin rebalsar: <b>' + it._maxMC + ' MC</b> (' + (it._maxMC * it._cxm) + ' cajas)</span></div>' : '';
     return '<div class="mg-row">' +
-      '<div class="mg-headline"><div class="mg-info">' + empChip + '<span class="mg-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span>' + gfill + '</div>' + head + '</div>' + mcHint +
+      '<div class="mg-headline"><div class="mg-info">' + empChip + '<span class="mg-cod">' + escapeHtml(codCanonSuf(it.cod)) + '</span> <span class="mg-desc">' + escapeHtml(it.desc || "") + '</span>' + gfill + '</div>' + head + '</div>' + mcHint + gubicRow +
       (it.excOn
         ? '<div class="mg-exp"><div class="mg-col g"><div class="mg-lbl gond">Góndola</div>' + gondStp(false) + '</div>' +
             '<div class="mg-col e"><button class="mg-exc-hdr" onclick="mgToggleExc(' + i + ')">☑ Excedente</button>' + excStp + '</div></div>' +
@@ -13487,9 +13512,24 @@ function mgAddManual() {
   if (!_mg) return;
   const cod = String(_mg.filtro || "").trim().toUpperCase(); if (!cod) return;
   if (!_mg.items.some(function (it) { return String(it.cod).toUpperCase() === cod; })) {
-    _mg.items.push({ cod: cod, desc: "", disponible: 99999, cargar: 0, exc: 0, ubic: "", excOn: false, manual: true });
+    const it = { cod: cod, desc: "", disponible: 99999, cargar: 0, exc: 0, ubic: "", gubic: "", excOn: false, manual: true, celdas: _mgCeldasDe(cod) }; it.sinCel = _mgSinCel(it.celdas);
+    _mg.items.push(it);
+    // v31.49: si el módulo se retomó de un borrador no está el mapa de celdas; se trae y se vuelve a dibujar.
+    if (!_mgCeldas) ocgFetchCeldas().then(function (m) { _mgCeldas = m || {}; it.celdas = _mgCeldasDe(cod); it.sinCel = _mgSinCel(it.celdas); mgRender(); }).catch(function () {});
   }
   mgRender();
+}
+/* v31.49 — celdas de góndola de un código: como viene, sin sufijo LK/CH y sin la L de LK. */
+function _mgCeldasDe(cod) {
+  const m = _mgCeldas || {}, k = _ocgNorm(cod);
+  const kb = k.replace(/\s+(LK|CH)$/, ""), kl = kb.replace(/([0-9E])L$/, "$1");
+  return m[k] || m[kb] || m[kl] || [];
+}
+/* Sin celda sólo si el mapa de celdas CARGÓ: una lectura rota no es «no tiene lugar» (no se frena el guardado). */
+function _mgSinCel(celdas) { return !!(_mgCeldas && Object.keys(_mgCeldas).length) && !(celdas && celdas.length); }
+function mgSetGubic(i, v) {
+  if (!_mg) return; const it = _mg.items[i]; if (!it) return;
+  it.gubic = String(v == null ? "" : v).toUpperCase().replace(/[^A-ZÑ0-9]/g, "").slice(0, 7);   // sin re-render: no pierde el foco
 }
 function mgChg(i, d) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; it.cargar = Math.max(0, Math.min(it.disponible - it.exc, it.cargar + d)); mgRender(); }
 function mgSet(i, v) { if (!_mg) return; const it = _mg.items[i]; if (!it) return; let n = Math.max(0, parseInt(v, 10) || 0); const mx = it.disponible - it.exc; if (n > mx) n = mx; it.cargar = n; mgRender(); }
@@ -13524,6 +13564,13 @@ async function mgConfirmar() {
 /* v23.72 — validación y filas de UN renglón, compartidas por el confirmar de todo y por
    «✓ Guardé este código» / «Ya estaba en góndola». */
 function mgValidarSel(sel) {
+  // v31.49 (Luis, 16/10): el código sin celda en el Mapa no se guarda sin decir DÓNDE.
+  const sinG = sel.find(function (it) { return it.cargar > 0 && it.sinCel && !String(it.gubic || "").trim(); });
+  if (sinG) { try { alert("📍 El " + codCanonSuf(sinG.cod) + " no tiene lugar cargado en el Mapa.\nEscribí en qué góndola lo guardaste (ej. G09): el supervisor lo da de alta."); } catch (_e) {} return false; }
+  if (_gvLugares && _gvLugares.set && _gvLugares.set.size) {
+    const malG = sel.find(function (it) { return it.cargar > 0 && it.sinCel && !_gvLugares.set.has(gvNormSector(it.gubic)); });
+    if (malG) { try { alert("📍 “" + String(malG.gubic || "") + "” no es un lugar del depósito.\nEmpezá a escribir y elegí uno de los que aparecen (ej. G09, M13)."); } catch (_e) {} return false; }
+  }
   // El excedente no tiene lugar fijo → la ubicación es obligatoria para tenerla
   // de dato (la usa el picking).
   const sinUbic = sel.find(function (it) { return (it.exc || 0) > 0 && String(it.ubic || "").trim().length < 1; });
@@ -13583,6 +13630,7 @@ async function mgConfirmarFin(sel, rows, nG, nE) {
   sel.filter(function (it) { return it.manual && (it.cargar + (it.exc || 0)) > 0; }).forEach(function (it) {
     try { mgEmitFueraLista(it.cod, it.cargar, it.exc || 0, _leg); } catch (_e) {}
   });
+  sel.forEach(function (it) { try { mgEmitGondola(it, _leg); } catch (_e) {} });   // v31.49
   try { opDraftClear(_leg); } catch (_e) {}
   closeMG();
   try { emitGuardadoSesion(nG + nE, _tsIni, _leg); } catch (_e) {}   // ratio de guardado (se autonutre)
@@ -13614,6 +13662,7 @@ async function mgGuardarUno(i, modo) {
     return;
   }
   if (it.manual) { try { mgEmitFueraLista(it.cod, it.cargar, it.exc || 0, _leg); } catch (_e) {} }
+  try { mgEmitGondola(it, _leg); } catch (_e) {}   // v31.49
   if (reg) {
     try { mgEmitMarca("MGR", _leg, String(codCanonSuf(it.cod)) + "|" + tot); } catch (_e) {}
   } else {
@@ -13627,7 +13676,7 @@ async function mgGuardarUno(i, modo) {
   try { mgEmitMarca("MGI", _leg); _mg._mgi = true; } catch (_e) {}
   _mgTramoGuardar(_leg, _mg.tsInicio);   // v26.83
   if (!it.manual) it.disponible = Math.max(0, it.disponible - tot);
-  it.cargar = 0; it.exc = 0; it.excOn = false; it.ubic = "";
+  it.cargar = 0; it.exc = 0; it.excOn = false; it.ubic = ""; it.gubic = "";
   _mg.items = _mg.items.filter(function (x) { return x.manual ? x !== it : x.disponible > 0; });
   try { opDraftClear(_leg); } catch (_e) {}
   mgRender();
@@ -13686,6 +13735,28 @@ function mgEmitGuardado(legajo, tsInicioMs) {
       try { renderLegajoHistory(legajoInput.value); } catch (_e) {}
     }
   } catch (_e) {}
+}
+/* v31.49 (Luis, 16/10: "cuando un operario guarda en gondola un codigo del que no hay posicion
+   establecida, debería preguntar DONDE se está guardando") — mismo circuito que el picking (PKG,
+   v29.69): el evento cae en el cuadro «Góndolas sin cargar en el Mapa» del supervisor.
+   texto = "COD|lo que escribió|GUARDADO|cajas". Sin ts_inicio: no abre tarea.
+   Dedup por día, legajo y código: guardar dos veces el mismo código en el día es UNA sugerencia. */
+function mgEmitGondola(it, legajo) {
+  if (!it || !(it.cargar > 0) || !it.sinCel) return;
+  const sec = String(it.gubic || "").toUpperCase().replace(/\|/g, "").slice(0, 12); if (!sec) return;
+  const leg = String(legajo || "").trim();
+  const cod = String(it.cod).toUpperCase().replace(/\|/g, "");
+  const dia = getTodayKey();
+  const payload = {
+    legajo: leg, opcion: "PKG", descripcion: "Góndola informada en guardado",
+    texto: cod + "|" + gvNormSector(sec) + "|GUARDADO|" + it.cargar,
+    ts: Date.now(),
+    id: ("pkg_" + leg + "_G" + dia + "_" + cod).replace(/[^a-zA-Z0-9_\-]/g, ""),
+    ts_inicio_iso: null
+  };
+  enqueueReport(payload);
+  if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
+  try { updatePendingIndicator(); } catch (_e) {}
 }
 /* Evento MGX: se guardó un código que NO estaba en "Mercadería a guardar". Un
    trigger de Supabase lo reenvía por Telegram. texto = "COD|G<góndola>|E<exc>". */
@@ -16540,7 +16611,13 @@ async function stockBajaPicking(tanda, legajo) {
     // de ESTA tanda: son justamente los que se están validando.
     let sal = {}, salOk = false;
     try {
-      const movs = (await stockFetchMovs()).filter(function (mv) {
+      // v31.38 — sólo la familia de los códigos de esta tanda (pelado + sufijos LK/CH/LOKE, como codBase).
+      const _codsTanda = [];
+      Object.keys(byArt).concat(Object.keys(espByArt)).forEach(function (a) {
+        const bk = codBase(a); if (!bk) return;
+        _codsTanda.push(bk, bk + " LK", bk + " CH", bk + " LOKE");
+      });
+      const movs = (await stockFetchMovs(_codsTanda)).filter(function (mv) {
         return !(mv.tipo === "picking" && String(mv.ref || "").split("|")[0].trim().toUpperCase() === t);
       });
       if (movs && movs.length) { sal = stockComputeSaldos(movs, await stockGetCutoff()); salOk = true; }
