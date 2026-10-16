@@ -1,3 +1,3 @@
-6534e88ca1b7d4262b323109f402da678526ccef  v31.82: picking — excedente sin posición registrada pide la posición del cartel y confirma al llegar
+73e4374021727624ca74ffe4c6dc254965421569  v31.85: «No está» del excedente sale en la landing del admin; ✓ lo da por vacío
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).

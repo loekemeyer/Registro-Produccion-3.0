@@ -7,7 +7,7 @@
      (b) una posición mal escrita no pasa;
      (c) anotada P13 → «¿Está el excedente en P13?» con Sí / No;
      (d) Sí → paso normal en P13; «✓ Puse» manda el PKC con el 8º campo P13 (campos 5-7 en su lugar);
-     (e) No está → 0 del excedente, sin 8º campo, y avanza;
+     (e) No está → 0 del excedente, 8º campo «-P13» (v31.85: aviso al admin) y avanza;
      (f) con posición registrada no pregunta; el excedente marcado a mano tampoco;
      (g) «Me equivoqué de posición» vuelve a pedir el cartel.
    Sale 1 si falla. */
@@ -65,7 +65,7 @@ const APP = process.env.PK_APP || path.join(__dirname, "..", "virgilio", "index.
     armar(); pkRender();
     document.getElementById("pkCartelInp").value = "P13"; pkExcCartelAnotar(); pkExcCartelEsta(false);
     out.noEsta = sent.length ? sent[sent.length - 1].texto : "";
-    out.noEstaOk = out.noEsta === "F12A|066|4|0|0|LK" && _pk.idx === 1;
+    out.noEstaOk = out.noEsta === "F12A|066|4|0|0|LK||-P13" && _pk.idx === 1;
     // (f)
     armar("P21"); pkRender();
     out.conPosNoPregunta = !document.getElementById("pkCartelInp") && /Puse 4/.test(txt());
@@ -86,7 +86,7 @@ const APP = process.env.PK_APP || path.join(__dirname, "..", "virgilio", "index.
   ok(r.llega, "(c) no preguntó si el excedente está en P13");
   ok(r.pasoNormal, "(d) «Sí, está» no llevó al paso de pickeo en P13");
   ok(r.pkcOk, "(d) el PKC salió «" + r.pkc + "» (esperaba F12A|066|4|4|4|LK||P13)");
-  ok(r.noEstaOk, "(e) «No está» salió «" + r.noEsta + "» (esperaba F12A|066|4|0|0|LK)");
+  ok(r.noEstaOk, "(e) «No está» salió «" + r.noEsta + "» (esperaba F12A|066|4|0|0|LK||-P13)");
   ok(r.conPosNoPregunta, "(f) preguntó el cartel con la posición registrada");
   ok(r.manualNoPregunta, "(f) preguntó el cartel en el excedente marcado a mano");
   ok(r.cambiar, "(g) «Me equivoqué» no volvió a pedir el cartel");

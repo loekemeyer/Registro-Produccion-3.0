@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.82">
+<link rel="stylesheet" href="gv-ui.css?v=31.85">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1364,7 +1364,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.31"></script>
+<script type="module" src="recepcion.js?v=30.32"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5295,7 +5295,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.31";
+const APP_VERSION = "v30.32";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -8840,7 +8840,9 @@ function pkExcSinPos(it) {
 function pkExcCartelCampo(art) {
   if (!_pk || !_pk.excCartel) return "";
   const c = _pk.excCartel[String(art).toUpperCase()];
-  return (c && c.ok === true && c.u) ? String(c.u).replace(/[^A-Z0-9Ñ]/gi, "") : "";
+  if (!c || !c.u || c.ok == null) return "";
+  // v31.85: «No está» viaja como «-P13» → aviso al admin (gv_exc_noesta_pendientes)
+  return (c.ok === false ? "-" : "") + String(c.u).replace(/[^A-Z0-9Ñ]/gi, "");
 }
 function pkExcCartelCardHtml(it, c, nav) {
   const cod = escapeHtml(_padCod(codBase(it.art)));
