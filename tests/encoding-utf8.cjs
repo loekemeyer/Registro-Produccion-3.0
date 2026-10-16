@@ -20,7 +20,6 @@ const ARCHIVOS = [
   "index.html", "sw.js",
   "virgilio/index.html", "virgilio/sw.js", "virgilio/recepcion.js", "virgilio/planimetria.js", "virgilio/supabase-config.js",
   "virgilio/cobranzas.js", "virgilio/importacion.js", "virgilio/hotsale.js",
-  "cervantes/index.html", "cervantes/app.js", "cervantes/sw.js",
 ];
 const fail = [];
 

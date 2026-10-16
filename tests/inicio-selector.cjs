@@ -78,9 +78,6 @@ const { servir } = require("./_servidor.cjs");
   // Android pide íconos PNG de 192 y 512 para instalar
   c.iconosPng = ["192x192", "512x512"].every((t) => mr.icons.some((i) => i.sizes === t && i.type === "image/png"
     && fs.existsSync(path.join(__dirname, "..", i.src))));
-  // la app vieja cervantes/ (sin enlace, se borra cuando pasen todos) conserva el suyo, con alcance en la raíz
-  const mc = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "cervantes", "manifest.json"), "utf8"));
-  c.cervantesViejaCubreElInicio = new URL(mc.scope || "./", raiz + "cervantes/manifest.json").href === raiz;
 
   const pass = Object.values(c).every(Boolean) && errs.length === 0 && sup404.length === 0;
   console.log("inicio-selector:", JSON.stringify(c), "· pageerrors:", errs.length ? errs.join("|") : "none", "· 4xx propios:", sup404.length ? sup404.join(", ") : "none", "·", pass ? "✓ OK" : "✗ FAIL");

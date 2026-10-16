@@ -5,7 +5,7 @@ operario**: lo de supervisor u oficina no está. **Leer `README.md` primero**: d
 qué se recortó y qué no se probó. Nació como copia de `loekemeyer/Gestion-Virgilio` y `loekemeyer/Gestion-Productiva-2.0`,
 pero **desde el 06/10/2026 ya no es una copia sin modificar**: la raíz (`/`) es el inicio que separa Cervantes y Virgilio;
 Virgilio vive en `virgilio/` con login sólo por el código de la TV, y Cervantes vive en `cervantes-gp2/` (la botonera de GP2, desde el
-08/10; la app vieja `cervantes/` quedó sin enlace) con login por el código de la TV de Cervantes, que se pide **antes de entrar** (`[Elías, 07/10/2026: «ya no estamos en GP2 … usan su celular personal»]`).
+08/10; la app vieja `cervantes/` quedó sin enlace y **se borró el 16/10/2026** `[Luis: «si, borra»]`) con login por el código de la TV de Cervantes, que se pide **antes de entrar** (`[Elías, 07/10/2026: «ya no estamos en GP2 … usan su celular personal»]`).
 La copia vieja de la tablet de GP2 (`gp2/`) **se borró el 08/10/2026** `[Elías: «2 si»]` (está en el historial de git). Supabase es el
 mismo proyecto (`hrxfctzncixxqmpfhskv`).
 

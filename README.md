@@ -461,10 +461,8 @@ supervisor). De esos tests se trajeron 8 de operario.
 |---|---|
 | `inicio-selector` | `/` con las 2 tarjetas; Virgilio abre `virgilio/` con su login; **Cervantes abre `cervantes/`** y, antes de entrar, muestra la pantalla del código de la TV con «Volver al inicio»; `supabase.js` compartido; redirección de `selector/`; el alcance (`scope`) de las 3 apps instalables cubre el inicio |
 | `virgilio-solo-operario` | **el recorte**: los archivos de supervisor no están; la página carga sin 404 ni errores; la botonera tiene sus 20 botones y cada uno se toca sin error; las entradas de supervisor no existen y los 5 cascarones y los paneles están vacíos (51 chequeos). Con el código sin recortar falla en 19 |
-| `articulo-envasado` | nombre y marca del artículo en envasado, en `cervantes/` (8 chequeos; la parte de la tablet de GP2 se fue con `gp2/` el 08/10): regla «mismo artículo → sólo marca» (322) y «nombres distintos → nombre y marca» (389), abreviaturas LK/CH, línea colapsada, matriz de una sola pieza, matriz que no es de envasado y la RPC caída |
 | `virgilio-al-dia-con-gv` | que GV no tenga nada de operario sin traer (corre `tools/traer_de_gv.cjs --revisar`; sin clon de GV, SALTEADA) |
 | `virgilio-solo-tv` | login de Virgilio sólo con TV, sin entrada por legajo y con la entrada por nombre (v30.08); el registro del equipo en cada ingreso (v30.12) y que si falla el operario entra igual (24 chequeos) |
-| `cervantes-tv` | entrada de `cervantes/` con el código de la TV (52 chequeos): la pantalla aparece ANTES de la del legajo y la tapa, código mal y bien, qué manda a la base (app, código, id del equipo, huella, navegador, pantalla; sin legajo), anotación de cada legajo en el equipo (1 vez por día), recarga con pase, vigencia 17:44/17:50, 08:00 sin LT, arranque sin internet (retenido) y pantalla sola al volver, internet cortado con la pantalla abierta, «Ingresar código» / «Ahora no», demasiados intentos, función caída o sin crear, 7 códigos malos seguidos |
 | `operario-queda-botonera`, `modulo-minimizar-anular`, `tarea-abierta-otro-dia`, `botonera-tm-historial`, `mg-reentrada`, `toggle-anular`, `rr-sin-remitos-cierra`, `encoding-utf8` | de Gestión Virgilio, con las rutas nuevas. `operario-queda-botonera` sin el segundo selector ni `chooseVirgilio` (lo llamaba el selector de planta); `modulo-minimizar-anular` sin el chequeo del monitor |
 
 - `modulo-minimizar-anular` es **intermitente** (falla «BR re-entrar = mismo tramo» algunas corridas): pasa igual en el
@@ -500,6 +498,10 @@ Medido el 06/10/2026 (noche), antes de pasar los operarios a este repo:
 
 ## Publicación
 
+**16/10/2026** `[Luis: «si, borra»]`: la app vieja `cervantes/` (copia de Registro Producción 2.0, sin enlace desde el 08/10) se **borró** del repo,
+junto con sus pruebas `articulo-envasado` y `cervantes-tv` (está en el historial de git). Lo que este README dice de `cervantes/` es historia.
+Cervantes es `cervantes-gp2/`. RP2 y la copia de GV muestran un aviso con el botón a `https://rp.loeke-erp.com/`.
+
 GitHub Pages está activado desde el 05/10/2026 (rama `main`, carpeta `/ (root)`). Base:
 `https://loekemeyer.github.io/Registro-Produccion-3.0/`
 
@@ -508,7 +510,6 @@ GitHub Pages está activado desde el 05/10/2026 (rama `main`, carpeta `/ (root)`
 | Inicio (elegir planta) | `/` |
 | Virgilio (operario) | `/virgilio/` |
 | Cervantes = botonera de GP2 en el celular (la tarjeta «Cervantes» del inicio) | `/cervantes-gp2/` |
-| Registro Producción 2.0 (sin enlace) | `/cervantes/` |
 
 - El origen es el mismo `loekemeyer.github.io` que Gestión Virgilio y GP2: comparten `localStorage` y la sesión de
   Supabase. El login de GP2 vuelve a `origin + pathname`: la URL nueva tiene que estar permitida en Supabase →
