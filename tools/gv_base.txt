@@ -1,3 +1,3 @@
-0921bcf1ea42f4c0a567067595b75b1c42d22ddd  v31.64: 574 — se da de baja al quedar saldado tras el armado; Completar pedido lo completa con 574E
+3ed200c77d8ce515ed6d6b71e68a6acc471570a8  v31.80: picking — excedente en 2+ posiciones pregunta de cuál sacó, para liberar la P vacía en el Ma
 # Commit de Gestión Virgilio del que sale virgilio/ (la BASE del merge de tools/traer_de_gv.cjs). La primera línea manda;
 # el script la reescribe después de cada traída. v27.57 = el último cruce función por función (README, «Fuente de verdad»).

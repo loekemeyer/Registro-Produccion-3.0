@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.64">
+<link rel="stylesheet" href="gv-ui.css?v=31.80">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -792,6 +792,17 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 .pk-gond-inp { flex:1; width:auto; margin:0; font-size:30px; font-weight:900; text-align:center;
   text-transform:uppercase; border:2px solid #cbd5e1; border-radius:12px; padding:8px; }
 .pk-gond-btn { flex:0 0 42%; margin:0; }
+.pk-excpos-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:8px; margin-bottom:10px; }
+.pk-excpos-btn { margin:0; display:flex; flex-direction:column; align-items:center; gap:2px; min-height:64px; }
+.pk-excpos-u { font-size:24px; font-weight:900; }
+.pk-excpos-c { font-size:12px; font-weight:700; opacity:.85; }
+.pk-excpos-tab { display:flex; flex-direction:column; gap:6px; margin-bottom:8px; }
+.pk-excpos-fila { display:flex; align-items:center; justify-content:center; gap:10px; }
+.pk-excpos-fila .pk-excpos-c { color:#64748b; min-width:70px; text-align:center; }
+.pk-excpos-inp { width:76px; height:48px; margin:0; font-size:22px; font-weight:900; text-align:center; }
+.pk-excpos-suma { text-align:center; font-size:14px; font-weight:800; color:#b45309; margin-bottom:8px; }
+.pk-excpos-suma.ok { color:#15803d; }
+.pk-excpos-suma.bad { color:#b91c1c; }
 .pk-conteo{ width:100%; box-sizing:border-box; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:13px; padding:12px 13px; text-align:left; }
 .pk-conteo.done{ background:#f0fdf4; border-color:#86efac; color:#166534; font-weight:700; text-align:center; }
 .pk-conteo-h{ font-size:14.5px; font-weight:800; color:#92400e; }
@@ -1353,7 +1364,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.28"></script>
+<script type="module" src="recepcion.js?v=30.29"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -1403,6 +1414,9 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
     <!-- Alternativa: entrar con el número de legajo (sin Google). Resuelve
          contra Empleados y guarda una sesión local que dura el día. -->
     <div class="auth-divider"><span>o</span></div>
+    <!-- v31.78 (Luis, 16/10): desde el sáb 17/10 00:01 el operario entra por RP3.0. El código de la TV se apaga
+         (también en el servidor: gv_tv_clave_validar devuelve «migrado») y lo reemplaza este botón. -->
+    <button id="loginOperarioRp" class="primary-btn" style="display:none" onclick="gvIrRp3()">Login Operario</button>
     <!-- v23.82 (Luis): el operario entra con la CLAVE que muestra la TV del depósito, después
          elige su nombre, o «+» si no está y tipea el legajo. -->
     <div id="legajoLoginRow">
@@ -5281,7 +5295,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.28";
+const APP_VERSION = "v30.29";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -7385,6 +7399,7 @@ function pkSave() {
       items: _pk.items, idx: _pk.idx, results: _pk.results, mode: _pk.mode,
       forced: _pk.forced || {}, cid: _pk.cid || {},   // v26.62
       gondDone: _pk.gondDone || {},   // v29.69
+      excPos: _pk.excPos || {},       // v31.80
       app: (typeof APP_VERSION !== "undefined" ? APP_VERSION : "")   // v18.53 — con qué versión se armó esta lista
     }));
   } catch (_e) { /* localStorage lleno / privado: no rompe el picking */ }
@@ -7465,7 +7480,7 @@ function pkResume(legajo) {
   m.querySelector(".tanda-modal-title").textContent = "Picking — Tanda " + saved.tanda;
   _pk = { tanda: saved.tanda, legajo: saved.legajo, items: saved.items,
           idx: saved.idx || 0, results: saved.results || {}, mode: saved.mode || "item",
-          forced: saved.forced || {}, cid: saved.cid || {}, gondDone: saved.gondDone || {} };   // v26.62 · v29.69
+          forced: saved.forced || {}, cid: saved.cid || {}, gondDone: saved.gondDone || {}, excPos: saved.excPos || {} };   // v26.62 · v29.69 · v31.80
   m.classList.add("show");
   pkRender();
 }
@@ -7542,11 +7557,13 @@ const PICK_UBIC_DUAL = {
 /* v30.29 (Luis, 14/10) — código pedido → código viejo cuyo saldo se liquida en ese
    picking (ver showPickingList). Mientras el viejo tenga saldo terminado > 0, el picking
    del pedido levanta primero las cajas del viejo. Al llegar a 0 se apaga solo. */
-const PK_LIQUIDAR_EN = {
-  "574E": { cod: "574", emp: "LK", sector: "F50", nota: "Corta Queso nacional — se liquida" },
-  // v31.60 (Luis, 16/10): 636E / 635E de Chef se pickean del nacional hasta liquidarlo.
-  "636E": { cod: "636", emp: "CH", sector: "M36", nota: "Espátula Calada nacional — se liquida" },
-  "635E": { cod: "635", emp: "CH", sector: "M35", nota: "Espátula Lisa nacional — se liquida" }
+const PK_LIQUIDAR_EN = {};
+/* Los pares de la liquidaciÃ³n (los mismos que GV_Pick_Liquidar). SÃ³lo los usa Completar pedido
+   (pkLiqPedidoDe, v31.64): un faltante del viejo se completa con el cÃ³digo del pedido. */
+const PK_LIQ_PARES = {
+  "574E": { cod: "574", emp: "LK" },
+  "636E": { cod: "636", emp: "CH" },
+  "635E": { cod: "635", emp: "CH" }
 };
 /* v6.83 (idea 9020): este mapa es el FALLBACK de display. Desde que el stock está
    partido por empresa ("438E LK" / "438E CH"), `pkCodEmpresa` ya parte el renglón
@@ -7777,7 +7794,7 @@ async function showPickingList(tanda, legajo, opts) {
     try {
       // v31.60: + los códigos viejos que se liquidan (no están en agg): su excedente sale primero.
       const excMap = await pkFetchExcedente(Object.keys(agg).concat(items.filter(function (it) { return it.liqDe && !agg[it.art]; }).map(function (it) { return it.art; })));
-      items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); } });
+      items.forEach(function (it) { const e = excMap[String(it.art).toUpperCase()]; if (e) { it.exc = e.cajas; it.excUbic = e.ubics.join(" · "); it.excPorUbic = e.porUbic || null; } });
       excOk = true;
     } catch (_e) { excOk = false; }
     // Excedente: se agarra PRIMERO del excedente y, si no alcanza, el RESTO de
@@ -7791,7 +7808,7 @@ async function showPickingList(tanda, legajo, opts) {
         const gondNeeded = it.esp - excUsed;           // el resto, de góndola
         if (gondNeeded > 0) { it.esp = gondNeeded; it.excHint = excUsed; }   // góndola pide solo el resto
         else { it.skip = true; }                                              // excedente cubre todo → saltear góndola
-        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, exc: it.exc, isExc: true, dual: null, emp: it.emp || "", liqDe: it.liqDe, liqNota: it.liqNota });
+        excSteps.push({ art: it.art, key: it.art + "·EXC", esp: excUsed, sector: it.excUbic || "—", excUbic: it.excUbic, excPorUbic: it.excPorUbic || null, exc: it.exc, isExc: true, dual: null, emp: it.emp || "", liqDe: it.liqDe, liqNota: it.liqNota });
       }
     });
     // v20.17 (Thomas, 2026-09-18): los pasos de EXCEDENTE vuelven al RECORRIDO.
@@ -7856,6 +7873,7 @@ async function showPickingList(tanda, legajo, opts) {
         }
         _pk.idx = Math.min(saved.idx || 0, items.length);
         _pk.mode = "item";
+        if (saved.excPos && typeof saved.excPos === "object") _pk.excPos = saved.excPos;   // v31.80
         // v6.11: re-aplicar "retirar de góndola forzado" sobre los ítems frescos
         // (deja de saltear + saca el paso de excedente de ese artículo).
         if (saved.forced && typeof saved.forced === "object") {
@@ -8027,9 +8045,11 @@ async function pkFetchExcedente(arts) {
         const k = String(mv.clave).toUpperCase();
         if (!out[k]) return;
         const u = pkUbicLimpia(mv.sector);
-        if (!u || out[k].ubics.indexOf(u) >= 0) return;
+        if (!u) return;
+        const pu = out[k].porUbic || (out[k].porUbic = {});
+        pu[u] = (pu[u] || 0) + (Number(mv.cajas) || 0);                 // v31.80: la misma posición con otra grafía suma
+        if (out[k].ubics.indexOf(u) >= 0) return;
         out[k].ubics.push(u);                                           // en orden de recorrido (orden asc)
-        (out[k].porUbic || (out[k].porUbic = {}))[u] = Number(mv.cajas) || 0;
       });
     }
     return out;
@@ -8278,6 +8298,7 @@ function pkRender() {
   // v21.73 (Marianela 23/09): 55215/55219/55289 van en UNIDADES en todo el sistema (uxb 1).
   const _pkUni = pkEsUnidad(rec);
   const _pkUd = _pkUni ? "unidades" : "cajas";
+  if (_pk.mode === "excPos") { body.innerHTML = pkExcPosCardHtml(it); return; }   // v31.80
   if (_pk.mode === "gond") { body.innerHTML = pkGondCardHtml(it); setTimeout(function () { const i = document.getElementById("pkGondInp"); if (i) i.focus(); }, 40); return; }
   if (_pk.mode === "fInput") {
     body.innerHTML = `<div class="pk-flow">${nav}
@@ -8491,6 +8512,7 @@ function pkOk() {
   pkSendDetail(rec, it.esp, it.esp);
   try { pkmConf("ok", it, it.esp); } catch (_e) {}
   if (pkGondPreguntar(it)) { _pk.mode = "gond"; pkRender(); return; }   // v29.69
+  if (pkExcPosPreguntar(it, it.esp)) { _pk.mode = "excPos"; pkRender(); return; }   // v31.80
   pkAdvance();
 }
 /* Sin stock: no había NADA de este código → registra 0 y avanza (faltante completo,
@@ -8615,6 +8637,7 @@ function pkConfirmF() {
   pkSendDetail(rec, it.esp, real);
   try { pkmConf("faltan", it, real); } catch (_e) {}
   if (real > 0 && pkGondPreguntar(it)) { _pk.mode = "gond"; pkRender(); return; }   // v29.69: si no agarró nada, no hay góndola que informar
+  if (pkExcPosPreguntar(it, real)) { _pk.mode = "excPos"; pkRender(); return; }   // v31.80
   pkAdvance();
 }
 /* ═══ v29.69 (Luis, 13/10): EL CÓDIGO QUE NO TIENE GÓNDOLA EN EL MAPA ═══════════════════════
@@ -8685,6 +8708,111 @@ function pkEmitGondola(art, sector) {
     if (typeof trySendOneReport === "function") trySendOneReport(payload).then(function (r) { if (r && r.ok) removeFromQueue(payload.id); }).catch(function () {});
     try { updatePendingIndicator(); } catch (_e) {}
   } catch (_e) { /* best-effort: nunca rompe el picking */ }
+}
+
+/* ═══ v31.80 (Luis, 16/10): ¿DE QUÉ POSICIÓN SACASTE EL EXCEDENTE? ════════════════════════════
+   "cuando un operario tiene que pickear un articulo que esta en excedente y esta en mas de una
+    gondola en excedente, que le pregunte al operario de donde lo sacó. esto es con el fin de
+    identificar cuando las gondolas se vacian para liberarlas en el mapa"
+   La salida de excedente del picking iba SIN posición y gv_excedente_posicion la descontaba de
+   la de menor orden: si el operario sacaba de otra, el Mapa seguía mostrando ocupada la que vació.
+   Ahora, si el excedente del artículo está en 2+ posiciones, después de confirmar el paso se
+   pregunta de cuál salió. La respuesta viaja en el 7º campo del PKC ("P18:3;P22:2"); el trigger
+   trg_gv_exc_pick_pos la guarda y la vista reparte la salida entre esas posiciones.
+   Como la de góndola (v29.69): el PKC sale ANTES de preguntar (si el celular muere, lo pickeado
+   no se pierde) y se puede saltear (queda como antes: se descuenta de la primera del recorrido).
+   sql/gv_excedente_pick_pos_v3180.sql · tests/pk-excedente-posicion.cjs */
+function pkExcPosLista(it) {
+  if (!it || !it.isExc || it.manualExc || !it.excPorUbic) return [];
+  const pu = it.excPorUbic;
+  const orden = String(it.excUbic || "").split("·").map(function (x) { return x.trim(); }).filter(Boolean);
+  Object.keys(pu).forEach(function (u) { if (orden.indexOf(u) < 0) orden.push(u); });
+  return orden.filter(function (u) { return pu[u] > 0; }).map(function (u) { return { u: u, cajas: Number(pu[u]) || 0 }; });
+}
+function pkExcPosPreguntar(it, real) {
+  if (!_pk || !(Number(real) > 0)) return false;
+  return pkExcPosLista(it).length >= 2;
+}
+function pkExcPosCampo(art) {
+  if (!_pk || !_pk.excPos) return "";
+  const d = _pk.excPos[String(art).toUpperCase()];
+  if (!d) return "";
+  return Object.keys(d).filter(function (u) { return d[u] > 0; })
+    .map(function (u) { return String(u).replace(/[^A-Z0-9Ñ]/gi, "") + ":" + pkFmt(d[u]); }).join(";");
+}
+function pkExcPosCardHtml(it) {
+  const real = Number(_pk.results[it.key]) || 0;
+  const lista = pkExcPosLista(it);
+  const varias = !!_pk.excPosVarias;
+  let h = '<div class="pk-flow">' +
+    '<div class="pk-gond-h">📦 ¿De qué posición sacaste el ' + escapeHtml(_padCod(codBase(it.art))) + '?</div>' +
+    '<div class="pk-gond-s">El excedente está en ' + lista.length + ' posiciones. Tocá de dónde sacaste las <b>' + pkFmt(real) + '</b> ' +
+      (pkEsUnidad(it.art) ? 'unidades' : 'cajas') + ': así el Mapa libera la que quedó vacía. Lo pickeado ya quedó registrado.</div>';
+  if (!varias) {
+    h += '<div class="pk-excpos-grid">' + lista.map(function (x, i) {
+      return '<button class="pk-btn pk-ok pk-excpos-btn" onclick="pkExcPosTodo(' + i + ')"><span class="pk-excpos-u">' + escapeHtml(x.u) + '</span>' +
+             '<span class="pk-excpos-c">había ' + pkFmt(x.cajas) + '</span></button>';
+    }).join("") + '</div>' +
+    '<button class="pk-btn pk-cancel" onclick="pkExcPosVarias(true)">Saqué de más de una</button>';
+  } else {
+    h += '<div class="pk-excpos-tab">' + lista.map(function (x, i) {
+      return '<label class="pk-excpos-fila"><span class="pk-excpos-u">' + escapeHtml(x.u) + '</span><span class="pk-excpos-c">había ' + pkFmt(x.cajas) + '</span>' +
+             '<input id="pkExcPos' + i + '" class="pk-excpos-inp" type="number" inputmode="numeric" min="0" value="" oninput="pkExcPosSuma()"></label>';
+    }).join("") + '</div>' +
+    '<div id="pkExcPosSuma" class="pk-excpos-suma">Anotadas 0 de ' + pkFmt(real) + '</div>' +
+    '<button class="pk-btn pk-ok" onclick="pkExcPosVariasOk()">✓ Anotar</button>' +
+    '<button class="pk-btn pk-cancel" onclick="pkExcPosVarias(false)">Volver</button>';
+  }
+  return h + '<button class="pk-btn pk-cancel" onclick="pkExcPosSkip()">No sé / seguir sin anotar</button></div>';
+}
+function pkExcPosGuardar(d) {
+  const it = _pk.items[_pk.idx];
+  if (!_pk.excPos) _pk.excPos = {};
+  _pk.excPos[String(it.art).toUpperCase()] = d;
+  try { pkSendDetail(it.art, it.esp, _pk.results[it.key]); } catch (_e) {}   // re-manda el PKC con el 7º campo (upsert)
+  pkExcPosSkip();
+}
+function pkExcPosTodo(i) {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const it = _pk.items[_pk.idx];
+  const x = pkExcPosLista(it)[i]; if (!x) return;
+  const d = {}; d[x.u] = Number(_pk.results[it.key]) || 0;
+  pkExcPosGuardar(d);
+}
+function pkExcPosVarias(on) { if (_pk) { _pk.excPosVarias = !!on; pkRender(); } }
+function pkExcPosLeer() {
+  const it = _pk.items[_pk.idx];
+  const d = {}; let tot = 0;
+  pkExcPosLista(it).forEach(function (x, i) {
+    const el = document.getElementById("pkExcPos" + i);
+    let v = el ? parseFloat(String(el.value).replace(",", ".")) : 0;
+    if (isNaN(v) || v < 0) v = 0;
+    if (v > 0) { d[x.u] = v; tot += v; }
+  });
+  return { d: d, tot: tot, real: Number(_pk.results[it.key]) || 0 };
+}
+function pkExcPosSuma() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const r = pkExcPosLeer(), el = document.getElementById("pkExcPosSuma");
+  if (!el) return;
+  el.textContent = "Anotadas " + pkFmt(r.tot) + " de " + pkFmt(r.real);
+  el.className = "pk-excpos-suma" + (Math.abs(r.tot - r.real) < 0.001 ? " ok" : "");
+}
+function pkExcPosVariasOk() {
+  if (!_pk || _pk.idx >= _pk.items.length) return;
+  const r = pkExcPosLeer();
+  if (Math.abs(r.tot - r.real) >= 0.001) {
+    const el = document.getElementById("pkExcPosSuma");
+    if (el) { el.textContent = "Tienen que sumar " + pkFmt(r.real) + " (anotaste " + pkFmt(r.tot) + ")"; el.className = "pk-excpos-suma bad"; }
+    return;
+  }
+  pkExcPosGuardar(r.d);
+}
+function pkExcPosSkip() {
+  if (!_pk) return;
+  _pk.excPosVarias = false;
+  _pk.mode = "item";
+  pkAdvance();
 }
 function pkClose() { _pk = null; closeTandaModal(); }
 
@@ -8987,13 +9115,16 @@ function pkSendDetail(art, esp, real) {
   // siempre. Como el texto es posicional, si hay empresa pero no hay depósito el 5º
   // campo va vacío para no correr la empresa al lugar del excedente.
   const emp   = tot.emp || "";
-  const dep   = _pk.excOk ? ("|" + tot.exc) : (emp ? "|" : "");
-  const empF  = emp ? ("|" + emp) : "";
+  // v31.80 — 7º campo: de qué posición(es) del excedente salió ("P18:3;P22:2"). Sólo cuando el
+  // operario lo contestó; los campos 5 y 6 van aunque estén vacíos para no correr la posición.
+  const posF  = pkExcPosCampo(art);
+  const dep   = _pk.excOk ? ("|" + tot.exc) : ((emp || posF) ? "|" : "");
+  const empF  = (emp || posF) ? ("|" + emp) : "";
   const payload = {
     legajo: _pk.legajo,
     opcion: "PKC",
     descripcion: "Picking artículo",
-    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep + empF).toUpperCase(),
+    texto: (_pk.tanda + "|" + art + "|" + espT + "|" + realT + dep + empF + (posF ? "|" + posF : "")).toUpperCase(),
     ts: nowMs,
     // client_id determinístico → reenviar/corregir el mismo artículo hace UPSERT
     // (merge-duplicates) en vez de duplicar. Por eso se puede ir y volver.
@@ -15688,8 +15819,8 @@ async function cpLoadFaltantes() {
 function pkLiqPedidoDe(cod, np) {
   try {
     const c = codBase(String(cod || "")).toUpperCase();
-    for (const ped of Object.keys(PK_LIQUIDAR_EN)) {
-      const v = PK_LIQUIDAR_EN[ped];
+    for (const ped of Object.keys(PK_LIQ_PARES)) {
+      const v = PK_LIQ_PARES[ped];
       if (v.cod === c && (!np || empresaDeNp(np) === v.emp)) return ped;
     }
   } catch (_e) {}
@@ -19129,6 +19260,11 @@ function _tvClaveError(e) {
   return "Clave incorrecta. Mirá la TV (cambia cada minuto).";
 }
 let __tvClaveOkAt = 0;
+/* v31.78 (Luis, 16/10): el sáb 17/10 a las 00:01 el ingreso con el código de la TV deja de aparecer y de andar;
+   en su lugar, «Login Operario» lleva a RP3.0. Se re-chequea cada 30 s para que la pantalla abierta cambie sola.
+   window.GV_CLAVE_TV_CORTE_TS sólo lo pisan los tests. */
+const RP3_URL = "https://rp.loeke-erp.com/";
+window.gvIrRp3 = function () { location.href = RP3_URL; };
 const TV_CLAVE_VALIDA_MS = 10 * 60 * 1000;   // una vez validada, 10 min para elegir nombre/legajo
 function _tvClaveVigente() { return __tvClaveOkAt && (Date.now() - __tvClaveOkAt) < TV_CLAVE_VALIDA_MS; }
 function _tvPaso(cual) {
