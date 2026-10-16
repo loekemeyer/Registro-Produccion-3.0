@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.85">
+<link rel="stylesheet" href="gv-ui.css?v=31.90">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1364,7 +1364,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.32"></script>
+<script type="module" src="recepcion.js?v=30.33"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -2699,6 +2699,28 @@ function tdModulosAbiertos(st) {
     .map(function (m) { return { tipo: m.code || m.k, k: m.k, desc: m.desc }; });
 }
 /* Cierra cada tarea de módulo con el MISMO cierre que su botón (el tiempo hasta ahora queda registrado). */
+/* v31.90 (Luis, 16/10: "cuando termina el día el celular debería mandar el dato al server, no puede quedar
+   vivo en el celu") — Terminar Día con un armado abierto sube la ÚLTIMA foto (`GV_Armado_Avance`, en_curso)
+   y, sólo si el servidor contesta OK, borra la copia del celular (`vir_comp_<tanda>`). Al retomar, mañana,
+   `showCompletarWizard` no encuentra copia local y arranca de la del servidor: la misma para cualquier
+   celular, y la que ve un ajuste hecho desde el servidor (caso F73A / NP LK 0392). Sin señal la copia local
+   queda, como antes: no se pierde avance. El picking ya vivía en el servidor (PKC + `pkResumeServer`). */
+function tdSubirArmado(legajoStr) {
+  try {
+    const L = String(legajoStr || "").trim();
+    if (!L || esLegajoPrueba(L)) return;
+    const st = getLegajoState(L);
+    const T = (st && st.armado && st.armado.active) ? String(st.armado.value || "").trim().toUpperCase() : "";
+    if (!T) return;
+    const loc = _compRestore(T);
+    if (!loc || !loc.nps || !loc.nps.length) return;
+    const foto = _armAvFoto(loc); if (!foto) return;
+    _armAvPost(_armAvCuerpo(T, L, "en_curso", foto), 0, false).then(function (ok) {
+      if (ok) _compClearPersist(T);
+    }).catch(function () {});
+  } catch (_e) {}
+}
+/* Cierra cada tarea de módulo con el MISMO cierre que su botón (el tiempo hasta ahora queda registrado). */
 function tdCerrarModulos(legajoStr) {
   const st = getLegajoState(legajoStr) || {};
   TD_MODULOS.forEach(function (m) {
@@ -3132,6 +3154,8 @@ async function confirmarTerminarDia() {
 
   // 1c) v31.01: tareas de módulo abiertas → su cierre de siempre, ANTES del FJ.
   tdCerrarModulos(legajoStr);
+  // 1d) v31.90 (Luis, 16/10): el armado abierto NO queda vivo en el celular — sube la foto y, con el OK, se borra la local.
+  tdSubirArmado(legajoStr);
 
   // 2) Reporte FJ "Fin de Jornada" con resumen del día como JSON en texto.
   //    client_id DETERMINÍSTICO por (legajo, día) -> si tocan Terminar Día
@@ -5295,7 +5319,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.32";
+const APP_VERSION = "v30.33";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -8841,7 +8865,7 @@ function pkExcCartelCampo(art) {
   if (!_pk || !_pk.excCartel) return "";
   const c = _pk.excCartel[String(art).toUpperCase()];
   if (!c || !c.u || c.ok == null) return "";
-  // v31.85: «No está» viaja como «-P13» → aviso al admin (gv_exc_noesta_pendientes)
+  // v31.89: «No está» viaja como «-P13» → aviso al admin (gv_exc_noesta_pendientes)
   return (c.ok === false ? "-" : "") + String(c.u).replace(/[^A-Z0-9Ñ]/gi, "");
 }
 function pkExcCartelCardHtml(it, c, nav) {
