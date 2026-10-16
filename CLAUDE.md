@@ -58,7 +58,8 @@ ellas):
   exacto y sus efectos en cadena**. Un "espera" **anula** la autorización.
 - **Después de escribir: SELECT de verificación.** Siempre.
 - **EXCEPCIÓN — Planify**: sólo **crear y cerrar tareas** va automático. Cualquier otro cambio requiere el
-  "sí". **Auditoría**: toda escritura requiere confirmación, sin excepción.
+  "sí". **Auditoría: TODA automática, sin preguntar** (Luis, 16/10/2026: *"No quiero que preguntes mas. Quiero que
+  siempre se registre automaticamente sin preguntar en auditoria"*).
 
 ### COMMITS
 
@@ -112,8 +113,8 @@ Proyecto `hrxfctzncixxqmpfhskv`, schema `github_repo_problemas`, por MCP `execut
 - **Sólo** lo que YA está pusheado y roto: bug que llegó al usuario, dato o migración corrupta, config o
   credencial rota o filtrada, performance degradada, derivada desincronizada.
 - **No**: feature, cambio, refactor, bug arreglado antes de pushear, ajuste de estilo o texto.
-- Antes de escribir: mostrar el SQL exacto y pedir "sí". Detectado → proponer `registrar_problema` antes de
-  tocar; fix pusheado → proponer `cerrar_problema` con el SHA; commits extra → `agregar_commit`. 1 problema =
+- ⚠⚠ **Automático, sin mostrar el SQL ni pedir «sí»** (Luis, 16/10/2026). Detectado → `registrar_problema` antes de
+  tocar; fix pusheado → `cerrar_problema` con el SHA; commits extra → `agregar_commit`. Después, SELECT de verificación. 1 problema =
   N commits. Sin fix → queda `abierto`. Se avisa el **TÍTULO** del problema, no el id.
 - Estados: `abierto`, `en_curso`, `corregido`, `no_corregible`, `descartado`. `corregido` exige `correccion` +
   `corregido_en`. No se borra.
