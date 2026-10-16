@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.90">
+<link rel="stylesheet" href="gv-ui.css?v=32.00">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -803,6 +803,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
 .pk-excpos-suma { text-align:center; font-size:14px; font-weight:800; color:#b45309; margin-bottom:8px; }
 .pk-excpos-suma.ok { color:#15803d; }
 .pk-excpos-suma.bad { color:#b91c1c; }
+.pk-pos-sel { letter-spacing:0; }
 .pk-conteo{ width:100%; box-sizing:border-box; background:#fffbeb; border:1.5px solid #fcd34d; border-radius:13px; padding:12px 13px; text-align:left; }
 .pk-conteo.done{ background:#f0fdf4; border-color:#86efac; color:#166534; font-weight:700; text-align:center; }
 .pk-conteo-h{ font-size:14.5px; font-weight:800; color:#92400e; }
@@ -1364,7 +1365,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.33"></script>
+<script type="module" src="recepcion.js?v=30.34"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5319,7 +5320,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.33";
+const APP_VERSION = "v30.34";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -8862,11 +8863,42 @@ function pkExcSinPos(it) {
   return !String(it.excUbic || "").split("·").some(function (x) { return !!pkUbicLimpia(x); });
 }
 function pkExcCartelCampo(art) {
-  if (!_pk || !_pk.excCartel) return "";
-  const c = _pk.excCartel[String(art).toUpperCase()];
-  if (!c || !c.u || c.ok == null) return "";
+  if (!_pk) return "";
+  const limpio = function (u) { return String(u).replace(/[^A-Z0-9Ñ]/gi, ""); };
+  const partes = [];
+  const c = _pk.excCartel && _pk.excCartel[String(art).toUpperCase()];
   // v31.89: «No está» viaja como «-P13» → aviso al admin (gv_exc_noesta_pendientes)
-  return (c.ok === false ? "-" : "") + String(c.u).replace(/[^A-Z0-9Ñ]/gi, "");
+  if (c && c.u && c.ok != null) partes.push((c.ok === false ? "-" : "") + limpio(c.u));
+  // v32.00 (Luis, D5): faltó en el paso de excedente → «-P21» por cada posición donde el sistema decía que había
+  pkExcFaltaPos(art).forEach(function (u) { const x = "-" + limpio(u); if (partes.indexOf(x) < 0) partes.push(x); });
+  return partes.join(";");
+}
+/* v32.00 (Luis, D5): «Sin stock» o «Faltan» en un paso de excedente CON posición registrada → cada posición del
+   paso va al admin como «Excedente que no estaba» (✓ vacía esa posición). Si vuelve a confirmar completo, se anula. */
+function pkExcFaltaPos(art) {
+  if (!_pk) return [];
+  const A = String(art).toUpperCase();
+  const x = (_pk.items || []).find(function (i) { return i.isExc && !i.manualExc && String(i.art).toUpperCase() === A; });
+  if (!x) return [];
+  const r = _pk.results ? _pk.results[x.key] : null;
+  if (r == null || !(Number(r) < Number(x.esp))) return [];
+  let l = pkExcPosLista(x).map(function (p) { return p.u; });
+  if (!l.length) l = String(x.excUbic || "").split("\u00b7").map(function (u) { return pkUbicLimpia(u); }).filter(Boolean);
+  return l;
+}
+/* v32.00 (Luis, D6): la posición del excedente se ELIGE de la lista de la zona P del Mapa (GV_Lugar), no se tipea.
+   Sin la lista (no cargó GV_Lugar) devuelve "" y el que llama deja el input de texto de antes. */
+function gvExcPosOpciones() {
+  const l = (_gvLugares && _gvLugares.lista) || [];
+  return l.filter(function (sec) { return /^P[0-9]{1,3}$/.test(sec); });
+}
+function gvExcPosSelect(attrs, val) {
+  const ops = gvExcPosOpciones();
+  if (!ops.length) return "";
+  const v = String(val || "").toUpperCase();
+  return '<select ' + attrs + '><option value="">— elegí —</option>' +
+    ops.map(function (sec) { return '<option value="' + escapeHtml(sec) + '"' + (sec === v ? ' selected' : '') + '>' + escapeHtml(sec) + '</option>'; }).join("") +
+    '</select>';
 }
 function pkExcCartelCardHtml(it, c, nav) {
   const cod = escapeHtml(_padCod(codBase(it.art)));
@@ -8874,8 +8906,9 @@ function pkExcCartelCardHtml(it, c, nav) {
     return '<div class="pk-flow">' + (nav || "") +
       '<div class="pk-gond-h">📦 ¿Dónde está el excedente del ' + cod + '?</div>' +
       '<div class="pk-gond-s">Hay <b>' + pkFmt(it.esp) + '</b> ' + (pkEsUnidad(it.art) ? 'unidades' : 'cajas') + ' para levantar del excedente, ' +
-        'pero no tiene posición registrada. Anotá la posición que dice el <b>cartel</b> (por ejemplo <b>P13</b>) y andá a buscarlo.</div>' +
-      '<div class="pk-gond-row"><input id="pkCartelInp" class="pk-gond-inp" type="text" inputmode="text" autocapitalize="characters" placeholder="P13" maxlength="6">' +
+        'pero no tiene posición registrada. Elegí la posición que dice el <b>cartel</b> y andá a buscarlo.</div>' +
+      '<div class="pk-gond-row">' + (gvExcPosSelect('id="pkCartelInp" class="pk-gond-inp pk-pos-sel"', "") ||
+        '<input id="pkCartelInp" class="pk-gond-inp" type="text" inputmode="text" autocapitalize="characters" placeholder="P13" maxlength="6">') +
         '<button class="pk-btn pk-ok pk-gond-btn" onclick="pkExcCartelAnotar()">✓ Anotar</button></div>' +
       '<div id="pkCartelErr" class="pk-excpos-suma bad" style="display:none"></div></div>';
   }
@@ -8894,7 +8927,7 @@ function pkExcCartelAnotar() {
   const u = pkUbicLimpia(String(inp ? inp.value : "").toUpperCase().replace(/[^A-Z0-9Ñ]/g, ""));
   if (!u) {
     const e = document.getElementById("pkCartelErr");
-    if (e) { e.textContent = "Escribí la posición como dice el cartel: letra y número (P13)."; e.style.display = ""; }
+    if (e) { e.textContent = "Elegí la posición que dice el cartel (P13)."; e.style.display = ""; }
     try { if (inp) inp.focus(); } catch (_e) {}
     return;
   }
@@ -13551,7 +13584,7 @@ let _mgCeldas = null;   // v31.49: cod → [celdas de góndola], para el código
 async function showMGModal(legajo, _resume) {
   if (!document.getElementById("mgCss")) {
     const s = document.createElement("style"); s.id = "mgCss";
-    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}.mg-gfill{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:8px;}.mg-gfill.lo{background:#fee2e2;color:#b91c1c;}.mg-gfill.mid{background:#fef3c7;color:#92400e;}.mg-gfill.hi{background:#dcfce7;color:#15803d;}.mg-gfill.unk{background:#f1f5f9;color:#64748b;}.mg-gfill.loc{display:block;background:#e0f2fe;color:#075985;margin-top:5px;}.mg-gfill.loc b{color:#0c4a6e;}.mg-prio{display:inline-block;margin-right:6px;font-size:10px;font-weight:900;color:#fff;background:#b91c1c;border-radius:6px;padding:1px 6px;vertical-align:middle;}.mg-mchint-row{margin-top:-2px;}.mg-mchint{font-size:11.5px;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:3px 8px;display:inline-block;}.mg-emp{display:inline-block;margin-right:6px;font-size:10.5px;font-weight:900;color:#fff;border-radius:6px;padding:2px 7px;vertical-align:middle;letter-spacing:.04em;}.mg-emp.lk{background:#1d4ed8;}.mg-emp.ch{background:#b45309;}.mg-ubic-inp.bad{border-color:#dc2626;background:#fef2f2;color:#b91c1c;}.mg-gubic{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:9px 11px;}.mg-gubic-l{font-size:13px;font-weight:800;color:#92400e;flex:1 1 150px;}.mg-gubic-n{flex-basis:100%;font-size:11.5px;color:#b45309;}.mg-rowact{display:flex;gap:8px;}.mg-ok1{flex:1.4;padding:11px 8px;border:none;border-radius:10px;background:#16a34a;color:#fff;font-size:14.5px;font-weight:800;cursor:pointer;}.mg-reg1{flex:1;padding:11px 8px;border:1.5px solid #94a3b8;border-radius:10px;background:#fff;color:#334155;font-size:13px;font-weight:800;cursor:pointer;}.mg-term{width:100%;margin-top:8px;padding:12px;border:none;border-radius:12px;background:#0f172a;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}.mg-term span{font-weight:600;opacity:.8;font-size:13px;}";
+    s.textContent = "#mgModal{display:none;position:fixed;inset:0;z-index:1290;background:rgba(2,6,23,.74);overflow:auto;padding:12px;}#mgModal.show{display:block;}.mg-card{background:#f8fafc;max-width:460px;margin:0 auto;border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5);}.mg-head{display:flex;align-items:center;justify-content:space-between;padding:13px 15px;background:linear-gradient(90deg,#16a34a,#15803d);color:#fff;}.mg-title{font-size:18px;font-weight:800;}.mg-close{background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-weight:800;cursor:pointer;width:auto;}.mg-body{padding:13px 14px;}.mg-loading,.mg-empty{padding:26px;text-align:center;color:#64748b;font-size:15px;}.mg-hint{font-size:12.5px;color:#64748b;margin-bottom:10px;}.mg-row{display:flex;flex-direction:column;gap:9px;border:1px solid #e2e8f0;border-radius:13px;padding:11px 12px;margin-bottom:9px;background:#fff;}.mg-headline{display:flex;align-items:baseline;justify-content:space-between;gap:8px;}.mg-agu{font-size:11.5px;color:#64748b;white-space:nowrap;}.mg-agu b{color:#0f172a;font-size:14px;}.mg-box{font-size:19px;line-height:1;}.mg-info{flex:1 1 110px;min-width:0;}.mg-def{display:flex;gap:10px;align-items:stretch;}.mg-gond-box{flex:1.7;display:flex;flex-direction:column;align-items:center;gap:8px;background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:11px 8px;}.mg-exc-q{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:8px;background:#fffbeb;border:1.5px dashed #f59e0b;border-radius:12px;padding:11px 8px;color:#92400e;font-weight:800;font-size:12.5px;text-align:center;cursor:pointer;line-height:1.15;}.mg-exc-q-b{height:50px;display:flex;align-items:center;justify-content:center;}.mg-exc-q .mg-box{font-size:30px;}.mg-exp{display:flex;gap:10px;align-items:stretch;}.mg-col{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;border-radius:12px;padding:9px 6px;}.mg-col.g{background:#f0fdf4;border:1px solid #bbf7d0;}.mg-col.e{background:#fff;border:1px solid #e2e8f0;}.mg-exc-hdr{background:none;border:none;color:#b45309;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;cursor:pointer;padding:0;width:auto;}.mg-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:2px;min-height:22px;}.mg-foot .mg-faltan{font-size:13px;white-space:nowrap;}.mg-foot .mg-faltan.ok{color:#15803d;}.mg-stp.big .mg-inp{width:62px;height:50px;font-size:23px;}.mg-stp.big .mg-sb{width:44px;height:50px;font-size:25px;}.mg-cod{font-size:16px;font-weight:800;font-family:Consolas,Menlo,monospace;}.mg-desc{font-size:12px;color:#475569;}.mg-faltan{font-size:11.5px;font-weight:800;color:#b45309;margin-top:1px;}.mg-faltan.ok{color:#15803d;}.mg-stp{display:flex;align-items:center;gap:5px;}.mg-sb{display:flex;align-items:center;justify-content:center;line-height:1;padding:0;margin:0;width:36px;height:40px;border:none;border-radius:9px;font-size:22px;font-weight:800;cursor:pointer;background:#e2e8f0;color:#475569;}.mg-inp{width:48px;height:40px;box-sizing:border-box;margin:0;text-align:center;font-size:18px;font-weight:800;border:2px solid #cbd5e1;border-radius:9px;padding:0;-moz-appearance:textfield;}.mg-inp::-webkit-outer-spin-button,.mg-inp::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}.mg-fin{width:100%;margin-top:10px;padding:14px;border:none;border-radius:12px;background:#16a34a;color:#fff;font-size:17px;font-weight:800;cursor:pointer;}.mg-fin:disabled{background:#cbd5e1;color:#64748b;cursor:not-allowed;}.mg-lbl{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#64748b;}.mg-lbl.gond{color:#15803d;}.mg-lbl.exc{color:#b45309;}.mg-search{width:100%;height:44px;border:2px solid #cbd5e1;border-radius:11px;padding:0 13px;font-size:16px;font-weight:700;margin-bottom:10px;box-sizing:border-box;}.mg-addrow{background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:11px 12px;margin-bottom:10px;font-size:13px;color:#92400e;}.mg-add-btn{margin-left:6px;background:#16a34a;color:#fff;border:none;border-radius:9px;padding:8px 13px;font-weight:800;cursor:pointer;width:auto;}.mg-add-note{font-size:11.5px;color:#b45309;margin-top:7px;}.mg-disp-x{color:#b45309;font-weight:800;}.mg-ubic{flex-basis:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:9px;padding-top:9px;border-top:1px dashed #fcd34d;font-size:12.5px;color:#92400e;}.mg-ubic-lbl{font-weight:800;}.mg-ubic-lbl small{font-weight:700;opacity:.8;}.mg-ubic-inp{width:84px;height:40px;border:2px solid #f59e0b;border-radius:9px;padding:0;font-size:20px;font-weight:800;text-align:center;letter-spacing:4px;text-transform:uppercase;box-sizing:border-box;}.mg-gfill{display:inline-block;margin-top:4px;font-size:11px;font-weight:800;padding:1px 8px;border-radius:8px;}.mg-gfill.lo{background:#fee2e2;color:#b91c1c;}.mg-gfill.mid{background:#fef3c7;color:#92400e;}.mg-gfill.hi{background:#dcfce7;color:#15803d;}.mg-gfill.unk{background:#f1f5f9;color:#64748b;}.mg-gfill.loc{display:block;background:#e0f2fe;color:#075985;margin-top:5px;}.mg-gfill.loc b{color:#0c4a6e;}.mg-prio{display:inline-block;margin-right:6px;font-size:10px;font-weight:900;color:#fff;background:#b91c1c;border-radius:6px;padding:1px 6px;vertical-align:middle;}.mg-mchint-row{margin-top:-2px;}.mg-mchint{font-size:11.5px;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:3px 8px;display:inline-block;}.mg-emp{display:inline-block;margin-right:6px;font-size:10.5px;font-weight:900;color:#fff;border-radius:6px;padding:2px 7px;vertical-align:middle;letter-spacing:.04em;}.mg-emp.lk{background:#1d4ed8;}.mg-emp.ch{background:#b45309;}.mg-ubic-inp.bad{border-color:#dc2626;background:#fef2f2;color:#b91c1c;}.mg-ubic-sel{width:104px;letter-spacing:0;font-size:18px;}.mg-gubic{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fffbeb;border:1px solid #fcd34d;border-radius:11px;padding:9px 11px;}.mg-gubic-l{font-size:13px;font-weight:800;color:#92400e;flex:1 1 150px;}.mg-gubic-n{flex-basis:100%;font-size:11.5px;color:#b45309;}.mg-rowact{display:flex;gap:8px;}.mg-ok1{flex:1.4;padding:11px 8px;border:none;border-radius:10px;background:#16a34a;color:#fff;font-size:14.5px;font-weight:800;cursor:pointer;}.mg-reg1{flex:1;padding:11px 8px;border:1.5px solid #94a3b8;border-radius:10px;background:#fff;color:#334155;font-size:13px;font-weight:800;cursor:pointer;}.mg-term{width:100%;margin-top:8px;padding:12px;border:none;border-radius:12px;background:#0f172a;color:#fff;font-size:15px;font-weight:800;cursor:pointer;}.mg-term span{font-weight:600;opacity:.8;font-size:13px;}";
     document.head.appendChild(s);
   }
   let ov = document.getElementById("mgModal");
@@ -13718,7 +13751,9 @@ function mgRender() {
     // y el <datalist> le va sugiriendo lugares reales; si igual escribe algo que
     // no existe, el borde se pone rojo y mgConfirmar() no lo deja pasar.
     const _ubicOk = !_gvLugares || !_gvLugares.set.size || !String(it.ubic || "").trim() || _gvLugares.set.has(gvNormSector(it.ubic));
-    const ubicInp = '<input class="mg-ubic-inp' + (_ubicOk ? '' : ' bad') + '" type="text" list="mgLugaresDL" maxlength="7" autocomplete="off" enterkeyhint="done" placeholder="A12" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-ZÑ0-9]/g,\'\').slice(0,7);mgSetUbic(' + i + ',this.value)">';
+    // v32.00 (Luis, D6): con la lista del Mapa, la posición se ELIGE de la zona P (lista desplegable); sin lista, el input de antes.
+    const ubicInp = gvExcPosSelect('class="mg-ubic-inp mg-ubic-sel' + ((_ubicOk && String(it.ubic || "").trim()) ? '' : ' bad') + '" onchange="mgSetUbic(' + i + ',this.value);this.classList.toggle(\'bad\',!this.value)"', gvNormSector(it.ubic || "")) ||
+      '<input class="mg-ubic-inp' + (_ubicOk ? '' : ' bad') + '" type="text" list="mgLugaresDL" maxlength="7" autocomplete="off" enterkeyhint="done" placeholder="A12" value="' + escapeHtml(it.ubic || "") + '" oninput="this.value=this.value.toUpperCase().replace(/[^A-ZÑ0-9]/g,\'\').slice(0,7);mgSetUbic(' + i + ',this.value)">';
     const faltTxt = it.manual ? '' : '<span class="mg-faltan' + (faltan <= 0 ? ' ok' : '') + '">' + (faltan <= 0 ? '✓ Listo' : 'Faltan ' + faltan) + '</span>';
     // v12.14 (idea 4926) — máximo de MCs que entran en góndola sin rebalsar (informativo,
     // NO limita el input — el tope real sigue siendo lo disponible en "a guardar").
@@ -13729,7 +13764,7 @@ function mgRender() {
       (it.excOn
         ? '<div class="mg-exp"><div class="mg-col g"><div class="mg-lbl gond">Góndola</div>' + gondStp(false) + '</div>' +
             '<div class="mg-col e"><button class="mg-exc-hdr" onclick="mgToggleExc(' + i + ')">☑ Excedente</button>' + excStp + '</div></div>' +
-          '<div class="mg-foot">' + faltTxt + '<span class="mg-ubic">📍 <span class="mg-ubic-lbl">Ubicación</span> ' + ubicInp + '</span></div>'
+          '<div class="mg-foot">' + faltTxt + '<span class="mg-ubic">📍 <span class="mg-ubic-lbl">Posición <small>(obligatoria)</small></span> ' + ubicInp + '</span></div>'
         : '<div class="mg-def"><div class="mg-gond-box"><div class="mg-lbl gond">Góndola</div>' + gondStp(true) + '</div>' +
             '<button class="mg-exc-q" onclick="mgToggleExc(' + i + ')"><span class="mg-exc-q-l">¿Hay Excedente?</span><span class="mg-exc-q-b"><span class="mg-box">◻</span></span></button></div>' +
           '<div class="mg-foot">' + faltTxt + '</div>') +

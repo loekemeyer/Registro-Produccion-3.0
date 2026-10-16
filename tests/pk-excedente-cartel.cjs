@@ -51,7 +51,7 @@ const APP = process.env.PK_APP || path.join(__dirname, "..", "virgilio", "index.
     out.sinSaltear = !/No s.|sin anotar/i.test(txt());
     // (b)
     document.getElementById("pkCartelInp").value = "cartel"; pkExcCartelAnotar();
-    out.malEscrita = !!document.getElementById("pkCartelInp") && /letra y n.mero/.test(txt());
+    out.malEscrita = !!document.getElementById("pkCartelInp") && /Eleg. la posici/.test(txt());
     // (c)
     document.getElementById("pkCartelInp").value = "p13"; pkExcCartelAnotar();
     out.llega = /Est. el excedente en P13/.test(txt()) && /No est/.test(txt()) && /S., est/.test(txt());
