@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="favicon-32.png">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <!-- GV-UI: el sistema de diseño de la app (tokens + clases). docs/GV-UI.md -->
-<link rel="stylesheet" href="gv-ui.css?v=31.31">
+<link rel="stylesheet" href="gv-ui.css?v=31.33">
 
 <style>
 body { font-family: Arial, sans-serif; margin: 0; padding: 12px; overflow-x: hidden; }
@@ -1353,7 +1353,7 @@ button.pk-frenar small{ display:block; font-size:12px; font-weight:700; opacity:
      window.supabase ya existe cuando recepcion.js arranca. Es el build UMD, el unico
      autocontenido (dist/index.mjs usa imports "bare" y necesitaria un bundler). -->
 <script src="vendor/supabase.umd.js"></script>
-<script type="module" src="recepcion.js?v=30.21"></script>
+<script type="module" src="recepcion.js?v=30.22"></script>
 <!-- Modal: historial de días anteriores (oculto por defecto) -->
 <div id="histModal" onclick="if(event.target.id==='histModal') closeHistoryModal()">
   <div class="hist-modal-card">
@@ -5281,7 +5281,7 @@ async function flushQueue() {
   }
 }
 
-const APP_VERSION = "v30.21";
+const APP_VERSION = "v30.22";
 
 /* v14.51 — Sello de app en cada evento de operario (columna gv_app de
    Registros_Produccion_Virgilio). La tabla es COMPARTIDA con Producción
@@ -17385,14 +17385,14 @@ async function fetchSinSalidaMap(sinceISO) {
    salían en RR con Cod Cliente y Razón Social vacíos. La nueva las completa desde PPP_Web_Programacion. */
 async function fetchCRData() {
   const H = { "apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY };
-  const res = await fetch(SUPABASE_URL + "/rest/v1/gv_vista_control_remitos?select=np,tanda,first_load,lios,clase,cajas,cod_cliente,rs,remito", {
+  const res = await fetch(SUPABASE_URL + "/rest/v1/gv_vista_control_remitos?select=np,tanda,first_load,lios,clase,cajas,cod_cliente,rs,remito,fletero", {
     headers: H, cache: "no-store"
   });
   if (!res.ok) throw new Error("HTTP " + res.status);
   const rows = (await res.json()).filter(function (r) { return !gvEsTandaPrueba(r.tanda); });   // v21.63
   return rows.map(r => ({
     np: r.np, tanda: r.tanda || "—", cod: r.cod_cliente || "", rs: r.rs || "",
-    remito: (r.remito || "").trim(),
+    remito: (r.remito || "").trim(), fletero: (r.fletero || "").trim(),
     lios: r.lios != null ? r.lios : null,
     clase: r.clase || "", cajas: (r.cajas != null ? Number(r.cajas) : null),
     loadMs: r.first_load ? new Date(r.first_load).getTime() : 0,
@@ -17449,7 +17449,7 @@ function crRender() {
     const liosCls = (cell.txt === "—") ? " cr-lios0" : "";
     const liosTtl = cell.esCajas ? "cajas" : "líos";
     rows += `<tr class="cr-row${on ? " cc-on" : ""}${it.venc ? " cr-venc" : ""}" onclick="crToggle('${npc}')">` +
-            `<td class="cr-td-np" data-label="NP">${crNpCell(it)}${it.loadMs ? `<div class="cr-cc-date">🚚 ${crFmtCC(it.loadMs)}</div>` : ""}</td>` +
+            `<td class="cr-td-np" data-label="NP">${crNpCell(it)}${(it.loadMs || it.fletero) ? `<div class="cr-cc-date">🚚 ${it.fletero ? escapeHtml(it.fletero) + (it.loadMs ? " · " : "") : ""}${it.loadMs ? crFmtCC(it.loadMs) : ""}</div>` : ""}</td>` +
             `<td class="cr-td-cod" data-label="Cod Cliente">${it.cod ? escapeHtml(it.cod) : "—"}</td>` +
             `<td class="cr-td-rs" data-label="Razón Social">${escapeHtml(it.rs || "—")}${it.venc ? `<span class="cr-venc-tag">VENCIDO</span>` : ""}</td>` +
             `<td class="cr-td-lios${liosCls}" data-label="${cell.esCajas ? "Cajas" : "Líos"}" title="${liosTtl}">${escapeHtml(cell.txt)}</td>` +
